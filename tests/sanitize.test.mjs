@@ -53,3 +53,12 @@ test('sanitize: bash label refuses quoted env values, so no word inside them lea
   assert.equal(describeTool('Bash', { command: 'FOO=bar git push' }), 'git 실행');
   assert.equal(describeTool('Bash', { command: 'A=1 B=2 git push' }), 'git 실행');
 });
+test('sanitize: bash label refuses escaped or substituted env values', () => {
+  for (const command of ['TOKEN=a\\ hunter2 git', 'PW=$(cat a b) hunter2', 'K=`x y` hunter2', 'K=$HOME/x hunter2']) {
+    const text = describeTool('Bash', { command });
+    assert.equal(text, '명령 실행', command);
+    assert.ok(!text.includes('hunter2'));
+  }
+  assert.equal(describeTool('Bash', { command: 'A=1 B=2 git' }), 'git 실행');
+  assert.equal(describeTool('Bash', { command: 'FOO=bar git push' }), 'git 실행');
+});
