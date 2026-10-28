@@ -22,9 +22,11 @@ export function firstWord(command) {
     rest = rest.slice(m[0].length);
     const token = m[1] ?? m[2] ?? m[3];
     if (/^[A-Za-z_]\w*=/.test(token)) {
-      // Skip a leading NAME=value only when the whole value is plain and a blank (not a line break) follows. Any other
-      // value (quotes, escapes, $( ), ; | & < > ...) is not parsed, so no word after it can leak.
-      if (!/^[A-Za-z_]\w*=[\w./:@%+,-]*$/.test(token) || /[\r\n]/.test(m[4] ?? '')) return '';
+      // Skip a leading NAME=value only when it is unquoted, the whole value is plain and spaces or tabs follow (bash
+      // splits on nothing else: NBSP, \f or U+3000 keep the next text in the value, a line break starts a new command).
+      // Any other value (quotes, escapes, $( ), ; | & < > ...) or a quoted 'A=1' (the command word, not an assignment)
+      // is not parsed, so no word after it can leak.
+      if (m[3] === undefined || !/^[A-Za-z_]\w*=[\w./:@%+,-]*$/.test(token) || !/^[ \t]*$/.test(m[4] ?? '')) return '';
       continue;
     }
     if (token.includes('://')) return '';

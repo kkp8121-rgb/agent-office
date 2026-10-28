@@ -78,9 +78,41 @@ test('F1: adversarial shapes around quotes and line breaks', () => {
     'A=1 "SECRET-123 x"',
   ]) assert.equal(firstWord(command), '', JSON.stringify(command));
   assert.equal(firstWord('A=1\tgit status'), 'git', 'a tab is a blank');
-  assert.equal(firstWord('"FOO=bar" git'), 'git');
   assert.equal(firstWord(`A=1${' '.repeat(100000)}git`), 'git', 'very long input');
   assert.equal(firstWord('npm\nSECRET-123'), 'npm', 'only the first word');
+});
+
+test('fix-back: only spaces and tabs end a skipped assignment; a quoted NAME=value is the command word', () => {
+  for (const command of [
+    'A=1 SECRET-123 ls', // NBSP: bash keeps "1 SECRET-123" in the value and runs ls
+    'A=1\fSECRET-123 ls',
+    'A=1\vSECRET-123 ls',
+    'A=1 SECRET-123 ls',
+    'A=1　SECRET-123 ls',
+    'A=1 B=2 SECRET-123 ls',
+    "'A=1' SECRET-123", // the command 'A=1' with argument SECRET-123
+    '"A=1" SECRET-123',
+    '"FOO=bar" git',
+  ]) {
+    assert.equal(firstWord(command), '', JSON.stringify(command));
+    assert.equal(describeTool('Bash', { command }), '명령 실행', JSON.stringify(command));
+  }
+  assert.equal(firstWord('A=1 \t B=2\tgit status'), 'git', 'spaces and tabs still separate');
+  assert.equal(firstWord('A=1​SECRET-123 ls'), '', 'zero-width space');
+  assert.equal(execStart('await tools.exec_command({cmd:"A=1 SECRET-123 ls"})'), '명령 실행');
+});
+
+test('fix-back: an HTML-like comment or a non-ASCII identifier start stops the exec scan', () => {
+  for (const input of [
+    '<!-- tools.exec_command({cmd:"SECRET-1 x"})\n await tools.exec_command({cmd:"ls"})',
+    'x = 1\n--> tools.exec_command({cmd:"SECRET-2 x"})',
+    'x = 1 --> tools.exec_command({cmd:"SECRET-3 x"})',
+    'ätools.exec_command({cmd:"SECRET-4 x"})',
+    'тtools.exec_command({cmd:"SECRET-5 x"})',
+  ]) assert.equal(execStart(input), '명령 실행', JSON.stringify(input));
+  // a plain call still labels, and text inside literals is not mistaken for a comment
+  assert.equal(execStart('const s = "<!--"; await tools.exec_command({cmd:"git status"})'), 'git 실행');
+  assert.equal(execStart('x--; await tools.exec_command({cmd:"ls"})'), 'ls 실행');
 });
 
 // ---- F2: the Codex exec label is tied to the exec_command call ---------------------------------

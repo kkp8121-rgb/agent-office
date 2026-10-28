@@ -99,7 +99,9 @@ function cmdFromInput(input) {
         if (close === -1) return '';
         i = close + 1;
       } else return ''; // division or regex literal: cannot tell them apart, so do not guess where code resumes
-    } else if (c === 't' && !/[\w$.]/.test(input[i - 1] ?? '')) {
+    } else if (input.startsWith('<!--', i) || input.startsWith('-->', i)) {
+      return ''; // Annex B HTML-like comment: the engine may skip the rest of the line, so do not guess
+    } else if (c === 't' && !/[\w$.]|[^\x00-\x7f]/.test(input[i - 1] ?? '')) {
       EXEC_CALL.lastIndex = i;
       if (!EXEC_CALL.test(input)) continue;
       CMD_KEY.lastIndex = EXEC_CALL.lastIndex;
