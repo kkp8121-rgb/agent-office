@@ -295,6 +295,17 @@ test('F10/F12: a new agent in a known folder is found, and a fresh folder mtime 
   assert.equal((await listAgents(sd, cache, undefined, 2000)).length, 4);
 });
 
+test('F10/F12: a folder listed right after its mtime is listed again when the mtime did not move (coarse timestamps)', async (t) => {
+  const { sd, wf } = agentTree(t);
+  const cache = new Map();
+  const T = new Date(Math.floor(Date.now() / 1000) * 1000); // whole second, as on a file system with 1 s timestamps
+  utimesSync(wf, T, T);
+  await listAgents(sd, cache, undefined, 2000);
+  writeFileSync(join(wf, 'agent-a3.meta.json'), '{"agentType":"worker","description":"z","workflowPhase":"P"}');
+  utimesSync(wf, T, T); // the change is invisible in the folder mtime
+  assert.deepEqual((await listAgents(sd, cache, undefined, 2000)).map((a) => a.agentId).sort(), ['a1', 'a2', 'a3']);
+});
+
 test('F10/F12: an idle tick does not stat the metas of finished agents', async (t) => {
   const h = fake(t);
   const now = Date.now();

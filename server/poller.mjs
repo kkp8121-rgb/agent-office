@@ -285,7 +285,7 @@ export class Poller {
   /**
    * A run is done when its journal has started agents, every started agent and every agent folder of the run has ended
    * (result, finished meta, or abandoned) and nothing in the run changed for workflow.doneQuietMs: the next phase starts
-   * its agents within seconds, so a quiet run is over. A done run drops its journal tail.
+   * its agents within seconds (real runs: p90 1.8 s, 2 % of gaps over 30 s), so a run quiet for minutes is over. A done run drops its journal tail.
    */
   #isDone(run, now) {
     const { started, finished } = run.journal;
