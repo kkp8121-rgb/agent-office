@@ -74,7 +74,7 @@ export function markSettled(cache, meta) {
 
 /**
  * @returns {Promise<AgentMeta[]>} `readFile` is injectable for tests; `dirTrustMs` is the directory-listing trust window (see names).
- * A workflow run whose agents have all ended and whose folder has been quiet for `runSettleMs` is remembered whole: later
+ * A workflow run whose agents have all ended and whose folder and meta files have been quiet for `runSettleMs` is remembered whole: later
  * scans neither stat nor list it, so scan cost follows the active runs, not the session's whole workflow history.
  */
 export async function listAgents(sessionDir, cache, readFile = fsReadFile, dirTrustMs = 0, runSettleMs = dirTrustMs) {
@@ -101,7 +101,9 @@ export async function listAgents(sessionDir, cache, readFile = fsReadFile, dirTr
     }
     out.push(...metas);
     const listing = cache.get(dir);
-    const quiet = listing?.trusted && Date.now() - listing.mtimeMs >= runSettleMs;
+    // The folder mtime only moves when an agent file appears; finishing an agent rewrites its meta, so quiet counts both.
+    const lastActive = Math.max(listing?.mtimeMs ?? 0, ...metas.map((m) => m.mtimeMs));
+    const quiet = listing?.trusted && Date.now() - lastActive >= runSettleMs;
     if (quiet && metas.length === files.length && files.length > 0 && files.every((n) => cache.get(join(dir, n))?.settled)) {
       cache.set(`run:${dir}`, metas);
     }

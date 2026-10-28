@@ -1,7 +1,7 @@
 // Final-fix round 2, poller side: scan cost follows the active workflow runs, not the session's whole run history.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync, readdirSync } from 'node:fs';
 import fsp from 'node:fs/promises';
 import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -39,8 +39,8 @@ function spyFs(t) {
   return { calls, reset: () => calls.splice(0), under: (needle) => calls.filter((c) => c.path.includes(needle)).length };
 }
 
-/** `runs` finished workflow runs of `perRun` agents each, every folder dated a minute ago. */
-function history(t, runs, perRun, extra = {}) {
+/** `runs` finished workflow runs of `perRun` agents each, every folder and meta file dated a minute ago (`freshMetas`: metas keep their write time). */
+function history(t, runs, perRun, extra = {}, freshMetas = false) {
   const sd = join(tmpDir(t, 'r2p-'), 's1');
   const wfRoot = join(sd, 'subagents', 'workflows');
   for (let r = 0; r < runs; r++) {
@@ -53,7 +53,11 @@ function history(t, runs, perRun, extra = {}) {
     for (const [id, body] of Object.entries(agents)) writeFileSync(join(wfRoot, run, `agent-${id}.meta.json`), body);
   }
   const old = new Date(Date.now() - 60000);
-  for (const d of [join(sd, 'subagents'), wfRoot, ...[...Array(runs).keys()].map((r) => join(wfRoot, `wf_old${r}`)), ...Object.keys(extra).map((r) => join(wfRoot, r))]) utimesSync(d, old, old);
+  const runDirs = [...[...Array(runs).keys()].map((r) => `wf_old${r}`), ...Object.keys(extra)];
+  if (!freshMetas) {
+    for (const r of runDirs) for (const n of readdirSync(join(wfRoot, r))) utimesSync(join(wfRoot, r, n), old, old);
+  }
+  for (const d of [join(sd, 'subagents'), wfRoot, ...runDirs.map((r) => join(wfRoot, r))]) utimesSync(d, old, old);
   return { sd, wfRoot };
 }
 
@@ -131,7 +135,8 @@ test('F10/F12: a poller tick does not touch finished run folders', async (t) => 
     mkdirSync(rd, { recursive: true });
     writeFileSync(join(rd, 'agent-a1.meta.json'), FINISHED);
     writeFileSync(join(rd, 'agent-a1.jsonl'), '');
-    utimesSync(rd, new Date(Date.now() - 60000), new Date(Date.now() - 60000));
+    const old = new Date(Date.now() - 60000);
+    for (const p of [rd, join(rd, 'agent-a1.meta.json'), join(rd, 'agent-a1.jsonl')]) utimesSync(p, old, old);
   }
   const now = Date.now();
   await poller.tick(now);
@@ -140,4 +145,32 @@ test('F10/F12: a poller tick does not touch finished run folders', async (t) => 
   await poller.tick(now + 6000);
   await poller.tick(now + 9000);
   assert.equal(fs.under('wf_old'), 0);
+});
+
+test('F10/F12: a phase 2 agent appearing right after phase 1 finished is found, although the run folder mtime is old', async (t) => {
+  // Phase 1 agents ran a long time: the folder mtime is their start, but their metas were rewritten (finished) just now.
+  const { sd, wfRoot } = history(t, 1, 2, {}, true);
+  const cache = new Map();
+  const window = 30000;
+  assert.equal((await listAgents(sd, cache, undefined, 2000, window)).length, 2);
+  assert.equal((await listAgents(sd, cache, undefined, 2000, window)).length, 2);
+  writeFileSync(join(wfRoot, 'wf_old0', 'agent-p2.meta.json'), RUNNING);
+  const ids = (await listAgents(sd, cache, undefined, 2000, window)).map((m) => m.agentId).sort();
+  assert.deepEqual(ids, ['a0', 'a1', 'p2']);
+});
+
+test('F10/F12: a run freezes once its metas, not only its folder, have been quiet for the settle window', async (t) => {
+  const { sd } = history(t, 1, 2, {}, true);
+  const cache = new Map();
+  const fs = spyFs(t);
+  const window = 300;
+  await listAgents(sd, cache, undefined, 2000, window);
+  fs.reset();
+  await listAgents(sd, cache, undefined, 2000, window);
+  assert.equal(fs.under('wf_old0'), 1, 'metas are fresh: run still checked');
+  await new Promise((r) => setTimeout(r, window + 100)); // the fresh metas become old
+  await listAgents(sd, cache, undefined, 2000, window); // freezes
+  fs.reset();
+  await listAgents(sd, cache, undefined, 2000, window);
+  assert.equal(fs.under('wf_old0'), 0);
 });
