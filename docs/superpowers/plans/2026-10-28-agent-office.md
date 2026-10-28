@@ -475,6 +475,56 @@ test('sanitize: output is bounded to 80 chars', () =>
 
 ---
 
+### Task 11: Codex 대응 (Task 5 뒤)
+
+**Files:**
+- Create: `server/codex.mjs`, `tests/codex.test.mjs`, `tests/fixtures/codex/*.jsonl`(아래 모양을 본뜬 견본 — 실제 롤아웃 복사 금지)
+- Modify: `server/poller.mjs`(Claude·Codex 세션을 합쳐 `office.syncSessions` 한 번), `server/office.mjs`(provider 별 팀장·기본 역할), `config.json`(`codex` 블록 + Codex 역할), `server/config.mjs`(env `AGENT_OFFICE_CODEX_HOME`)
+
+**Interfaces:**
+- Consumes: `FileTail`(Task 2), `Office`(Task 4), `Poller`(Task 5), `clip`(Task 1)
+- Produces: `parseCodexMeta(line: string): null | {id:string, cwd:string, kind:'exec'|'interactive'|'subagent', parentId:string|null, agentRole:string|null, taskName:string, startedAt:number}` — `session_meta` 줄에서 이 필드만 꺼낸다(`creator_user_id`·`creator_account_id`·instructions 등은 절대 담지 않음).
+- Produces: `parseCodexLine(line: string): Ev[]` — Task 2 와 같은 `Ev` 모양.
+- Produces: `class CodexSource { constructor(cfg); poll(now: number): Promise<{sessions: Session[], sessionEvents: Map<string, Ev[]>, agents: Map<string, AgentMeta[]>, agentEvents: Map<string, Ev[]>}> }` — `agentEvents` 키는 `${parentId}/${childId}`.
+
+Codex 기록 사실(2026-10-28 조사, codex-cli 0.164.0):
+- 롤아웃: `<codexHome>/sessions/YYYY/MM/DD/rollout-<시각>-<uuid>.jsonl`(10-15 이전은 `.jsonl.zst` — 지금 활동이 아니므로 무시). 줄 = `{"timestamp","type","payload":{…}}`, 첫 줄 `type:"session_meta"`(약 22KB).
+- 세션 종류: `payload.originator`·`payload.source` — exec 는 `originator:"codex_exec"`/`source:"exec"`, 대화형은 `source:"cli"`/`"vscode"`, 하위 에이전트는 `source` 가 객체 `{"subagent":{"thread_spawn":{"parent_thread_id","depth","agent_path":"/root/<task_name>","agent_nickname","agent_role"}}}`. 하위 에이전트의 `parent_thread_id` = 부모 `session_meta.payload.id`.
+- 도구 시작: `response_item` + `payload.type:"custom_tool_call"`(name `exec`, `input` 은 `await tools.exec_command({cmd:"…"})` 같은 JS 문자열, `call_id`) / `payload.type:"function_call"`(name `spawn_agent`·`wait_agent`·`list_agents`·`send_message`·`followup_task`, `arguments` JSON 문자열, `call_id`).
+- 도구 끝: `custom_tool_call_output`·`function_call_output`(`call_id`). 그리고 `event_msg` + `payload.type:"item_completed"` 의 `payload.item.type`: `CommandExecution`(`parsed_cmd[0].cmd`, `status`), `Extension`(`kind`: `image_gen.generation`·`web.search`), `McpToolCall`(`server`, `tool`).
+- 생각/답: `response_item` 의 `reasoning`·`message` → think(내용은 암호화되었거나 본문이라 쓰지 않음).
+- 턴: `event_msg` `task_started` → 작업 시작, `task_complete` → 턴 끝.
+- 제목 이벤트 없음 → 층 이름 = 작업 폴더 이름(`cwd` 끝), exec 는 `codex exec · <폴더>`.
+- PID 레지스트리 없음, 파일 mtime 은 실제보다 늦게 바뀜 → 활동 판단은 **파일 크기 변화와 줄의 `timestamp`** 로만.
+
+규칙:
+- 지켜볼 파일: 오늘·어제(로컬 날짜) 폴더의 `rollout-*.jsonl` — 폴더 목록은 `agentScanEveryTicks` 마다, 파일은 크기만 매 tick. 첫 발견 때 앞부분에서 `session_meta` 한 줄만 읽고(`codex.headBytes` 안에서 첫 `\n` 까지), 나머지는 FileTail(`cfg.tail.startBytes`).
+- 세션 살아 있음 판정: 마지막 이벤트가 `task_started` 뒤 `task_complete` 전이면 `status:'busy'`. 턴이 끝났으면 `'waiting'` 으로 두되 마지막 이벤트 뒤 대화형은 `codex.idleKeepMs`, exec 는 `codex.execKeepMs` 가 지나면 목록에서 뺀다(→ Office 가 층 퇴근 처리, 숨김 기록도 지워져 「다시 실행」 하면 다시 보임). `Session` = `{provider:'codex', pid:0, sessionId:<payload.id>, cwd, status, name:'', startedAt:<이번 활동 시작 ts>}`.
+- 하위 에이전트: 부모 층의 캐릭터. `agentType` = `'codex:' + (agent_role ?? '__default')`, `description` = `task_name` 의 `_` 를 공백으로, `finished` = 자기 롤아웃 마지막 이벤트가 `task_complete`.
+- 말풍선·기록 문구(개인정보 규칙 그대로): exec 시작 → `input` 에서 `cmd:"` 뒤 첫 단어만 정규식으로 꺼내 `clip` 후 `「<단어> 실행」`(못 꺼내면 「명령 실행」, PowerShell 조각처럼 글자·숫자·`-`·`.` 이외로 시작하면 「명령 실행」); `CommandExecution` 완료 → 같은 규칙으로 `parsed_cmd[0].cmd` 첫 단어; `spawn_agent` → `위임 · <task_name>`; `wait_agent` → 「동료 기다리는 중」; 그 밖의 협업 함수 → 「동료와 협업」; `image_gen.generation` → 「그림 그리는 중」; `web.search` → 「웹 조사 중」; `McpToolCall` → `<server> 도구 사용`. 절대 쓰지 않음: 명령 전체, `arguments`·`message`·`input` 본문, `revisedPrompt`, `savedPath`, `arguments.code`, 메시지 본문, 계정 id.
+- 역할 표(`config.json` roles 에 추가 — 그림은 같은 등급의 Claude 캐릭터 그림을 같이 쓴다): `codex:__lead` → `{key:'lead', name:'하나', role:'팀장'}`, `codex:scout` → `{key:'scout', name:'별이', role:'정찰'}`, `codex:worker_low` → `{key:'worker-low', name:'보미', role:'막내'}`, `codex:worker` → `{key:'worker', name:'도담', role:'개발'}`, `codex:worker_high` → `{key:'worker-high', name:'한결', role:'선임'}`, `codex:architect` → `{key:'architect', name:'라온', role:'설계'}`, `codex:architect_high` → `{key:'architect-high', name:'새봄', role:'수석'}`, `codex:__default` → `{key:'default', name:'누리', role:'지원'}`. Office 는 `provider === 'codex'` 인 층의 팀장에 `codex:__lead`, 모르는 Codex 역할에 `codex:__default` 를 쓴다.
+- `config.json` `codex`: `{"enabled": true, "headBytes": 262144, "idleKeepMs": 1800000, "execKeepMs": 60000}`. `cfg.codexHome` = env `AGENT_OFFICE_CODEX_HOME` 또는 `~/.codex`. 폴더가 없으면 조용히 건너뜀.
+- 화면: 층 표지에 `provider` 배지(「Claude」/「Codex」) — Task 6 이 FloorView.provider 로 그린다.
+
+- [ ] **Step 1: 실패하는 시험 작성**
+  - `codex: meta of exec, interactive and subagent` — 세 견본 `session_meta` → kind 와 parentId·agentRole·taskName(`/root/billing_config_review` → `billing config review`)
+  - `codex: meta never carries account ids` — 견본에 `creator_user_id:"U-SECRET"` 를 넣고 `JSON.stringify(parseCodexMeta(...))` 에 `U-SECRET` 없음
+  - `codex: exec tool start exposes first word only` — `input: 'await tools.exec_command({cmd:"git push https://token@x"})'` → text `'git 실행'`, `token` 미포함; `cmd:"@'` 로 시작 → `'명령 실행'`
+  - `codex: call output and item_completed end the tool` → `toolDone`(같은 call_id)
+  - `codex: spawn, image_gen, web.search, mcp labels` — 위 문구 그대로
+  - `codex: reasoning and message become think without text` — 결과 Ev 에 본문 문자열 없음
+  - `codex: source lists busy session and its subagent` — 임시 codexHome 에 오늘 폴더 + 부모 롤아웃(task_started 만) + 자식 롤아웃(scout) → sessions 1개(`status:'busy'`), agents 에 `codex:scout` 1개
+  - `codex: finished exec session drops after execKeepMs` — task_complete 뒤 `now` 를 `execKeepMs+1` 만큼 넘기면 sessions 에서 빠짐
+  - `office: codex floor uses 하나·팀장 and 도담 for worker`
+  - `poller: claude and codex sessions merge into one sync` — 두 provider 층이 함께 snapshot 에
+- [ ] **Step 2: 실패 확인** → FAIL
+- [ ] **Step 3: 구현**
+- [ ] **Step 4: 통과 확인** → `node --test tests/` PASS
+- [ ] **Step 5: 실데이터 확인** — 서버를 실제 홈으로 켠 채 짧은 `codex exec --skip-git-repo-check -s read-only "Reply with OK."` 를 한 번 돌려, 실행 중 Codex 층이 생기고 끝난 뒤 `execKeepMs` 안에 사라지는지 `/api/state` 로 확인(파일 크기가 실행 중 커지는지도 기록 — 조사에서 확인 못 한 항목). 자기가 띄운 프로세스만 정리.
+- [ ] **Step 6: 커밋** — `git commit -m "feat: show Codex sessions and sub-agents"`
+
+---
+
 ### Task 12: 원격 저장소 연결 (마지막, push 는 매번 사용자 확인)
 
 **Files:**
