@@ -6,10 +6,16 @@ function setText(el, text) {
   if (el.textContent !== text) el.textContent = text;
 }
 
-const hues = new Map(); // sessionId -> hue; consecutive sessions get well-separated hues (golden angle)
+/** The hue is a pure function of the id (FNV-1a), so the main page, the log page and every reload agree. */
 function hueOf(sessionId) {
-  if (!hues.has(sessionId)) hues.set(sessionId, Math.round((hues.size * 137.508 + 15) % 360));
-  return hues.get(sessionId);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < sessionId.length; i++) h = Math.imul(h ^ sessionId.charCodeAt(i), 0x01000193);
+  return (h >>> 0) % 360;
+}
+/** Finished agents fill a 3-wide grid leftwards from the tray; every other row is shifted half a step and stands one row higher, so no two slots coincide. */
+function trayPos(i, tray, stepPx, rowPx) {
+  const row = Math.floor(i / 3);
+  return { x: tray[0] - ((i % 3) + (row % 2) / 2) * stepPx, y: tray[1] - row * rowPx };
 }
 const colorOf = (sessionId) => `hsl(${hueOf(sessionId)} 55% 42%)`;
 
@@ -63,4 +69,14 @@ function fillLogRow(row, e) {
   b.title = e.role;
   setText(time, clock(e.ts));
   setText(row.querySelector('p'), e.head ? `${e.head} · ${e.text}` : e.text);
+}
+
+/** Session filter label: a live floor's title, else the last title the server remembers, else a bare id prefix. */
+function sessionLabel(sessionId, liveTitles, knownTitles) {
+  return liveTitles.get(sessionId) ?? (knownTitles && Object.hasOwn(knownTitles, sessionId) ? knownTitles[sessionId] : undefined) ?? `지난 세션 ${sessionId.slice(0, 8)}`;
+}
+
+function logMetaText(count, capped) {
+  if (!count) return '기록이 없습니다';
+  return capped ? `최근 ${count}건만 표시 · 최신 순` : `${count}건 · 최신 순`;
 }

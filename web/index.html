@@ -13,13 +13,13 @@
   <aside id="panel">
     <h2>세션</h2>
     <div id="sessions"></div>
-    <div id="empty">실행 중인 세션이 없습니다</div>
+    <div id="empty" hidden>실행 중인 세션이 없습니다. Claude Code나 Codex를 실행하면 층이 생깁니다.</div>
     <h2 class="log-head"><span>기록</span><a href="/log" target="_blank" rel="noopener">전체 기록 ↗</a></h2>
-    <div id="log"></div>
+    <div id="log" role="log" aria-label="기록"></div>
     <button id="quit" type="button">끄기</button>
   </aside>
 </main>
-<div id="conn" hidden></div>
+<div id="conn" role="status" hidden></div>
 <script src="/web/logrow.js"></script>
 <script src="/web/app.js"></script>
 </body>
