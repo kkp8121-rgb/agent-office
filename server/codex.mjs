@@ -25,7 +25,8 @@ const folderOf = (cwd) => String(cwd ?? '').split(/[\\/]/).filter(Boolean).pop()
  * instructions, which must never be kept.
  * @returns {null | {id:string, cwd:string, kind:'exec'|'interactive'|'subagent', parentId:string|null, agentRole:string|null, taskName:string, startedAt:number}}
  */
-export function parseCodexMeta(text, cwdMax = MAX_LEN) {
+export function parseCodexMeta(text, cwdMax) {
+  if (!Number.isInteger(cwdMax) || cwdMax <= 0) throw new TypeError('parseCodexMeta needs cwdMax (codex.cwdMaxChars)');
   let o;
   try {
     o = JSON.parse(text);
@@ -330,7 +331,7 @@ export class CodexSource {
         if (bytesRead >= this.#cfg.codex.headBytes) rec.ignored = true; // first line too long
         return null; // otherwise: still being written
       }
-      const meta = parseCodexMeta(buf.toString('utf8', 0, nl).replace(/\r$/, ''));
+      const meta = parseCodexMeta(buf.toString('utf8', 0, nl).replace(/\r$/, ''), this.#cfg.codex.cwdMaxChars);
       if (!meta) rec.ignored = true;
       return meta;
     } finally {
@@ -414,7 +415,7 @@ export class CodexSource {
     for (const rec of this.#recs.values()) {
       rec.pending = [];
       // A finished rollout that is not listed holds no FileTail (64 KB buffer); it resumes from its line offset.
-      if (rec.tail && rec.meta && !listedRecs.has(rec) && finished(rec)) {
+      if (rec.tail?.resumable && rec.meta && !listedRecs.has(rec) && finished(rec)) {
         rec.resumeAt = rec.tail.lineStart;
         rec.tail = null;
       }

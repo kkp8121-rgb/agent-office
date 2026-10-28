@@ -20,6 +20,7 @@ export function firstWord(command) {
     if (!m) return '';
     rest = rest.slice(m[0].length);
     const token = m[1] ?? m[2] ?? m[3];
+    if (/^[A-Za-z_]\w*=["']/.test(token)) return ''; // quoted value: its words are not parsed, so none can leak
     if (/^[A-Za-z_]\w*=/.test(token)) continue; // leading NAME=value assignment
     if (token.includes('://')) return '';
     const word = baseName(token).replace(/\.(exe|cmd|bat|ps1)$/i, '');

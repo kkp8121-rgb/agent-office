@@ -102,3 +102,15 @@ test('tail: resumes at a given line start and exposes where an incomplete line b
   assert.equal(b.lineStart, b.offset);
   t.done();
 });
+
+test('tail: not resumable while skipping an oversized line', async () => {
+  const t = tmp();
+  writeFileSync(t.file, '{"a":1}\n' + 'x'.repeat(50));
+  const tail = new FileTail(t.file, { chunkBytes: 16, maxLineBytes: 20 });
+  assert.deepEqual(await tail.poll(), ['{"a":1}']);
+  assert.equal(tail.resumable, false, 'the oversized line is being skipped');
+  appendFileSync(t.file, 'y'.repeat(10) + '\n{"ok":1}\n');
+  assert.deepEqual(await tail.poll(), ['{"ok":1}']);
+  assert.equal(tail.resumable, true);
+  t.done();
+});

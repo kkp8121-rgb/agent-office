@@ -44,3 +44,12 @@ test('sanitize: bash first word never leaks env assignments, URLs or stray quote
   assert.equal(describeTool('Bash', {}), '명령 실행');
   assert.equal(describeTool('Bash', {command:'A=1 B=2'}), '명령 실행');
 });
+test('sanitize: bash label refuses quoted env values, so no word inside them leaks', () => {
+  for (const command of ['TOKEN="a hunter2 c" git push', "TOKEN='a hunter2 c' git push", 'A=1 TOKEN="x hunter2" git']) {
+    const text = describeTool('Bash', { command });
+    assert.equal(text, '명령 실행', command);
+    assert.ok(!text.includes('hunter2'));
+  }
+  assert.equal(describeTool('Bash', { command: 'FOO=bar git push' }), 'git 실행');
+  assert.equal(describeTool('Bash', { command: 'A=1 B=2 git push' }), 'git 실행');
+});

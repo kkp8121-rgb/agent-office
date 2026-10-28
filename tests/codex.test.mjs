@@ -17,6 +17,7 @@ const EXEC_ID = '11111111-1111-4111-8111-111111111111';
 const PARENT_ID = '22222222-2222-4222-8222-222222222222';
 const CHILD_ID = '33333333-3333-4333-8333-333333333333';
 const EMPTY = { hidden: [], names: {} };
+const CWD_MAX = loadConfig().codex.cwdMaxChars;
 
 const iso = (ms) => new Date(ms).toISOString();
 const line = (ms, type, payload) => JSON.stringify({ timestamp: iso(ms), type, payload }) + '\n';
@@ -50,7 +51,7 @@ function fake(t, overrides = {}) {
 // ---- parsing ---------------------------------------------------------------------------------
 
 test('codex: meta of exec, interactive and subagent', () => {
-  const exec = parseCodexMeta(fixture('meta-exec.jsonl'));
+  const exec = parseCodexMeta(fixture('meta-exec.jsonl'), CWD_MAX);
   assert.equal(exec.kind, 'exec');
   assert.equal(exec.id, EXEC_ID);
   assert.equal(exec.cwd, 'C:\\Project\\billing-app');
@@ -58,24 +59,24 @@ test('codex: meta of exec, interactive and subagent', () => {
   assert.equal(exec.agentRole, null);
   assert.equal(exec.startedAt, Date.parse('2026-10-28T08:00:00.000Z'));
 
-  const inter = parseCodexMeta(fixture('meta-interactive.jsonl'));
+  const inter = parseCodexMeta(fixture('meta-interactive.jsonl'), CWD_MAX);
   assert.equal(inter.kind, 'interactive');
   assert.equal(inter.id, PARENT_ID);
 
-  const sub = parseCodexMeta(fixture('meta-subagent.jsonl'));
+  const sub = parseCodexMeta(fixture('meta-subagent.jsonl'), CWD_MAX);
   assert.equal(sub.kind, 'subagent');
   assert.equal(sub.id, CHILD_ID);
   assert.equal(sub.parentId, PARENT_ID);
   assert.equal(sub.agentRole, 'scout');
   assert.equal(sub.taskName, 'billing config review');
 
-  assert.equal(parseCodexMeta('not json'), null);
-  assert.equal(parseCodexMeta(line(1, 'event_msg', { type: 'task_started' })), null);
+  assert.equal(parseCodexMeta('not json', CWD_MAX), null);
+  assert.equal(parseCodexMeta(line(1, 'event_msg', { type: 'task_started' }), CWD_MAX), null);
 });
 
 test('codex: meta never carries account ids', () => {
   for (const f of ['meta-exec.jsonl', 'meta-interactive.jsonl', 'meta-subagent.jsonl']) {
-    const out = JSON.stringify(parseCodexMeta(fixture(f)));
+    const out = JSON.stringify(parseCodexMeta(fixture(f), CWD_MAX));
     for (const secret of ['U-SECRET', 'A-SECRET', 'SECRET-INSTRUCTIONS']) assert.ok(!out.includes(secret), `${f}: ${secret}`);
   }
 });
@@ -523,4 +524,35 @@ test('codex: a hidden floor with a busy sub-agent shows neither the agent nor it
   assert.equal(h.office.queryLog({ sessionId: PARENT_ID }).length, 0);
   assert.equal(h.office.queryLog().filter((e) => e.sessionId === PARENT_ID).length, 0);
   assert.equal(h.office.drainLog().filter((e) => e.sessionId === PARENT_ID).length, 0);
+});
+
+// ---- fix round 2 -----------------------------------------------------------------------------
+
+test('codex: cwdMaxChars is applied, so a deep folder name is not cut at 80 chars', async (t) => {
+  const h = fake(t);
+  const now = Date.now();
+  const folder = 'b'.repeat(60);
+  const cwd = `C:/Project/${'a'.repeat(60)}/${folder}`;
+  assert.ok(cwd.length > 80 && cwd.length < h.cfg.codex.cwdMaxChars);
+  h.rollout(PARENT_ID, meta(now - 5000, PARENT_ID, { cwd }) + started(now - 4000));
+  const r = await new CodexSource(h.cfg).poll(now);
+  assert.equal(r.sessions[0].cwd, cwd);
+  assert.equal(r.sessionEvents.get(PARENT_ID).find((e) => e.kind === 'title').title, folder);
+  assert.throws(() => parseCodexMeta(fixture('meta-exec.jsonl')), TypeError, 'the limit is required');
+  const capped = parseCodexMeta(fixture('meta-exec.jsonl'), 10);
+  assert.equal(capped.cwd.length, 10);
+});
+
+test('codex: quoted env values never leak a word into the label', () => {
+  const start = (cmd) =>
+    parseCodexLine(line(5, 'response_item', { type: 'custom_tool_call', name: 'exec', call_id: 'c1', input: `await tools.exec_command({cmd:${JSON.stringify(cmd)}})` }));
+  const done = (cmd) => parseCodexLine(line(8, 'event_msg', { type: 'item_completed', item: { type: 'CommandExecution', id: 'x', parsed_cmd: [{ cmd }] } }))[0];
+  for (const cmd of ['TOKEN="a hunter2 c" git', "TOKEN='a hunter2 c' git"]) {
+    for (const e of [start(cmd)[0], done(cmd)]) {
+      assert.equal(e.text, '명령 실행', cmd);
+      assert.ok(!JSON.stringify(e).includes('hunter2'));
+    }
+  }
+  assert.equal(start('FOO=bar git push')[0].text, 'git 실행');
+  assert.equal(done('FOO=bar git push').text, 'git 실행');
 });

@@ -31,6 +31,11 @@ export class FileTail {
     return this.#offset;
   }
 
+  /** False while the rest of an oversized line is being skipped: `lineStart` is not a line start then. */
+  get resumable() {
+    return !this.#skipping;
+  }
+
   /** Where an incomplete trailing line begins (equals `offset` when the last read ended on a line end). */
   get lineStart() {
     return this.#offset - this.#carryLen;
