@@ -1,7 +1,7 @@
 // Local HTTP server: JSON API, SSE push and static files. Every request must carry a loopback Host
 // header (DNS rebinding) and every POST a matching Origin (cross-site requests). No CORS headers at all.
 import http from 'node:http';
-import { createReadStream } from 'node:fs';
+import { createReadStream, readdirSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { isSafeId } from './sessions.mjs';
@@ -129,7 +129,7 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
 
   // ---- static files ------------------------------------------------------------------------
 
-  async function sendStatic(res, dirName, rawRel) {
+  async function sendStatic(res, dirName, rawRel, baseDir = join(cfg.root, dirName)) {
     let rel;
     try {
       rel = decodeURIComponent(rawRel);
@@ -137,7 +137,7 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
       return notFound(res);
     }
     if (rel.includes('\0')) return notFound(res);
-    const base = join(cfg.root, dirName);
+    const base = baseDir;
     const file = resolve(base, rel);
     const inside = relative(base, file);
     if (inside === '' || inside.startsWith('..') || isAbsolute(inside)) return notFound(res);
@@ -159,11 +159,24 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
 
   // ---- routes ------------------------------------------------------------------------------
 
+  // assets/sprites/<key>-sit.png present at start-up: the page asks only for seated pictures that exist
+  let sitSprites = [];
+  try {
+    sitSprites = readdirSync(join(cfg.root, 'assets', 'sprites')).filter((n) => n.endsWith('-sit.png')).map((n) => n.slice(0, -8)).sort();
+  } catch {
+    // no sprites folder: nobody sits
+  }
+
   function uiConfig() {
     const roles = {};
     // Codex roles reuse the Claude sprite keys, so they must not overwrite the Claude names here.
     for (const [k, r] of Object.entries(cfg.roles)) if (!k.startsWith('codex:')) roles[r.key] = { name: r.name, role: r.role };
-    return { spriteHeight: cfg.spriteHeight, layouts: cfg.layouts, ui: cfg.ui, bubbleShowMs: cfg.agent.bubbleShowMs, nameMaxChars: cfg.floor.nameMaxChars, roles };
+    const scenes = {};
+    for (const [design, s] of Object.entries(cfg.scenes ?? {})) scenes[design] = { ...s.raw, url: s.url };
+    return {
+      spriteHeight: cfg.spriteHeight, layouts: cfg.layouts, ui: cfg.ui, bubbleShowMs: cfg.agent.bubbleShowMs, nameMaxChars: cfg.floor.nameMaxChars, roles,
+      scenes, sitSprites, sitHeight: cfg.sitHeight, nav: cfg.nav, depth: cfg.depth,
+    };
   }
 
   const isVisible = (sessionId) => office.snapshot().floors.some((f) => f.sessionId === sessionId);
@@ -242,6 +255,7 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
       case '/log': return sendStatic(res, 'web', 'log.html');
       default:
     }
+    if (path.startsWith('/scenes/') && cfg.scenesDir) return sendStatic(res, 'scenes', path.slice('/scenes/'.length), cfg.scenesDir);
     for (const dir of STATIC_DIRS) {
       if (path.startsWith(`/${dir}/`)) return sendStatic(res, dir, path.slice(dir.length + 2));
     }

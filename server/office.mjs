@@ -2,6 +2,7 @@
 // No I/O and no Date.now(): the server feeds every call with `now`. Only strings that already went
 // through sanitize.mjs (Ev.text) or local JSON clipped here (descriptions, workflow labels) are kept.
 import { clip } from './sanitize.mjs';
+import { overflowPoint, resolveScene } from '../web/scene.mjs';
 
 /** @typedef {import('./parse.mjs').Ev} Ev */
 
@@ -35,6 +36,7 @@ export class Office {
     /** Increments on every change to what saved() returns. */
     this.savedVersion = 0;
     this.floors = new Map(); // sessionId -> floor
+    this.resolved = new Map(); // design -> resolved scene (designs that have a layered scene)
     this.floorsCreated = 0; // never decremented: breaks ties between equally used designs
     this.floorSeq = 0;
     this.hiddenRecs = new Map(); // sessionId -> {sessionId, pid, startedAt}
@@ -367,6 +369,8 @@ export class Office {
 
   /** Smallest free index over [...desks, ...aisle]; beyond that, round r revisits the aisle spots shifted by ui.overflowShifts[r - 1]. */
   #allocSlot(f) {
+    const scene = this.#sceneOf(f.design);
+    if (scene) return this.#allocSceneSlot(f, scene);
     const { desks, aisle, size } = this.cfg.layouts[f.design];
     const { overflowShifts, overflowMarginPx } = this.cfg.ui;
     let i = 0;
@@ -383,6 +387,33 @@ export class Office {
     const x = Math.min(Math.max(base[0] + dx, overflowMarginPx), size[0] - overflowMarginPx);
     const y = Math.min(Math.max(base[1] + dy, this.cfg.spriteHeight), size[1] - 4);
     return { x, y, i };
+  }
+
+  #sceneOf(design) {
+    if (!this.resolved.has(design)) {
+      const entry = this.cfg.scenes?.[design];
+      this.resolved.set(design, entry ? resolveScene(entry.raw) : null);
+    }
+    return this.resolved.get(design);
+  }
+
+  /** Smallest free index over [...seats, ...idle, ...overflow]; past the last overflow point it laps with `ring` + 1 (the screen moves and snaps it). */
+  #allocSceneSlot(f, r) {
+    let i = 0;
+    while (f.usedSlots.has(i)) i++;
+    f.usedSlots.add(i);
+    const seat = r.seats[i];
+    if (seat) { // ref is the seat number, not the desk id: ids like "desk-1" contain "sk-" and the privacy guard bans that text in /api/state
+      return { i, kind: 'seat', ref: String(seat.i), x: seat.at[0], y: seat.at[1], approach: seat.approach, sit: seat.sitAt, face: seat.face, ring: 0 };
+    }
+    const k = i - r.seats.length;
+    if (k < r.idle.length) {
+      const p = r.idle[k];
+      return { i, kind: 'idle', ref: String(k), x: p.at[0], y: p.at[1], approach: null, sit: null, face: p.face, ring: 0 };
+    }
+    const j = k - r.idle.length;
+    const { at, ring } = overflowPoint(r, j, this.cfg.nav.overflowRing);
+    return { i, kind: 'overflow', ref: String(j % r.overflow.length), x: Math.round(at[0]), y: Math.round(at[1]), approach: null, sit: null, face: r.overflow[j % r.overflow.length].face, ring };
   }
 
   // One board line per floor: the most recently reported run owns it, and the line clears when that run is done.

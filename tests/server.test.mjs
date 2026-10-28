@@ -5,6 +5,7 @@ import net from 'node:net';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../server/config.mjs';
 import { Office } from '../server/office.mjs';
 import { createServer } from '../server/http.mjs';
@@ -334,4 +335,32 @@ test('server: /api/log clamps limit', async (t) => {
   const capped = async (q) => JSON.parse((await req(c, 'GET', `/api/log${q}`)).body).capped;
   assert.equal(await capped('?limit=1'), true);
   assert.equal(await capped('?limit=3'), false);
+});
+
+test('server: /api/ui carries the scenes, sit sprites and the scene numbers', async (t) => {
+  const fixtures = fileURLToPath(new URL('./fixtures/scenes', import.meta.url));
+  const c = await start(t, { cfg: loadConfig({ scenesDir: fixtures, designOrder: ['studio2', 'lounge'] }) });
+  const ui = JSON.parse((await req(c, 'GET', '/api/ui')).body);
+  assert.deepEqual(Object.keys(ui.scenes), ['studio2']);
+  assert.equal(ui.scenes.studio2.url, '/scenes/studio2/');
+  assert.equal(ui.scenes.studio2.shell, 'shell.png');
+  assert.ok(Array.isArray(ui.sitSprites));
+  assert.equal(ui.sitHeight, 50);
+  assert.equal(ui.nav.cellPx, 8);
+  assert.equal(ui.depth.frontZ, 7000);
+  assert.equal(ui.ui.ambient.maxAway, 2);
+  assert.ok(ui.layouts.lounge, 'designs without a scene keep their layout');
+});
+
+test('server: /scenes serves scene pictures with the picture cache header and refuses traversal', async (t) => {
+  const fixtures = fileURLToPath(new URL('./fixtures/scenes', import.meta.url));
+  const c = await start(t, { cfg: loadConfig({ scenesDir: fixtures, designOrder: ['studio2'] }) });
+  const png = await req(c, 'GET', '/scenes/studio2/shell.png');
+  assert.equal(png.status, 200);
+  assert.equal(png.headers['content-type'], 'image/png');
+  assert.equal(png.headers['cache-control'], 'max-age=3600');
+  assert.equal((await req(c, 'GET', '/scenes/studio2/scene.json')).status, 200);
+  for (const p of ['/scenes/..%2Fconfig.json', '/scenes/studio2/..%2F..%2Fconfig.json', '/scenes/%00', '/scenes/', '/scenes/studio2/nope.png']) {
+    assert.equal((await req(c, 'GET', p)).status, 404, p);
+  }
 });

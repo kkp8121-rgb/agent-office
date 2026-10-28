@@ -1,0 +1,569 @@
+{
+  "version": 1,
+  "design": "studio2",
+  "minSeats": 4,
+  "size": [
+    1024,
+    512
+  ],
+  "shell": "shell.png",
+  "front": "front.png",
+  "atlas": "objects.png",
+  "board": [
+    16,
+    8,
+    300,
+    48
+  ],
+  "reports": [
+    60,
+    -62
+  ],
+  "sign": null,
+  "walkable": [
+    [
+      [
+        16,
+        128
+      ],
+      [
+        1008,
+        128
+      ],
+      [
+        1008,
+        496
+      ],
+      [
+        16,
+        496
+      ]
+    ]
+  ],
+  "blocked": [],
+  "frontMask": [
+    [
+      [
+        0,
+        496
+      ],
+      [
+        1024,
+        496
+      ],
+      [
+        1024,
+        512
+      ],
+      [
+        0,
+        512
+      ]
+    ]
+  ],
+  "door": {
+    "at": [
+      960,
+      420
+    ],
+    "face": "left"
+  },
+  "kinds": {
+    "desk": {
+      "rect": [
+        0,
+        0,
+        80,
+        56
+      ],
+      "anchor": [
+        40,
+        56
+      ],
+      "footprint": [
+        [
+          -40,
+          -26
+        ],
+        [
+          40,
+          -26
+        ],
+        [
+          40,
+          0
+        ],
+        [
+          -40,
+          0
+        ]
+      ],
+      "blocks": true,
+      "depth": "auto",
+      "seat": {
+        "at": [
+          0,
+          -48
+        ],
+        "sitAt": [
+          0,
+          -44
+        ],
+        "approach": [
+          0,
+          -84
+        ],
+        "visit": [
+          66,
+          -30
+        ],
+        "face": "right"
+      }
+    },
+    "chair": {
+      "rect": [
+        80,
+        0,
+        32,
+        44
+      ],
+      "anchor": [
+        16,
+        44
+      ],
+      "footprint": [
+        [
+          -12,
+          -8
+        ],
+        [
+          12,
+          -8
+        ],
+        [
+          12,
+          0
+        ],
+        [
+          -12,
+          0
+        ]
+      ],
+      "blocks": true,
+      "depth": "auto"
+    },
+    "plant": {
+      "rect": [
+        112,
+        0,
+        44,
+        70
+      ],
+      "anchor": [
+        22,
+        70
+      ],
+      "footprint": [
+        [
+          -10,
+          -10
+        ],
+        [
+          10,
+          -10
+        ],
+        [
+          10,
+          0
+        ],
+        [
+          -10,
+          0
+        ]
+      ],
+      "blocks": true,
+      "depth": "auto"
+    },
+    "cabinet": {
+      "rect": [
+        156,
+        0,
+        120,
+        60
+      ],
+      "anchor": [
+        60,
+        60
+      ],
+      "footprint": [
+        [
+          -60,
+          -50
+        ],
+        [
+          60,
+          -20
+        ],
+        [
+          60,
+          0
+        ],
+        [
+          -60,
+          -30
+        ]
+      ],
+      "blocks": true,
+      "depth": "auto"
+    },
+    "lead-desk": {
+      "rect": [
+        276,
+        0,
+        96,
+        56
+      ],
+      "anchor": [
+        48,
+        56
+      ],
+      "footprint": [
+        [
+          -48,
+          -26
+        ],
+        [
+          48,
+          -26
+        ],
+        [
+          48,
+          0
+        ],
+        [
+          -48,
+          0
+        ]
+      ],
+      "blocks": true,
+      "depth": "auto"
+    }
+  },
+  "objects": [
+    {
+      "id": "desk-1",
+      "kind": "desk",
+      "at": [
+        300,
+        230
+      ]
+    },
+    {
+      "id": "chair-1",
+      "kind": "chair",
+      "at": [
+        300,
+        180
+      ]
+    },
+    {
+      "id": "desk-2",
+      "kind": "desk",
+      "at": [
+        430,
+        230
+      ]
+    },
+    {
+      "id": "chair-2",
+      "kind": "chair",
+      "at": [
+        430,
+        180
+      ]
+    },
+    {
+      "id": "desk-3",
+      "kind": "desk",
+      "at": [
+        300,
+        340
+      ]
+    },
+    {
+      "id": "chair-3",
+      "kind": "chair",
+      "at": [
+        300,
+        290
+      ]
+    },
+    {
+      "id": "desk-4",
+      "kind": "desk",
+      "at": [
+        430,
+        340
+      ]
+    },
+    {
+      "id": "chair-4",
+      "kind": "chair",
+      "at": [
+        430,
+        290
+      ]
+    },
+    {
+      "id": "plant-1",
+      "kind": "plant",
+      "at": [
+        640,
+        300
+      ]
+    },
+    {
+      "id": "cabinet-1",
+      "kind": "cabinet",
+      "at": [
+        780,
+        330
+      ]
+    },
+    {
+      "id": "lead-desk-1",
+      "kind": "lead-desk",
+      "at": [
+        520,
+        460
+      ]
+    },
+    {
+      "id": "chair-lead",
+      "kind": "chair",
+      "at": [
+        520,
+        410
+      ]
+    }
+  ],
+  "seats": [
+    "desk-1",
+    "desk-2",
+    "desk-3",
+    "desk-4"
+  ],
+  "lead": {
+    "desk": "lead-desk-1",
+    "at": [
+      520,
+      412
+    ],
+    "sitAt": [
+      520,
+      416
+    ],
+    "approach": [
+      520,
+      376
+    ],
+    "face": "right"
+  },
+  "tray": {
+    "object": "lead-desk-1",
+    "queue": [
+      [
+        600,
+        480
+      ],
+      [
+        572,
+        480
+      ],
+      [
+        544,
+        480
+      ],
+      [
+        516,
+        480
+      ],
+      [
+        488,
+        480
+      ],
+      [
+        460,
+        480
+      ],
+      [
+        430,
+        452
+      ],
+      [
+        402,
+        452
+      ],
+      [
+        374,
+        452
+      ],
+      [
+        346,
+        452
+      ],
+      [
+        318,
+        452
+      ],
+      [
+        290,
+        452
+      ]
+    ]
+  },
+  "idle": [
+    {
+      "at": [
+        860,
+        170
+      ],
+      "face": "left"
+    },
+    {
+      "at": [
+        860,
+        210
+      ],
+      "face": "left"
+    },
+    {
+      "at": [
+        860,
+        250
+      ],
+      "face": "left"
+    },
+    {
+      "at": [
+        900,
+        170
+      ],
+      "face": "left"
+    },
+    {
+      "at": [
+        900,
+        210
+      ],
+      "face": "left"
+    },
+    {
+      "at": [
+        900,
+        250
+      ],
+      "face": "left"
+    }
+  ],
+  "overflow": [
+    {
+      "at": [
+        80,
+        180
+      ],
+      "face": "right"
+    },
+    {
+      "at": [
+        80,
+        230
+      ],
+      "face": "right"
+    },
+    {
+      "at": [
+        80,
+        280
+      ],
+      "face": "right"
+    },
+    {
+      "at": [
+        80,
+        330
+      ],
+      "face": "right"
+    },
+    {
+      "at": [
+        80,
+        380
+      ],
+      "face": "right"
+    },
+    {
+      "at": [
+        80,
+        430
+      ],
+      "face": "right"
+    },
+    {
+      "at": [
+        140,
+        180
+      ],
+      "face": "right"
+    },
+    {
+      "at": [
+        140,
+        230
+      ],
+      "face": "right"
+    }
+  ],
+  "spots": [
+    {
+      "id": "coffee",
+      "kind": "coffee",
+      "at": [
+        660,
+        156
+      ],
+      "face": "right",
+      "pair": [
+        704,
+        156
+      ]
+    },
+    {
+      "id": "window",
+      "kind": "window",
+      "at": [
+        160,
+        156
+      ],
+      "face": "right"
+    },
+    {
+      "id": "plant",
+      "kind": "plant",
+      "at": [
+        600,
+        290
+      ],
+      "face": "right"
+    },
+    {
+      "id": "board",
+      "kind": "whiteboard",
+      "at": [
+        400,
+        156
+      ],
+      "face": "right"
+    }
+  ]
+}

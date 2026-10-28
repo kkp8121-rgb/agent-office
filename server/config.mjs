@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadScenes } from './scenes.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -30,5 +31,7 @@ export function loadConfig(overrides = {}) {
   cfg.codexHome = process.env.AGENT_OFFICE_CODEX_HOME || path.join(os.homedir(), '.codex');
   cfg.dataDir = process.env.AGENT_OFFICE_DATA_DIR || path.join(ROOT, 'data');
   if (process.env.AGENT_OFFICE_PORT) cfg.port = Number(process.env.AGENT_OFFICE_PORT);
+  cfg.scenesDir = path.resolve(ROOT, overrides.scenesDir || process.env.AGENT_OFFICE_SCENES_DIR || cfg.scenesDir);
+  cfg.scenes = loadScenes(cfg);
   return cfg;
 }
