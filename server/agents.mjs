@@ -8,16 +8,36 @@ import { join } from 'node:path';
 const str = (v) => (typeof v === 'string' ? v : '');
 const META_RE = /^agent-(.+)\.meta\.json$/;
 
-async function names(dir) {
+/**
+ * Names in `dir` that pass `keep`. The listing is remembered in `cache` under the directory path and reused while the
+ * directory's mtime is unchanged, unless it was taken within `trustMs` of that mtime (a later change could share it).
+ */
+async function names(dir, keep, cache, trustMs) {
+  let mtimeMs;
   try {
-    return await readdir(dir);
+    mtimeMs = (await stat(dir)).mtimeMs;
+  } catch {
+    cache.delete(dir);
+    return [];
+  }
+  const hit = cache.get(dir);
+  if (hit?.trusted && hit.mtimeMs === mtimeMs) return hit.names;
+  const listedAt = Date.now();
+  let all;
+  try {
+    all = await readdir(dir);
   } catch {
     return [];
   }
+  const kept = all.filter(keep);
+  cache.set(dir, { mtimeMs, names: kept, trusted: listedAt - mtimeMs > trustMs });
+  return kept;
 }
 
 async function readMeta(dir, name, runId, cache, readFile) {
   const file = join(dir, name);
+  const settled = cache.get(file);
+  if (settled?.settled) return settled.value; // a finished agent's meta never changes again: not even a stat
   let mtimeMs;
   try {
     mtimeMs = (await stat(file)).mtimeMs;
@@ -42,23 +62,25 @@ async function readMeta(dir, name, runId, cache, readFile) {
     mtimeMs,
     workflow: runId ? { runId, phase: str(j.workflowPhase), label: str(j.description) } : null,
   };
-  cache.set(file, { mtimeMs, value });
+  cache.set(file, { mtimeMs, value, settled: value.finished });
   return value;
 }
 
-/** @returns {Promise<AgentMeta[]>} `readFile` is injectable for tests. */
-export async function listAgents(sessionDir, cache, readFile = fsReadFile) {
+/** Marks an agent whose end is known from elsewhere (workflow journal result): its meta is not stat-ed again. */
+export function markSettled(cache, meta) {
+  const hit = cache.get(meta.transcriptPath.replace(/\.jsonl$/, '.meta.json'));
+  if (hit) hit.settled = true;
+}
+
+/** @returns {Promise<AgentMeta[]>} `readFile` is injectable for tests; `dirTrustMs` is the directory-listing trust window (see names). */
+export async function listAgents(sessionDir, cache, readFile = fsReadFile, dirTrustMs = 0) {
   const root = join(sessionDir, 'subagents');
+  const isMeta = (n) => META_RE.test(n);
   const targets = [];
-  for (const n of await names(root)) {
-    if (META_RE.test(n)) targets.push([root, n, null]);
-  }
+  for (const n of await names(root, isMeta, cache, dirTrustMs)) targets.push([root, n, null]);
   const wfRoot = join(root, 'workflows');
-  for (const run of await names(wfRoot)) {
-    if (!run.startsWith('wf_')) continue;
-    for (const n of await names(join(wfRoot, run))) {
-      if (META_RE.test(n)) targets.push([join(wfRoot, run), n, run]);
-    }
+  for (const run of await names(wfRoot, (n) => n.startsWith('wf_'), cache, dirTrustMs)) {
+    for (const n of await names(join(wfRoot, run), isMeta, cache, dirTrustMs)) targets.push([join(wfRoot, run), n, run]);
   }
   const out = [];
   for (const [dir, n, runId] of targets) {

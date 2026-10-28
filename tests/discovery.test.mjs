@@ -8,16 +8,18 @@ import { listLiveSessions, findSessionPaths, isPidAlive } from '../server/sessio
 import { listAgents } from '../server/agents.mjs';
 import { WorkflowJournal, phasesFromScript } from '../server/workflows.mjs';
 
-function home() {
+/** Temp dir for one test; removed when the test ends, pass or fail. */
+function home(t) {
   const dir = mkdtempSync(join(tmpdir(), 'disc-'));
-  return { dir, done: () => rmSync(dir, { recursive: true, force: true }) };
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  return { dir };
 }
 const sess = (pid) =>
   JSON.stringify({ pid, sessionId: 's1', cwd: 'C:\\Project', status: 'busy', name: 'x', startedAt: 1793170000000 });
 const O = { chunkBytes: 65536, maxLineBytes: 4194304 };
 
-test('sessions: live session is listed', async () => {
-  const h = home();
+test('sessions: live session is listed', async (t) => {
+  const h = home(t);
   mkdirSync(join(h.dir, 'sessions'));
   writeFileSync(join(h.dir, 'sessions', `${process.pid}.json`), sess(process.pid));
   const r = await listLiveSessions(h.dir);
@@ -26,29 +28,26 @@ test('sessions: live session is listed', async () => {
     provider: 'claude', pid: process.pid, sessionId: 's1', cwd: 'C:\\Project', status: 'busy', name: 'x', startedAt: 1793170000000,
   });
   assert.equal(isPidAlive(process.pid), true);
-  h.done();
 });
 
-test('sessions: dead pid is excluded', async () => {
-  const h = home();
+test('sessions: dead pid is excluded', async (t) => {
+  const h = home(t);
   mkdirSync(join(h.dir, 'sessions'));
   writeFileSync(join(h.dir, 'sessions', '999999.json'), sess(999999));
   assert.equal((await listLiveSessions(h.dir)).length, 0);
-  h.done();
 });
 
-test('sessions: key files and broken json are ignored', async () => {
-  const h = home();
+test('sessions: key files and broken json are ignored', async (t) => {
+  const h = home(t);
   mkdirSync(join(h.dir, 'sessions'));
   writeFileSync(join(h.dir, 'sessions', 'abc.key'), sess(process.pid)); // would be listed if opened
   writeFileSync(join(h.dir, 'sessions', 'bad.json'), '{x');
   assert.deepEqual(await listLiveSessions(h.dir), []);
   assert.deepEqual(await listLiveSessions(join(h.dir, 'nope')), []);
-  h.done();
 });
 
-test('sessions: transcript is found across project folders', async () => {
-  const h = home();
+test('sessions: transcript is found across project folders', async (t) => {
+  const h = home(t);
   mkdirSync(join(h.dir, 'projects', 'other'), { recursive: true });
   mkdirSync(join(h.dir, 'projects', 'C--Project'), { recursive: true });
   assert.equal(await findSessionPaths(h.dir, 's1'), null);
@@ -56,7 +55,6 @@ test('sessions: transcript is found across project folders', async () => {
   const r = await findSessionPaths(h.dir, 's1');
   assert.equal(r.transcript, join(h.dir, 'projects', 'C--Project', 's1.jsonl'));
   assert.equal(r.sessionDir, join(h.dir, 'projects', 'C--Project', 's1'));
-  h.done();
 });
 
 function agentFixture(h) {
@@ -70,8 +68,8 @@ function agentFixture(h) {
   return sd;
 }
 
-test('agents: background and workflow agents are listed', async () => {
-  const h = home();
+test('agents: background and workflow agents are listed', async (t) => {
+  const h = home(t);
   const sd = agentFixture(h);
   const r = await listAgents(sd, new Map());
   assert.equal(r.length, 2);
@@ -84,11 +82,10 @@ test('agents: background and workflow agents are listed', async () => {
   assert.deepEqual(wf.workflow, { runId: 'wf_r1', phase: 'Promote', label: 'FE stg' });
   assert.equal(wf.finished, false);
   assert.deepEqual(await listAgents(join(h.dir, 'missing'), new Map()), []);
-  h.done();
 });
 
-test('agents: unchanged meta is not re-read', async () => {
-  const h = home();
+test('agents: unchanged meta is not re-read', async (t) => {
+  const h = home(t);
   const sd = agentFixture(h);
   const cache = new Map();
   let reads = 0;
@@ -97,11 +94,10 @@ test('agents: unchanged meta is not re-read', async () => {
   assert.equal(reads, 2);
   await listAgents(sd, cache, counting);
   assert.equal(reads, 2);
-  h.done();
 });
 
-test('workflows: journal tracks started and finished', async () => {
-  const h = home();
+test('workflows: journal tracks started and finished', async (t) => {
+  const h = home(t);
   writeFileSync(
     join(h.dir, 'journal.jsonl'),
     [
@@ -118,18 +114,16 @@ test('workflows: journal tracks started and finished', async () => {
   assert.deepEqual(j.started.get('a1'), { label: 'verify:1', phase: 'Browser' });
   assert.equal(j.finished.has('a2'), true);
   assert.equal(j.finished.has('a1'), false);
-  h.done();
 });
 
-test('workflows: missing journal is not an error', async () => {
-  const h = home();
+test('workflows: missing journal is not an error', async (t) => {
+  const h = home(t);
   const j = new WorkflowJournal(h.dir, O);
   await j.poll();
   assert.equal(j.started.size, 0);
   appendFileSync(join(h.dir, 'journal.jsonl'), '{"type":"started","agentId":"a1","label":"l","phase":"p"}\n');
   await j.poll();
   assert.equal(j.started.size, 1);
-  h.done();
 });
 
 test('workflows: phases from script', () => {
@@ -138,8 +132,8 @@ test('workflows: phases from script', () => {
   assert.deepEqual(phasesFromScript('const a = 1;'), []);
 });
 
-test('sessions: path-like sessionId is rejected', async () => {
-  const h = home();
+test('sessions: path-like sessionId is rejected', async (t) => {
+  const h = home(t);
   mkdirSync(join(h.dir, 'sessions'));
   writeFileSync(
     join(h.dir, 'sessions', 'evil.json'),
@@ -147,7 +141,6 @@ test('sessions: path-like sessionId is rejected', async () => {
   );
   assert.deepEqual(await listLiveSessions(h.dir), []);
   assert.equal(await findSessionPaths(h.dir, '../x'), null);
-  h.done();
 });
 
 test('sessions: pid 0 and negative are not alive', () => {
