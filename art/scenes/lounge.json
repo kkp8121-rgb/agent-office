@@ -1,0 +1,85 @@
+{
+  "shellPrompt": "Use your image generation tool to edit the attached image lounge.png: output the SAME room (same pixel-art style, same isometric camera angle, same brick walls, windows with sky view, paintings, wall pendant lights, whiteboard, door with its door frame, lighting, same 16:9 aspect ratio, same cream background outside the room) but with EVERY free-standing floor object removed: no desks, chairs, monitors, desk plants, potted plants standing on the floor, sofa, coffee table, floor lamp, bar stools, no leaf plants next to the walls, no small tables. Keep every rug and floor mat exactly where it is (the red patterned rugs, the green mats, the door mat). Keep the two tall bookshelves flush against the back wall, the wooden cabinet with the coffee machine and cups, and the long bar counter along the right wall, drawn as part of the wall. Keep the low brown wall ledges and planter boxes along the front edge of the room. Only the empty room shell with wooden floor, rugs, walls, windows and wall-mounted items remains. Save the result as shell.png in the current directory.",
+  "shell": {
+    "ref": "assets/floors/lounge.png",
+    "size": [
+      1024,
+      576
+    ],
+    "floorIoU": 0.99
+  },
+  "layout": "diagonal (desk long side runs upper-left to lower-right; seat on the far side, monitor back toward the viewer)",
+  "sheets": [
+    {
+      "id": "s1",
+      "rows": 2,
+      "ref": "assets/floors/lounge.png",
+      "pieces": [
+        "desk",
+        "chair",
+        "lead-desk",
+        "stool",
+        "table(unused)",
+        "sofa"
+      ],
+      "prompt": "Use your image generation tool to create a sprite sheet of 6 separate furniture objects in EXACTLY the same pixel-art style, palette, dark outlines, pixel size and same isometric camera angle as the objects in the attached lounge.png. Layout: TWO rows of 3 objects with wide empty gaps between all objects, each object alone and fully separated, on a flat solid #FF00FF magenta background (no shadow on the floor, no floor, no glow). In the attached image every desk is drawn diagonally: its long side runs from upper-left to lower-right, and we see its long side facing the lower-left. Keep that EXACT diagonal isometric angle for the desks and chair, but turn the monitor around. Objects, row 1 left to right: 1) a wooden office desk with a drawer pedestal, same diagonal isometric angle as the desks in the attached image, with a computer monitor and keyboard on it, the monitor placed on the near long edge so that the BACK of the monitor faces the viewer, a small potted plant on the desk, no chair; 2) a dark green office swivel chair with armrests and a tall backrest, same diagonal isometric angle, the seat facing the lower-left toward the viewer so we see the front of the seat, nobody sitting in it; 3) a wider wooden manager desk in the same diagonal isometric angle, back of its monitor facing the viewer, with a small flat grey document tray (inbox) with papers at its left end, no chair. Row 2 left to right: 4) a wooden bar stool with a round seat and a footrest ring; 5) a low rectangular wooden coffee table; 6) a green fabric sofa with two cushions, seen diagonally, facing the lower-right. Do not use magenta anywhere inside the objects. Canvas 2:1 wide. Save as sheet.png in the current directory."
+    },
+    {
+      "id": "s2",
+      "rows": 2,
+      "ref": "assets/floors/lounge.png",
+      "pieces": [
+        "plant-big",
+        "plant-rubber",
+        "plant-fern",
+        "plant-snake",
+        "lamp",
+        "cafe-table"
+      ],
+      "prompt": "Use your image generation tool to create a sprite sheet of 6 separate objects in EXACTLY the same pixel-art style, palette, dark outlines, pixel size and same isometric camera angle as the objects in the attached lounge.png. Layout: TWO rows of 3 objects with wide empty gaps between all objects, each object alone and fully separated, on a flat solid #FF00FF magenta background (no shadow on the floor, no floor, no glow). Objects, row 1 left to right: 1) a tall leafy banana-type plant in a square terracotta planter (tall, about 2.5 times as tall as wide); 2) a medium rubber plant with broad dark green leaves in a round terracotta pot; 3) a bushy fern in a round brown clay pot. Row 2 left to right: 4) a tall slim snake plant (sansevieria) in a dark grey pot; 5) a tall standing floor lamp with a warm cream lampshade on a dark wooden pole; 6) a small round wooden cafe table on a single pedestal leg with a white coffee cup on it. Do not use magenta anywhere inside the objects. Canvas 2:1 wide. Save as sheet.png in the current directory."
+    }
+  ],
+  "note": "sheet 1 piece rows overlap in y, so pieces were split by connected components (work script outside the repo) instead of snap.py sheet --rows 2; pieces s1/piece-4 (coffee table) and s2/piece-5 (cafe table) are not used. Footprints, seats and points are written by a one-off generator outside the repo; scene.json is the source of truth.",
+  "kinds": {
+    "desk": {
+      "piece": "s1/piece-0",
+      "width": 92
+    },
+    "chair": {
+      "piece": "s1/piece-1",
+      "height": 50
+    },
+    "lead-desk": {
+      "piece": "s1/piece-2",
+      "width": 108
+    },
+    "stool": {
+      "piece": "s1/piece-3",
+      "height": 32
+    },
+    "sofa": {
+      "piece": "s1/piece-5",
+      "width": 112
+    },
+    "plant-big": {
+      "piece": "s2/piece-0",
+      "height": 74
+    },
+    "plant-rubber": {
+      "piece": "s2/piece-1",
+      "height": 62
+    },
+    "plant-fern": {
+      "piece": "s2/piece-2",
+      "height": 52
+    },
+    "plant-snake": {
+      "piece": "s2/piece-3",
+      "height": 56
+    },
+    "lamp": {
+      "piece": "s2/piece-4",
+      "height": 70
+    }
+  }
+}
