@@ -95,6 +95,8 @@ test('poller: missing transcript is retried until it appears', async (t) => {
   assert.equal(h.office.snapshot().floors.length, 1);
   writeFileSync(h.transcript, toolLine(now, 'Bash', { command: 'ls', description: '늦게 생긴 기록' }));
   await h.poller.tick(now + 1500);
+  assert.equal(floor(h.office).lead.bubble, '', 'a miss is not searched again before floor.transcriptRetryMs');
+  await h.poller.tick(now + h.cfg.floor.transcriptRetryMs);
   assert.equal(floor(h.office).lead.bubble, '늦게 생긴 기록');
 });
 
@@ -137,9 +139,15 @@ test('poller: forced hide survives one failed read of the session list', async (
   assert.equal(h.office.saved().hidden.length, 1);
 });
 
-test('poller: abandoned agents are not shown, and running ones finish after abandonMs', async (t) => {
+test('poller: agents silent for abandonMs are sent as abandoned, not finished', async (t) => {
   const h = fake(t);
   const now = Date.now();
+  const sent = new Map(); // agentId -> last meta sent to Office
+  const sync = h.office.syncAgents.bind(h.office);
+  h.office.syncAgents = (id, metas, at) => {
+    for (const m of metas) sent.set(m.agentId, m);
+    return sync(id, metas, at);
+  };
   writeFileSync(h.transcript, '');
   const ancient = h.cfg.agent.abandonMs * 2;
   agentFiles(h, 'old', { agentType: 'worker', description: '오래된' });
@@ -147,12 +155,16 @@ test('poller: abandoned agents are not shown, and running ones finish after aban
   age(join(h.subagents, 'agent-old.jsonl'), ancient);
   agentFiles(h, 'live', { agentType: 'worker', description: '진행 중' });
   await h.poller.tick(now);
-  assert.deepEqual(floor(h.office).agents.map((a) => a.agentId), ['live']);
+  assert.equal(sent.get('old').abandoned, true);
+  assert.equal(sent.get('old').finished, false);
+  assert.notEqual(sent.get('live').abandoned, true);
+  assert.equal(sent.get('live').finished, false);
 
   age(join(h.subagents, 'agent-live.meta.json'), ancient);
   age(join(h.subagents, 'agent-live.jsonl'), ancient);
   await h.poller.tick(now + 1500);
-  assert.equal(floor(h.office).agents[0].state, 'done');
+  assert.equal(sent.get('live').abandoned, true);
+  assert.equal(sent.get('live').finished, false);
 });
 
 test('poller: a recently written agent transcript keeps an old meta alive', async (t) => {
