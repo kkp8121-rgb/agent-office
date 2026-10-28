@@ -314,7 +314,7 @@ export class CodexSource {
       if (!this.#recs.has(path)) {
         this.#recs.set(path, {
           path, size: -1, meta: null, ignored: false, tail: null, resumeAt: 0,
-          turn: 'none', lastTs: 0, activeFrom: null, titleSent: false, pending: [], hot: false, gaps: null, busy: null,
+          turn: 'none', lastTs: 0, activeFrom: null, titleSent: false, pending: [], hot: false, runs: null, busy: null,
         });
       }
     }
@@ -332,21 +332,22 @@ export class CodexSource {
     if (!rec.meta) return;
 
     rec.tail ??= new FileTail(rec.path, { ...this.#cfg.tail, offset: rec.resumeAt });
-    const before = rec.tail.offset;
     const lines = await rec.tail.poll();
-    this.bytesRead += rec.tail.offset >= before ? rec.tail.offset - before : rec.tail.offset;
+    this.bytesRead += rec.tail.lastRead;
     rec.size = size;
     // On the first batch (server start) the period began after the last silence longer than the keep time during
     // which the floor would have been unlisted, exactly where it would have begun had the server been running all
-    // along. Whether a sub-agent kept it listed is only known once every rollout is read, so the silences (`gaps`)
-    // and the spans in which this rollout counted as unfinished (`busy`) are kept for #assemble to settle.
-    const keepMs = this.#keepMs(rec);
+    // along. Whether the rest of the family kept it listed is only known once every rollout is read, so the runs of
+    // lines (`runs`, no two further apart than the shortest keep time) and the spans in which this rollout counted
+    // as unfinished (`busy`) are kept for #assemble to settle.
+    const { idleKeepMs, execKeepMs } = this.#cfg.codex;
+    const runGap = Math.min(idleKeepMs, execKeepMs);
     const { abandonMs } = this.#cfg.agent;
     const first = rec.lastTs === 0;
     // A window that starts mid-file cannot see where the period began: default to the session start, so the value
     // does not depend on how big the file is (a hidden floor's record must still match after a restart).
     if (first && rec.meta.startedAt > 0) rec.activeFrom = rec.meta.startedAt;
-    const gaps = [];
+    const runs = [];
     const busy = [];
     let openFrom = null;
     let prev = 0;
@@ -357,7 +358,8 @@ export class CodexSource {
       if (rec.activeFrom === null) rec.activeFrom = ts;
       if (e.turn) rec.turn = e.turn;
       if (first) {
-        if (prev > 0 && ts - prev > keepMs) gaps.push([prev, ts]);
+        if (prev > 0 && ts - prev <= runGap) runs.at(-1)[1] = Math.max(runs.at(-1)[1], ts);
+        else runs.push([ts, ts]);
         if (openFrom !== null && ts - prev > abandonMs) {
           busy.push([openFrom, prev + abandonMs]); // counted as abandoned in between
           openFrom = null;
@@ -374,7 +376,7 @@ export class CodexSource {
     }
     if (first) {
       if (openFrom !== null) busy.push([openFrom, prev + abandonMs]);
-      rec.gaps = gaps;
+      rec.runs = runs;
       rec.busy = busy;
     }
   }
@@ -432,16 +434,19 @@ export class CodexSource {
     }
     const finished = (rec) => rec.turn === 'end' || rec.lastTs < abandonedBefore;
 
-    // First batch of a top-level rollout: a silence longer than the keep time started a new period only if some
-    // moment of it was not covered by an unfinished sub-agent (only then would the floor have been unlisted).
+    // First batch of a top-level rollout: the floor is listed while any rollout of its family (the top-level one and
+    // its sub-agents) wrote a line within the keep time or is unfinished. A period begins where that coverage restarts
+    // after a hole, the same rule the live listing below applies, so a restarted server and a running one agree.
     for (const rec of byId.values()) {
-      if (rec.meta.kind === 'subagent' || !rec.gaps) continue;
-      const spans = (kids.get(rec) ?? []).flatMap((k) => k.busy ?? []).sort((a, b) => a[0] - b[0]);
+      if (rec.meta.kind === 'subagent' || !rec.runs) continue;
       const keepMs = this.#keepMs(rec);
-      for (const [from, to] of rec.gaps) {
-        let reach = from + keepMs; // the floor would have left here unless a sub-agent was unfinished
-        for (const [s, e] of spans) if (s <= reach) reach = Math.max(reach, e);
-        if (reach < to) rec.activeFrom = to;
+      const covered = [rec, ...(kids.get(rec) ?? [])]
+        .flatMap((m) => [...(m.runs ?? []).map(([from, to]) => [from, to + keepMs]), ...(m.busy ?? [])])
+        .sort((a, b) => a[0] - b[0]);
+      let reach = -Infinity;
+      for (const [from, to] of covered) {
+        if (reach > -Infinity && from > reach) rec.activeFrom = from;
+        reach = Math.max(reach, to);
       }
     }
 
@@ -451,7 +456,8 @@ export class CodexSource {
       const own = !finished(rec);
       const keepMs = this.#keepMs(rec);
       const mine = kids.get(rec) ?? [];
-      const listed = own || now - rec.lastTs <= keepMs || mine.some((k) => !finished(k));
+      const lastTs = Math.max(rec.lastTs, ...mine.map((k) => k.lastTs));
+      const listed = own || now - lastTs <= keepMs || mine.some((k) => !finished(k));
       if (!listed) {
         rec.activeFrom = null; // the next activity starts a new period (and a new startedAt)
         rec.titleSent = false;
@@ -489,7 +495,7 @@ export class CodexSource {
     // Events are delivered once: whatever was read for unlisted files is dropped, as a Claude tail would drop it.
     for (const rec of this.#recs.values()) {
       rec.pending = [];
-      rec.gaps = rec.busy = null;
+      rec.runs = rec.busy = null;
       rec.hot = listedRecs.has(rec) || (!rec.meta && !rec.ignored); // a first line still being written stays watched
       // A finished rollout that is not listed holds no FileTail (64 KB buffer); it resumes from its line offset.
       if (rec.tail?.resumable && rec.meta && !listedRecs.has(rec) && finished(rec)) {
