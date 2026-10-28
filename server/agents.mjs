@@ -72,20 +72,41 @@ export function markSettled(cache, meta) {
   if (hit) hit.settled = true;
 }
 
-/** @returns {Promise<AgentMeta[]>} `readFile` is injectable for tests; `dirTrustMs` is the directory-listing trust window (see names). */
-export async function listAgents(sessionDir, cache, readFile = fsReadFile, dirTrustMs = 0) {
+/**
+ * @returns {Promise<AgentMeta[]>} `readFile` is injectable for tests; `dirTrustMs` is the directory-listing trust window (see names).
+ * A workflow run whose agents have all ended and whose folder and meta files have been quiet for `runSettleMs` is remembered whole: later
+ * scans neither stat nor list it, so scan cost follows the active runs, not the session's whole workflow history.
+ */
+export async function listAgents(sessionDir, cache, readFile = fsReadFile, dirTrustMs = 0, runSettleMs = dirTrustMs) {
   const root = join(sessionDir, 'subagents');
   const isMeta = (n) => META_RE.test(n);
-  const targets = [];
-  for (const n of await names(root, isMeta, cache, dirTrustMs)) targets.push([root, n, null]);
+  const out = [];
+  for (const n of await names(root, isMeta, cache, dirTrustMs)) {
+    const m = await readMeta(root, n, null, cache, readFile);
+    if (m) out.push(m);
+  }
   const wfRoot = join(root, 'workflows');
   for (const run of await names(wfRoot, (n) => n.startsWith('wf_'), cache, dirTrustMs)) {
-    for (const n of await names(join(wfRoot, run), isMeta, cache, dirTrustMs)) targets.push([join(wfRoot, run), n, run]);
-  }
-  const out = [];
-  for (const [dir, n, runId] of targets) {
-    const m = await readMeta(dir, n, runId, cache, readFile);
-    if (m) out.push(m);
+    const dir = join(wfRoot, run);
+    const frozen = cache.get(`run:${dir}`);
+    if (frozen) {
+      out.push(...frozen);
+      continue;
+    }
+    const files = await names(dir, isMeta, cache, dirTrustMs);
+    const metas = [];
+    for (const n of files) {
+      const m = await readMeta(dir, n, run, cache, readFile);
+      if (m) metas.push(m);
+    }
+    out.push(...metas);
+    const listing = cache.get(dir);
+    // The folder mtime only moves when an agent file appears; finishing an agent rewrites its meta, so quiet counts both.
+    const lastActive = Math.max(listing?.mtimeMs ?? 0, ...metas.map((m) => m.mtimeMs));
+    const quiet = listing?.trusted && Date.now() - lastActive >= runSettleMs;
+    if (quiet && metas.length === files.length && files.length > 0 && files.every((n) => cache.get(join(dir, n))?.settled)) {
+      cache.set(`run:${dir}`, metas);
+    }
   }
   return out;
 }

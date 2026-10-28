@@ -183,7 +183,7 @@ export class Poller {
   // ---- subagents ---------------------------------------------------------------------------
 
   async #scanAgents(id, st, now) {
-    const metas = await listAgents(st.paths.sessionDir, this.#metaCache, undefined, this.#cfg.agent.dirTrustMs);
+    const metas = await listAgents(st.paths.sessionDir, this.#metaCache, undefined, this.#cfg.agent.dirTrustMs, this.#cfg.workflow.doneQuietMs);
     const abandonedBefore = now - this.#cfg.agent.abandonMs;
     const byRun = new Map(); // runId -> metas of that run
     for (const m of metas) {
