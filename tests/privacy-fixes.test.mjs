@@ -37,7 +37,7 @@ function home(t, overrides = {}) {
   cfg.codexHome = dir;
   const pad = (n) => String(n).padStart(2, '0');
   const rollout = (id, content) => {
-    const day = new Date();
+    const day = new Date(Date.now() - 60 * 60000); // the tests poll up to an hour back: put the file in the day folder every poll scans (a test run just after midnight would miss today's)
     const d = join(dir, 'sessions', String(day.getFullYear()), pad(day.getMonth() + 1), pad(day.getDate()));
     mkdirSync(d, { recursive: true });
     const file = join(d, `rollout-2026-10-28T00-00-00-${id}.jsonl`);

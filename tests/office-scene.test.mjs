@@ -1,4 +1,4 @@
-import { test, mock } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -60,30 +60,16 @@ test('office-scene: freed seat is reused', () => {
   assert.equal(late.slot.kind, 'seat');
 });
 
-test('office-scene: design without scene keeps legacy slot shape', () => {
-  const o = setup(loadConfig({ scenesDir: FIXTURE_SCENES, designOrder: ['lounge'] }));
-  o.syncAgents('s1', [M('a0')], 1000);
-  assert.deepEqual(Object.keys(agentsOf(o)[0].slot).sort(), ['i', 'x', 'y']);
-});
-
-test('office-scene: broken scene with legacy layout falls back, without layout refuses start', (t) => {
+test('office-scene: a design without a scene, or with a broken one, refuses to start', (t) => {
   const tmp = mkdtempSync(join(tmpdir(), 'scenes-'));
   t.after(() => rmSync(tmp, { recursive: true, force: true }));
-  const broken = (name) => {
-    cpSync(FIXTURE_DIR, join(tmp, name), { recursive: true });
-    const raw = fixtureRaw();
-    raw.design = name;
-    delete raw.seats;
-    writeFileSync(join(tmp, name, 'scene.json'), JSON.stringify(raw));
-  };
-  broken('studio2');
-  const warn = mock.method(console, 'warn', () => {});
-  const cfg = loadConfig({ scenesDir: tmp, designOrder: ['studio2'] });
-  assert.equal(cfg.scenes.studio2, undefined);
-  assert.equal(warn.mock.callCount(), 1);
-  warn.mock.restore();
-  broken('noroom');
+  cpSync(FIXTURE_DIR, join(tmp, 'noroom'), { recursive: true });
+  const raw = fixtureRaw();
+  raw.design = 'noroom';
+  delete raw.seats;
+  writeFileSync(join(tmp, 'noroom', 'scene.json'), JSON.stringify(raw));
   assert.throws(() => loadConfig({ scenesDir: tmp, designOrder: ['noroom'] }), /장면 검사 실패/);
+  assert.throws(() => loadConfig({ scenesDir: tmp, designOrder: ['absent'] }), /장면 검사 실패/);
 });
 
 test('office-scene: a scene whose design differs from its folder is refused', (t) => {

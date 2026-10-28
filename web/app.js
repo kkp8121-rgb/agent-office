@@ -42,17 +42,13 @@ const recOf = new WeakMap(); // character element -> rec
 
 // ---------- small helpers ----------
 
-function layoutOf(design) {
-  return ui.layouts[design] ?? ui.layouts[Object.keys(ui.layouts)[0]];
-}
-
 /** Scales the floors down (CSS zoom) so the widest one fits beside the panel, or above it in a narrow window. */
 function fitFloors() {
   const cs = getComputedStyle(appEl);
   const sideBySide = cs.flexDirection === 'row';
   const avail = appEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
     - (sideBySide ? panelEl.offsetWidth + parseFloat(cs.columnGap) : 0);
-  const widest = Math.max(0, ...[...floorRecs.values()].map((r) => r.layout.size[0]));
+  const widest = Math.max(0, ...[...floorRecs.values()].map((r) => r.scene.r.size[0]));
   floorsEl.style.zoom = widest > avail ? String(Math.max(avail, 0) / widest) : '';
 }
 
@@ -154,7 +150,7 @@ function createChar(av, stage, startAt, sc) {
   flip.append(spr);
   body.append(flip);
   root.append(body, zz);
-  root.style.zIndex = String(sc ? charZ(startAt.y, ui.depth) : Math.round(startAt.y));
+  root.style.zIndex = String(charZ(startAt.y, ui.depth));
   root.style.transform = `translate(${startAt.x}px, ${startAt.y}px)`;
   root.style.setProperty('--fid-ms', `${amb.fidgetMs}ms`);
   tagRoot.style.transform = root.style.transform;
@@ -162,29 +158,15 @@ function createChar(av, stage, startAt, sc) {
     el: root, tagRoot, body, bubTxt, bubDot, flip, tag, img, sitImg: null, sprite: av.sprite, x: startAt.x, y: startAt.y, state: '', bubKey: null, arrived: false,
     scene: sc, walk: null, seated: false, seat: null, away: false, trip: null, target: null, targetKey: '', slot: av.slot, isLead: false, frec: null, m: null, rng: null,
   };
-  if (sc && sitSet.has(av.sprite)) {
+  if (sitSet.has(av.sprite)) {
     rec.sitImg = makeSitSprite(rec, av.sprite);
     spr.append(rec.sitImg);
   }
   recOf.set(root, rec);
-  const settle = (e) => {
-    if (e.target !== root || e.propertyName !== 'transform') return;
-    // A cancel caused by a retarget leaves a newer walk running: only the latest walk's end (or a cancel with no
-    // walk left, as when pause() switches transitions off) settles.
-    if (e.type === 'transitioncancel' && root.getAnimations().some((a) => a.transitionProperty === 'transform' && a.playState === 'running')) return;
-    root.classList.remove('walking');
-    flip.classList.remove('left');
-    rec.arrived = true;
-    if (rec.state === 'done') root.classList.add('arrived');
-  };
-  // old layouts: one straight transition per walk. Scenes: a chain of pieces; only a piece's own end moves it on.
+  // A walk is a chain of pieces; only a piece's own end moves it on.
   root.addEventListener('transitionend', (e) => {
     if (e.target !== root || e.propertyName !== 'transform') return;
     if (rec.walk) walkEnded(rec, e);
-    else if (!rec.scene) settle(e);
-  });
-  root.addEventListener('transitioncancel', (e) => {
-    if (!rec.walk && !rec.scene) settle(e);
   });
   const gestureEnd = (e) => {
     if ((e.target === body || e.target === flip) && (e.animationName === 'squash' || e.animationName.startsWith('fid-'))) e.target.classList.remove(e.animationName);
@@ -195,25 +177,7 @@ function createChar(av, stage, startAt, sc) {
   return rec;
 }
 
-/** Moves a character in a straight line; the duration follows the distance. */
-function walkTo(elm, x, y) {
-  const rec = recOf.get(elm);
-  const { tagRoot } = rec;
-  const dx = x - rec.x;
-  const dy = y - rec.y;
-  const dist = Math.hypot(dx, dy);
-  rec.x = x;
-  rec.y = y;
-  elm.style.zIndex = String(Math.round(y));
-  if (dist < 1) return;
-  rec.arrived = false;
-  elm.style.transitionDuration = tagRoot.style.transitionDuration = `${Math.max(WALK_MIN_MS, (dist / WALK_PX_PER_SEC) * 1000)}ms`;
-  rec.flip.classList.toggle('left', dx < 0);
-  elm.classList.add('walking');
-  elm.style.transform = tagRoot.style.transform = `translate(${x}px, ${y}px)`;
-}
-
-// ---------- scene walking ----------
+// ---------- walking ----------
 
 const setFacing = (rec, face) => rec.flip.classList.toggle('left', face === 'left');
 
@@ -399,13 +363,13 @@ function settleNow(rec, animate = false) {
   arriveAt(rec, rec.target, animate);
 }
 
-// ---------- life: gestures and trips (scenes only for trips) ----------
+// ---------- life: gestures and trips ----------
 
 const whoOf = (frec, rec) => ({ isLead: rec.isLead, state: rec.state, floorStatus: frec.status });
 
 /** Sets the next trip time from the character's state range; no range (a lead off tour, a finished agent) = never until the state changes. */
 function scheduleTrip(frec, rec, extra = 0) {
-  const range = frec.scene ? tripRange(amb, whoOf(frec, rec)) : null;
+  const range = tripRange(amb, whoOf(frec, rec));
   rec.m.nextTripAt = range ? Date.now() + extra + between(rec.rng, range) : Infinity;
 }
 
@@ -489,7 +453,7 @@ function startLeg(frec, rec) {
 }
 
 function doTrip(frec, rec) {
-  const range = frec.scene ? tripRange(amb, whoOf(frec, rec)) : null;
+  const range = tripRange(amb, whoOf(frec, rec));
   const legs = range && !rec.walk && !rec.away && rec.arrived && rec.state !== 'done' ? pickLegs(frec, rec) : null;
   if (!legs?.length) return scheduleTrip(frec, rec);
   rec.away = true;
@@ -573,26 +537,17 @@ function setBubble(rec, bubble, since) {
 function renderAgent(av, floorEl) {
   const frec = floorRecs.get(floorEl.dataset.sid);
   const sc = frec.scene;
-  const layout = frec.layout;
   const isLead = av.key === 'lead';
   let rec = frec.agents.get(av.key);
   const done = av.state === 'done';
-  // Finished agents line up at the tray. Old layouts: leftwards from it, the lead to its right, every other row shifted half a step.
-  let target;
-  let key;
-  if (sc) {
-    target = sceneTarget(av, frec, done);
-    key = `${target.x},${target.y},${target.seated}`;
-  } else {
-    target = done ? trayPos(av.slot.i, layout.tray, ui.ui.traySpreadPx, ui.ui.trayRowPx) : { x: av.slot.x, y: av.slot.y };
-  }
+  const target = sceneTarget(av, frec, done);
+  const key = `${target.x},${target.y},${target.seated}`;
 
   if (!rec) {
     // The first render of a floor places everyone directly; later newcomers walk in from the entrance.
     const walksIn = frec.populated && !isLead && !done;
-    const door = sc ? sc.r.door : null;
-    const entrance = sc ? door.at : layout.entrance;
-    const startAt = walksIn ? { x: entrance[0], y: entrance[1] } : target;
+    const { door } = sc.r;
+    const startAt = walksIn ? { x: door.at[0], y: door.at[1] } : target;
     rec = createChar(av, frec.stage, startAt, sc);
     rec.frec = frec;
     rec.isLead = isLead;
@@ -602,21 +557,19 @@ function renderAgent(av, floorEl) {
       rec.tagRoot.classList.add('enter-in');
     }
     initAmbient(rec, frec, av);
-    if (sc) {
-      setFacing(rec, walksIn ? door.face : target.face);
-      if (!walksIn) {
-        rec.target = target;
-        rec.targetKey = key;
-        settleNow(rec);
-      } else void rec.el.offsetWidth; // commit the start point before the walk
-    } else if (walksIn) void rec.el.offsetWidth;
+    setFacing(rec, walksIn ? door.face : target.face);
+    if (!walksIn) {
+      rec.target = target;
+      rec.targetKey = key;
+      settleNow(rec);
+    } else void rec.el.offsetWidth; // commit the start point before the walk
   }
   rec.slot = av.slot;
 
   if (rec.sprite !== av.sprite) {
     rec.sprite = av.sprite;
     rec.img.src = spriteUrl(av.sprite);
-    if (sc && sitSet.has(av.sprite)) {
+    if (sitSet.has(av.sprite)) {
       if (rec.sitImg) rec.sitImg.src = sitUrl(av.sprite);
       else {
         rec.sitImg = makeSitSprite(rec, av.sprite);
@@ -646,29 +599,20 @@ function renderAgent(av, floorEl) {
     rec.tagRoot.classList.toggle('done', done); // finished agents stand together on the tray: their tags would pile up
   }
   if (done && !frec.populated && lastNow - av.since > DONE_STALE_MS) rec.el.classList.add('gone'); // already reported before this page loaded
-  if (sc && rec.m.nextTripAt === Infinity && !rec.away && rec.m.returnAt === 0) {
+  if (rec.m.nextTripAt === Infinity && !rec.away && rec.m.returnAt === 0) {
     scheduleTrip(frec, rec, rec.m.fresh ? between(rec.rng, amb.firstDelayMs) : 0);
     rec.m.fresh = false;
   }
 
   setBubble(rec, av.bubble, av.since);
 
-  if (sc) {
-    rec.target = target;
-    if (rec.targetKey !== key) {
-      rec.targetKey = key;
-      retarget(rec, frec, target);
-    } else if (rec.away && av.state === 'working') {
-      retarget(rec, frec, target); // back to work: the server's place wins over the trip
-    } else if (done && !rec.walk) {
-      rec.arrived = true;
-      rec.el.classList.add('arrived');
-    }
-    return;
-  }
-  if (rec.x !== target.x || rec.y !== target.y) {
-    walkTo(rec.el, target.x, target.y);
-  } else if (done && !rec.el.classList.contains('walking')) {
+  rec.target = target;
+  if (rec.targetKey !== key) {
+    rec.targetKey = key;
+    retarget(rec, frec, target);
+  } else if (rec.away && av.state === 'working') {
+    retarget(rec, frec, target); // back to work: the server's place wins over the trip
+  } else if (done && !rec.walk) {
     rec.arrived = true;
     rec.el.classList.add('arrived');
   }
@@ -766,40 +710,28 @@ function buildNavDebug(frec, sc) {
 
 function createFloor(fv) {
   const sc = sceneOf(fv.design);
-  const layout = sc ? { size: sc.r.size } : layoutOf(fv.design);
+  const { r } = sc;
   const root = el('section', 'floor');
   root.dataset.sid = fv.sessionId;
   root.style.setProperty('--c', colorOf(fv.sessionId));
-  root.style.width = `${layout.size[0]}px`;
-  root.style.height = `${layout.size[1]}px`;
+  root.style.width = `${r.size[0]}px`;
+  root.style.height = `${r.size[1]}px`;
   const stage = el('div', 'stage');
-  let boardBox;
-  let reportsAt;
-  let signAt = null;
-  if (sc) {
-    const { r } = sc;
-    stage.classList.add('scened');
-    stage.style.backgroundImage = `url(${sc.url}${encodeURIComponent(r.shell)})`;
-    stage.style.setProperty('--atlas', `url(${sc.url}${encodeURIComponent(r.atlas)})`);
-    for (const n of sc.nodes) stage.append(objNode(n));
-    if (r.front) {
-      const front = el('div', 'front');
-      front.style.backgroundImage = `url(${sc.url}${encodeURIComponent(r.front)})`;
-      front.style.zIndex = String(ui.depth.frontZ);
-      stage.append(front);
-    }
-    boardBox = r.board;
-    reportsAt = [r.tray.at[0] + r.reports[0], r.tray.at[1] + r.reports[1]];
-    signAt = r.sign;
-  } else {
-    stage.style.backgroundImage = `url(/assets/floors/${encodeURIComponent(layout.image)})`;
-    boardBox = layout.board;
-    reportsAt = [layout.tray[0] + 30, layout.tray[1] - 22];
+  stage.classList.add('scened');
+  stage.style.backgroundImage = `url(${sc.url}${encodeURIComponent(r.shell)})`;
+  stage.style.setProperty('--atlas', `url(${sc.url}${encodeURIComponent(r.atlas)})`);
+  for (const n of sc.nodes) stage.append(objNode(n));
+  if (r.front) {
+    const front = el('div', 'front');
+    front.style.backgroundImage = `url(${sc.url}${encodeURIComponent(r.front)})`;
+    front.style.zIndex = String(ui.depth.frontZ);
+    stage.append(front);
   }
-  stage.style.backgroundSize = `${layout.size[0]}px ${layout.size[1]}px`;
+  const reportsAt = [r.tray.at[0] + r.reports[0], r.tray.at[1] + r.reports[1]];
+  stage.style.backgroundSize = `${r.size[0]}px ${r.size[1]}px`;
 
   const board = el('div', 'board');
-  const [bx, by, bw, bh] = boardBox;
+  const [bx, by, bw, bh] = r.board;
   Object.assign(board.style, { left: `${bx}px`, top: `${by}px`, width: `${bw}px`, maxHeight: `${bh}px` });
   const bt = el('b');
   const bl = el('p');
@@ -807,7 +739,7 @@ function createFloor(fv) {
 
   const sign = el('div', 'sign');
   sign.title = '더블클릭하면 이름을 바꿉니다';
-  if (signAt) Object.assign(sign.style, { left: `${signAt[0]}px`, top: `${signAt[1]}px`, right: 'auto' });
+  if (r.sign) Object.assign(sign.style, { left: `${r.sign[0]}px`, top: `${r.sign[1]}px`, right: 'auto' });
   const fno = el('span', 'fno');
   const ft = el('span', 'ft');
   const ff = el('span', 'ff');
@@ -824,11 +756,11 @@ function createFloor(fv) {
   stage.append(board, sign, reports);
   root.append(stage);
   const rec = {
-    el: root, stage, layout, bt, bl, fno, ft, ff, fs, prov, reports, agents: new Map(), populated: false,
+    el: root, stage, bt, bl, fno, ft, ff, fs, prov, reports, agents: new Map(), populated: false,
     sid: fv.sessionId, design: fv.design, scene: sc, status: fv.status, dbg: null, clock: null, clockOn: false, warned: false,
   };
   rec.clock = makeClock(rec);
-  if (sc && DEBUG_NAV) {
+  if (DEBUG_NAV) {
     rec.dbg = buildNavDebug(rec, sc);
     stage.append(rec.dbg.svg);
   }
@@ -861,15 +793,13 @@ function renderFloor(fv, elm) {
   rec.reports.hidden = fv.reports <= 0;
   if (fv.reports > 0) setText(rec.reports, `보고 ${fv.reports}`);
 
-  const lead = rec.scene?.r.lead;
+  const { lead } = rec.scene.r;
   const leadView = {
     key: 'lead',
     name: fv.lead.name,
     role: fv.lead.role,
     sprite: fv.lead.sprite,
-    slot: lead
-      ? { kind: 'seat', i: 0, x: lead.at[0], y: lead.at[1], approach: lead.approach, sit: lead.sitAt, face: lead.face, ring: 0 }
-      : { x: rec.layout.lead[0], y: rec.layout.lead[1], i: 0 },
+    slot: { kind: 'seat', i: 0, x: lead.at[0], y: lead.at[1], approach: lead.approach, sit: lead.sitAt, face: lead.face, ring: 0 },
     state: fv.lead.state,
     bubble: fv.lead.bubble,
     since: fv.lead.bubble === (rec.leadBubble ?? null) ? rec.leadSince : lastNow,

@@ -1,5 +1,5 @@
 // Reads the layered scenes (assets/scenes/<design>/scene.json) at start-up and checks their format (stage 1 only;
-// the heavy stages 2-9 belong to the validator and the tests). A design without a scene keeps its old layout.
+// the heavy stages 2-9 belong to the validator and the tests).
 import fs from 'node:fs';
 import path from 'node:path';
 import { checkSceneFormat } from '../web/scene.mjs';
@@ -34,23 +34,14 @@ export function readScene(dir, design, cfg, opts = {}) {
   return errors.length ? { errors } : { raw };
 }
 
-/**
- * @returns {Record<string, {raw: object, url: string}>} the designs in `designOrder` that have a valid scene. A broken
- * scene falls back to the design's old layout (one warning line); without an old layout it refuses to start.
- */
+/** @returns {Record<string, {raw: object, url: string}>} every design in `designOrder`; a design without a valid scene refuses to start. */
 export function loadScenes(cfg) {
   const out = {};
   for (const design of cfg.designOrder) {
     const dir = path.join(cfg.scenesDir, design);
-    if (!fs.existsSync(path.join(dir, 'scene.json'))) continue;
     const res = readScene(dir, design, cfg);
-    if (res.raw) {
-      out[design] = { raw: res.raw, url: `/scenes/${design}/` };
-    } else if (cfg.layouts?.[design]) {
-      console.warn(`장면 검사 실패, 옛 배치로 대신합니다: ${design}: ${res.errors[0]}`);
-    } else {
-      throw new Error(`장면 검사 실패: ${design}: ${res.errors[0]}`);
-    }
+    if (!res.raw) throw new Error(`장면 검사 실패: ${design}: ${res.errors[0]}`);
+    out[design] = { raw: res.raw, url: `/scenes/${design}/` };
   }
   return out;
 }

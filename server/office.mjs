@@ -37,7 +37,7 @@ export class Office {
     /** Increments on every change to what saved() returns. */
     this.savedVersion = 0;
     this.floors = new Map(); // sessionId -> floor
-    this.resolved = new Map(); // design -> resolved scene (designs that have a layered scene)
+    this.resolved = new Map(); // design -> resolved scene
     this.grids = new Map(); // design -> baked walking grid (overflow spots are picked on open floor)
     this.floorsCreated = 0; // never decremented: breaks ties between equally used designs
     this.floorSeq = 0;
@@ -322,7 +322,7 @@ export class Office {
     const entry = this.#roleFor(f, m.agentType);
     const wf = m.workflow;
     const head = clip(wf ? `${wf.phase} · ${wf.label}` : m.description ?? '', log.headMaxChars);
-    const slot = this.#allocSlot(f);
+    const slot = this.#allocSceneSlot(f, this.#sceneOf(f.design));
     const a = {
       agentId: m.agentId,
       key: `${f.sessionId}:${m.agentId}`,
@@ -369,33 +369,8 @@ export class Office {
     }
   }
 
-  /** Smallest free index over [...desks, ...aisle]; beyond that, round r revisits the aisle spots shifted by ui.overflowShifts[r - 1]. */
-  #allocSlot(f) {
-    const scene = this.#sceneOf(f.design);
-    if (scene) return this.#allocSceneSlot(f, scene);
-    const { desks, aisle, size } = this.cfg.layouts[f.design];
-    const { overflowShifts, overflowMarginPx } = this.cfg.ui;
-    let i = 0;
-    while (f.usedSlots.has(i)) i++;
-    f.usedSlots.add(i);
-    const k = i - desks.length;
-    if (k < aisle.length) {
-      const p = k < 0 ? desks[i] : aisle[k];
-      return { x: p[0], y: p[1], i };
-    }
-    const round = Math.floor(k / aisle.length) - 1; // 0 for the first lap over the aisle
-    const base = aisle[k % aisle.length];
-    const [dx, dy] = overflowShifts[round % overflowShifts.length];
-    const x = Math.min(Math.max(base[0] + dx, overflowMarginPx), size[0] - overflowMarginPx);
-    const y = Math.min(Math.max(base[1] + dy, this.cfg.spriteHeight), size[1] - 4);
-    return { x, y, i };
-  }
-
   #sceneOf(design) {
-    if (!this.resolved.has(design)) {
-      const entry = this.cfg.scenes?.[design];
-      this.resolved.set(design, entry ? resolveScene(entry.raw) : null);
-    }
+    if (!this.resolved.has(design)) this.resolved.set(design, resolveScene(this.cfg.scenes[design].raw));
     return this.resolved.get(design);
   }
 

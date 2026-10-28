@@ -9,11 +9,6 @@ function setText(el, text) {
 /** The server gives each session a palette index (floor.colorIndex, /api/log colors); ui.sessionPalette turns it into a colour. */
 const sessionColorIdx = new Map(); // sessionId -> palette index
 let sessionPalette = [];
-/** Finished agents fill a 3-wide grid leftwards from the tray; every other row is shifted half a step and stands one row higher, so no two slots coincide. */
-function trayPos(i, tray, stepPx, rowPx) {
-  const row = Math.floor(i / 3);
-  return { x: tray[0] - ((i % 3) + (row % 2) / 2) * stepPx, y: tray[1] - row * rowPx };
-}
 const colorOf = (sessionId) => sessionPalette[sessionColorIdx.get(sessionId)] ?? '#8a6a42';
 
 const spriteUrl = (key) => `/assets/sprites/${encodeURIComponent(key)}.png`;

@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadConfig } from '../server/config.mjs';
 import { Office } from '../server/office.mjs';
+import { namedScenesDir } from './helpers/fixture.mjs';
 
 const cfg = loadConfig();
 const EMPTY = { hidden: [], names: {} };
@@ -217,8 +218,7 @@ test('office: departed titles are forgotten once the log no longer references th
 
 // T8B
 test('office: a new floor gets the least used design, existing floors keep theirs', () => {
-  const layout = (image) => ({ ...cfg.layouts.studio, image });
-  const c3 = loadConfig({ designOrder: ['a', 'b', 'c'], layouts: { a: layout('a.png'), b: layout('b.png'), c: layout('c.png') } });
+  const c3 = loadConfig({ scenesDir: namedScenesDir('a', 'b', 'c'), designOrder: ['a', 'b', 'c'] });
   const o = new Office(c3, EMPTY);
   const live = (...ids) => ids.map((id) => S(id, { startedAt: Number(id.slice(1)) }));
   const designs = () => Object.fromEntries(o.snapshot().floors.map((f) => [f.sessionId, f.design]));

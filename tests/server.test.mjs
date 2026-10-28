@@ -180,7 +180,8 @@ test('server: api/state and api/ui', async (t) => {
   assert.equal(state.floors[0].sessionId, 's1');
   const ui = JSON.parse((await req(c, 'GET', '/api/ui')).body);
   assert.equal(ui.spriteHeight, c.cfg.spriteHeight);
-  assert.deepEqual(ui.layouts, c.cfg.layouts);
+  assert.deepEqual(Object.keys(ui.scenes), c.cfg.designOrder);
+  assert.ok(Array.isArray(ui.sitSprites));
   assert.deepEqual(ui.ui, c.cfg.ui);
   assert.equal(ui.bubbleShowMs, c.cfg.agent.bubbleShowMs);
   assert.equal(ui.nameMaxChars, c.cfg.floor.nameMaxChars);
@@ -339,7 +340,7 @@ test('server: /api/log clamps limit', async (t) => {
 
 test('server: /api/ui carries the scenes, sit sprites and the scene numbers', async (t) => {
   const fixtures = fileURLToPath(new URL('./fixtures/scenes', import.meta.url));
-  const c = await start(t, { cfg: loadConfig({ scenesDir: fixtures, designOrder: ['studio2', 'lounge'] }) });
+  const c = await start(t, { cfg: loadConfig({ scenesDir: fixtures, designOrder: ['studio2'] }) });
   const ui = JSON.parse((await req(c, 'GET', '/api/ui')).body);
   assert.deepEqual(Object.keys(ui.scenes), ['studio2']);
   assert.equal(ui.scenes.studio2.url, '/scenes/studio2/');
@@ -349,7 +350,7 @@ test('server: /api/ui carries the scenes, sit sprites and the scene numbers', as
   assert.equal(ui.nav.cellPx, 8);
   assert.equal(ui.depth.frontZ, 7000);
   assert.equal(ui.ui.ambient.maxAway, 2);
-  assert.ok(ui.layouts.lounge, 'designs without a scene keep their layout');
+  assert.equal(ui.layouts, undefined);
 });
 
 test('server: /scenes serves scene pictures with the picture cache header and refuses traversal', async (t) => {

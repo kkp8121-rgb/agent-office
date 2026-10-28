@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
+import { loadConfig } from '../server/config.mjs';
+import { resolveScene, trayPoint } from '../web/scene.mjs';
 
 // logrow.js is a classic script: load it into a fresh context (its DOM helpers are only touched inside functions).
 function loadLogrow() {
@@ -33,20 +35,13 @@ test('web: log meta line says when the list is capped', () => {
   assert.equal(run('logMetaText(500, true)'), '최근 500건만 표시 · 최신 순');
 });
 
-test('web: config has the tray spread and it clears the character width', () => {
-  const cfg = JSON.parse(readFileSync(new URL('../config.json', import.meta.url), 'utf8'));
-  assert.ok(cfg.ui.traySpreadPx >= 44);
-});
-
 test('web: tray slots never coincide, even for 24 finished agents', () => {
-  const run = loadLogrow();
-  const cfg = JSON.parse(readFileSync(new URL('../config.json', import.meta.url), 'utf8'));
-  const pts = new Set();
-  for (let i = 0; i < 24; i++) {
-    const p = run(`trayPos(${i}, [400, 500], ${cfg.ui.traySpreadPx}, ${cfg.ui.trayRowPx})`);
-    pts.add(`${p.x},${p.y}`);
+  const cfg = loadConfig();
+  for (const d of cfg.designOrder) {
+    const r = resolveScene(cfg.scenes[d].raw);
+    const pts = new Set(Array.from({ length: 24 }, (_, i) => trayPoint(r, i, cfg.nav.trayRowPx).join(',')));
+    assert.equal(pts.size, 24, d);
   }
-  assert.equal(pts.size, 24);
 });
 
 test('web: hasOwn title lookup ignores inherited keys', () => {

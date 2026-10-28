@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadConfig } from '../server/config.mjs';
 import { Office } from '../server/office.mjs';
+import { resolveScene } from '../web/scene.mjs';
+import { namedScenesDir } from './helpers/fixture.mjs';
 
 const cfg = loadConfig();
 const EMPTY = { hidden: [], names: {} };
@@ -98,17 +100,20 @@ test('office: unknown agentType uses 나래·지원', () => {
   assert.equal(b.name, '나래+1');
 });
 
-test('office: desks fill first, then aisle, then overflow index', () => {
-  const L = cfg.layouts[cfg.designOrder[0]];
-  const total = L.desks.length + L.aisle.length;
+test('office: seats fill first, then idle spots, then overflow index', () => {
+  const r = resolveScene(cfg.scenes[cfg.designOrder[0]].raw);
+  const total = r.seats.length + r.idle.length;
   const o = setup();
   const metas = Array.from({ length: total + 2 }, (_, i) => M(`a${i}`));
   o.syncAgents('s1', metas, 1000);
   const slots = floorOf(o, 's1').agents.map((a) => a.slot);
-  L.desks.forEach((d, i) => assert.deepEqual(slots[i], { x: d[0], y: d[1], i }));
-  L.aisle.forEach((p, k) => assert.deepEqual(slots[L.desks.length + k], { x: p[0], y: p[1], i: L.desks.length + k }));
-  // overflow no longer stacks: it revisits the aisle spots, shifted (details in round2-web.test.mjs)
-  assert.equal(slots[total].i, total);
+  r.seats.forEach((d, i) => assert.deepEqual([slots[i].kind, slots[i].x, slots[i].y, slots[i].i], ['seat', d.at[0], d.at[1], i]));
+  r.idle.forEach((p, k) => {
+    const i = r.seats.length + k;
+    assert.deepEqual([slots[i].kind, slots[i].x, slots[i].y, slots[i].i], ['idle', p.at[0], p.at[1], i]);
+  });
+  // overflow no longer stacks: every point is its own (details in office-scene.test.mjs)
+  assert.deepEqual([slots[total].kind, slots[total].i], ['overflow', total]);
   assert.notDeepEqual([slots[total].x, slots[total].y], [slots[total + 1].x, slots[total + 1].y]);
   // freed desk 0 is reused by the next newcomer
   o.syncAgents('s1', metas.map((m, i) => (i === 0 ? { ...m, finished: true } : m)), 2000);
@@ -119,8 +124,7 @@ test('office: desks fill first, then aisle, then overflow index', () => {
 });
 
 test('office: floors get designs in rotation and keep them', () => {
-  const layout = (image) => ({ ...cfg.layouts.studio, image });
-  const c2 = loadConfig({ designOrder: ['a', 'b'], layouts: { a: layout('a.png'), b: layout('b.png') } });
+  const c2 = loadConfig({ scenesDir: namedScenesDir('a', 'b'), designOrder: ['a', 'b'] });
   const o = new Office(c2, EMPTY);
   o.syncSessions([S('s1', { startedAt: 1 }), S('s2', { startedAt: 2 }), S('s3', { startedAt: 3 })], 1000);
   const designs = () => Object.fromEntries(o.snapshot().floors.map((f) => [f.sessionId, f.design]));

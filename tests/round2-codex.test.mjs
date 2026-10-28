@@ -29,7 +29,8 @@ function fake(t, overrides = {}) {
   const cfg = loadConfig({ agentScanEveryTicks: 1, ...overrides });
   cfg.codexHome = dir;
   const pad = (n) => String(n).padStart(2, '0');
-  const rollout = (id, content, day = new Date()) => {
+  // default folder = the day two hours ago: the tests poll up to that far back, and every poll scans its own day and the day before
+  const rollout = (id, content, day = new Date(Date.now() - 120 * 60000)) => {
     const d = join(dir, 'sessions', String(day.getFullYear()), pad(day.getMonth() + 1), pad(day.getDate()));
     mkdirSync(d, { recursive: true });
     const file = join(d, `rollout-${id}.jsonl`);
