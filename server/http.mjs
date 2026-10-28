@@ -90,7 +90,7 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
     res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
     const snap = office.snapshot();
     res.write(frame('state', snap));
-    lastStateJson = JSON.stringify(snap.floors); // this client is now in sync
+    if (clients.size === 0) lastStateJson = JSON.stringify(snap.floors); // only client: in sync now; an older client's baseline is never overwritten
     res.write(frame('log', office.queryLog({ limit: cfg.log.sendCap }).reverse()));
     clients.add(res);
     res.on('close', () => clients.delete(res));

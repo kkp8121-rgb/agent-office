@@ -4,6 +4,7 @@ import { loadConfig, pollDelayMs } from './config.mjs';
 import { Office } from './office.mjs';
 import { Poller } from './poller.mjs';
 import { createServer } from './http.mjs';
+import { DETACHED_OPTIONS } from './launch.mjs';
 import { loadSaved, saveSaved } from './hidden.mjs';
 
 const EXIT_PORT_BUSY = 2;
@@ -98,7 +99,7 @@ server.listen(cfg.port, '127.0.0.1', () => {
   const url = `http://127.0.0.1:${cfg.port}/`;
   console.log(`agent office: ${url}`);
   if (process.argv.includes('--open')) {
-    spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    spawn('cmd', ['/c', 'start', '', url], DETACHED_OPTIONS).unref();
   }
   inflight = round();
 });
