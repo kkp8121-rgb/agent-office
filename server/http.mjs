@@ -1,0 +1,219 @@
+// Local HTTP server: JSON API, SSE push and static files. Every request must carry a loopback Host
+// header (DNS rebinding) and every POST a matching Origin (cross-site requests). No CORS headers at all.
+import http from 'node:http';
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
+import { extname, isAbsolute, join, relative, resolve } from 'node:path';
+
+const TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+};
+const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico']);
+const IMAGE_CACHE = 'max-age=3600';
+const STATIC_DIRS = ['web', 'assets'];
+
+const isObj = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+function sendJson(res, status, obj) {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify(obj));
+}
+
+function sendText(res, status, text, extra = {}) {
+  res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8', ...extra });
+  res.end(text);
+}
+
+const notFound = (res) => sendText(res, 404, 'not found');
+const badRequest = (res) => sendText(res, 400, 'bad request', { Connection: 'close' });
+
+/** Resolves to the body text, or null when it is larger than `max` (the rest is discarded, never buffered). */
+function readBody(req, max) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    let size = 0;
+    const tooBig = () => {
+      chunks.length = 0;
+      req.removeAllListeners('data');
+      req.resume();
+      resolve(null);
+    };
+    if (Number(req.headers['content-length']) > max) return tooBig();
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > max) tooBig();
+      else chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', () => resolve(null));
+  });
+}
+
+export function createServer(cfg, office, { onSavedChange, onShutdown } = {}) {
+  const clients = new Set(); // open SSE responses
+  let lastStateJson = JSON.stringify(office.snapshot().floors);
+
+  const server = http.createServer((req, res) => {
+    handle(req, res).catch((e) => {
+      console.error('요청 처리 실패:', e?.message ?? e);
+      if (!res.headersSent) sendText(res, 500, 'server error');
+      else res.destroy();
+    });
+  });
+
+  // ---- security ----------------------------------------------------------------------------
+
+  const allowedHosts = () => {
+    const { port } = server.address();
+    return [`127.0.0.1:${port}`, `localhost:${port}`];
+  };
+
+  // ---- SSE ---------------------------------------------------------------------------------
+
+  const frame = (event, data) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+
+  function openEvents(res) {
+    res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+    res.write(frame('state', office.snapshot()));
+    res.write(frame('log', office.queryLog({ limit: cfg.log.sendCap }).reverse()));
+    clients.add(res);
+    res.on('close', () => clients.delete(res));
+  }
+
+  /** Sends `state` only when it differs from the last one sent, and every new or updated log entry. */
+  server.broadcast = () => {
+    const entries = office.drainLog(); // drained even without clients so entries never pile up
+    const snap = office.snapshot();
+    const json = JSON.stringify(snap.floors);
+    const changed = json !== lastStateJson;
+    lastStateJson = json;
+    if (clients.size === 0) return;
+    for (const res of clients) {
+      if (changed) res.write(frame('state', snap));
+      if (entries.length) res.write(frame('log', entries));
+    }
+  };
+
+  server.closeSse = () => {
+    for (const res of clients) res.end();
+    clients.clear();
+  };
+
+  Object.defineProperty(server, 'sseClients', { get: () => clients.size });
+
+  const ping = setInterval(() => {
+    for (const res of clients) res.write(': ping\n\n');
+  }, cfg.server.ssePingMs);
+  ping.unref();
+  server.on('close', () => clearInterval(ping));
+
+  // ---- static files ------------------------------------------------------------------------
+
+  async function sendStatic(res, dirName, rawRel) {
+    let rel;
+    try {
+      rel = decodeURIComponent(rawRel);
+    } catch {
+      return notFound(res);
+    }
+    if (rel.includes('\0')) return notFound(res);
+    const base = join(cfg.root, dirName);
+    const file = resolve(base, rel);
+    const inside = relative(base, file);
+    if (inside === '' || inside.startsWith('..') || isAbsolute(inside)) return notFound(res);
+    let st;
+    try {
+      st = await stat(file);
+    } catch {
+      return notFound(res);
+    }
+    if (!st.isFile()) return notFound(res);
+    const ext = extname(file).toLowerCase();
+    const headers = { 'Content-Type': TYPES[ext] ?? 'application/octet-stream', 'Content-Length': st.size };
+    if (IMAGE_EXTS.has(ext)) headers['Cache-Control'] = IMAGE_CACHE;
+    res.writeHead(200, headers);
+    const stream = createReadStream(file);
+    stream.on('error', () => res.destroy());
+    stream.pipe(res);
+  }
+
+  // ---- routes ------------------------------------------------------------------------------
+
+  function uiConfig() {
+    const roles = {};
+    for (const r of Object.values(cfg.roles)) roles[r.key] = { name: r.name, role: r.role };
+    return { spriteHeight: cfg.spriteHeight, layouts: cfg.layouts, ui: cfg.ui, bubbleShowMs: cfg.agent.bubbleShowMs, roles };
+  }
+
+  const isVisible = (sessionId) => office.snapshot().floors.some((f) => f.sessionId === sessionId);
+
+  async function handlePost(path, body, res) {
+    if (path === '/api/shutdown') {
+      res.writeHead(204, { Connection: 'close' });
+      res.end(() => onShutdown?.());
+      return;
+    }
+    if (path !== '/api/hide' && path !== '/api/rename') return notFound(res);
+
+    let json;
+    try {
+      json = JSON.parse(body);
+    } catch {
+      return badRequest(res);
+    }
+    if (!isObj(json) || typeof json.sessionId !== 'string') return badRequest(res);
+
+    if (path === '/api/hide') {
+      if (!office.hide(json.sessionId)) return notFound(res);
+    } else {
+      if (typeof json.name !== 'string') return badRequest(res);
+      if (!isVisible(json.sessionId)) return notFound(res);
+      office.rename(json.sessionId, json.name);
+    }
+    await onSavedChange?.();
+    res.writeHead(204);
+    res.end();
+  }
+
+  async function handle(req, res) {
+    if (!allowedHosts().includes(String(req.headers.host).toLowerCase())) return sendText(res, 403, 'forbidden');
+    const q = req.url.indexOf('?');
+    const path = q === -1 ? req.url : req.url.slice(0, q); // not URL-normalized: traversal is checked on the file path
+
+    if (req.method === 'POST') {
+      const origin = String(req.headers.origin ?? '').toLowerCase();
+      if (!allowedHosts().some((h) => origin === `http://${h}`)) return sendText(res, 403, 'forbidden');
+      const body = await readBody(req, cfg.server.maxBodyBytes);
+      if (body === null) return badRequest(res);
+      return handlePost(path, body, res);
+    }
+    if (req.method !== 'GET') return notFound(res);
+
+    switch (path) {
+      case '/health': return sendJson(res, 200, { app: 'agent-office', pid: process.pid });
+      case '/api/state': return sendJson(res, 200, office.snapshot());
+      case '/api/ui': return sendJson(res, 200, uiConfig());
+      case '/api/events': return openEvents(res);
+      case '/': return sendStatic(res, 'web', 'index.html');
+      case '/log': return sendStatic(res, 'web', 'log.html');
+      default:
+    }
+    for (const dir of STATIC_DIRS) {
+      if (path.startsWith(`/${dir}/`)) return sendStatic(res, dir, path.slice(dir.length + 2));
+    }
+    return notFound(res);
+  }
+
+  return server;
+}

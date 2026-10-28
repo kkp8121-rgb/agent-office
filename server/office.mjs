@@ -175,7 +175,8 @@ export class Office {
 
   // ---- events ------------------------------------------------------------------------------
 
-  applySessionEvents(sessionId, evs, now) {
+  // `opts.logSince`: events stamped before it still drive state but add no log entries (backfill).
+  applySessionEvents(sessionId, evs, now, opts = {}) {
     this.now = now;
     const f = this.floors.get(sessionId);
     if (!f) return;
@@ -185,17 +186,17 @@ export class Office {
       } else if (ev.kind === 'workflowLaunch') {
         if (ev.runId) f.workflows.set(ev.runId, { name: ev.workflowName, scriptPath: ev.scriptPath });
       } else {
-        this.#actorEvent(f, f.lead, ev, now, true);
+        this.#actorEvent(f, f.lead, ev, now, true, opts.logSince);
       }
     }
   }
 
-  applyAgentEvents(sessionId, agentId, evs, now) {
+  applyAgentEvents(sessionId, agentId, evs, now, opts = {}) {
     this.now = now;
     const f = this.floors.get(sessionId);
     const a = f?.agents.get(agentId);
     if (!a) return;
-    for (const ev of evs) this.#actorEvent(f, a, ev, now, false);
+    for (const ev of evs) this.#actorEvent(f, a, ev, now, false, opts.logSince);
   }
 
   #setState(actor, state, bubble, now) {
@@ -205,14 +206,16 @@ export class Office {
     actor.since = now;
   }
 
-  #actorEvent(f, actor, ev, now, isLead) {
+  #actorEvent(f, actor, ev, now, isLead, logSince = 0) {
     if (!isLead && actor.state === 'done') return;
     const t = ev.ts > 0 ? ev.ts : now;
     if (!isLead) actor.lastAt = Math.max(actor.lastAt, t);
+    const quiet = ev.ts > 0 && ev.ts < logSince;
 
     switch (ev.kind) {
       case 'tool':
         this.#setState(actor, 'working', ev.text, now);
+        if (quiet) break;
         if (READ_TOOLS.has(ev.name)) this.#logRead(f, actor, t);
         else if (isLogged(ev.name)) this.#log(f, actor, t, ev.text);
         break;
@@ -222,7 +225,7 @@ export class Office {
         break;
       case 'end':
         if (isLead) this.#setState(actor, 'idle', '', now);
-        else this.#logDone(f, actor, t);
+        else if (!quiet) this.#logDone(f, actor, t);
         break;
       default:
     }

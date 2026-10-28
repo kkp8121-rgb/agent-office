@@ -371,3 +371,20 @@ test('office: nothing logged while hidden resurfaces after the session is re-run
   assert.ok(o.snapshot().floors.length === 1);
   assert.ok(!JSON.stringify([o.drainLog(), o.queryLog({})]).includes('secret-'));
 });
+
+test('office: events older than logSince drive state but add no log entries', () => {
+  const o = setup();
+  o.syncAgents('s1', [M('a1')], 1000);
+  o.drainLog();
+  const logSince = 5000;
+  o.applySessionEvents('s1', [tool(4000, 'old-bash'), { kind: 'end', ts: 4001 }], 6000, { logSince });
+  o.applySessionEvents('s1', [tool(4002, 'old-bash-2')], 6000, { logSince });
+  assert.equal(floorOf(o, 's1').lead.bubble, 'old-bash-2');
+  o.applyAgentEvents('s1', 'a1', [tool(4000, 'old-agent', 'Edit'), tool(4500, 'x.cs', 'Read'), { kind: 'end', ts: 4600 }], 6000, { logSince });
+  assert.equal(floorOf(o, 's1').agents[0].bubble, 'x.cs');
+  assert.deepEqual(o.drainLog(), []);
+  o.applySessionEvents('s1', [tool(5000, 'fresh-bash')], 6000, { logSince });
+  const fresh = o.drainLog();
+  assert.equal(fresh.length, 1);
+  assert.equal(fresh[0].text, 'fresh-bash');
+});

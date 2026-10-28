@@ -4,8 +4,9 @@
   "agentScanEveryTicks": 2,
   "tail": { "startBytes": 262144, "chunkBytes": 65536, "maxLineBytes": 4194304 },
   "log": { "cap": 2000, "backfillMinutes": 30, "mergeWindowMs": 20000, "sendCap": 200, "headMaxChars": 80 },
-  "agent": { "doneLingerMs": 15000, "staleMs": 600000, "bubbleShowMs": 8000 },
+  "agent": { "doneLingerMs": 15000, "staleMs": 600000, "bubbleShowMs": 8000, "abandonMs": 1800000 },
   "floor": { "leaveMs": 5000, "nameMaxChars": 30 },
+  "server": { "ssePingMs": 25000, "maxBodyBytes": 1024 },
   "ui": { "bubbleMaxChars": 16, "logDomCap": 300 },
   "roles": {
     "__lead":               { "key": "lead",                 "name": "유나", "role": "팀장" },
