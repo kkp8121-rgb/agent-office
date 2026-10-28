@@ -4,6 +4,7 @@
 import config from '../config.json' with { type: 'json' };
 
 // Text clip for bubbles, log rows and every other short label: log.headMaxChars is the single source.
+// Read once at load from config.json; loadConfig() overrides do not reach it (no caller passes one).
 export const MAX_LEN = config.log.headMaxChars;
 
 export function clip(s, n) {
