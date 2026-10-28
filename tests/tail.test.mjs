@@ -88,3 +88,17 @@ test('tail: truncated file restarts from tail', async () => {
   assert.deepEqual(await tail.poll(), ['{"b":1}']);
   t.done();
 });
+
+test('tail: resumes at a given line start and exposes where an incomplete line begins', async () => {
+  const t = tmp();
+  writeFileSync(t.file, '{"a":1}\n{"b"');
+  const a = new FileTail(t.file, O);
+  assert.deepEqual(await a.poll(), ['{"a":1}']);
+  assert.equal(a.offset, 12);
+  assert.equal(a.lineStart, 8, 'start of the incomplete line');
+  const b = new FileTail(t.file, { ...O, startBytes: 4, offset: a.lineStart });
+  appendFileSync(t.file, ':2}\n{"c":3}\n');
+  assert.deepEqual(await b.poll(), ['{"b":2}', '{"c":3}'], 'resumed, neither replayed nor skipped');
+  assert.equal(b.lineStart, b.offset);
+  t.done();
+});

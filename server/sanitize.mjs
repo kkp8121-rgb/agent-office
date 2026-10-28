@@ -1,7 +1,7 @@
 // Privacy filter: turns a tool call into a short label. Never exposes full commands,
 // search patterns, paths beyond the basename, or file contents.
 
-const MAX_LEN = 80;
+export const MAX_LEN = 80;
 
 export function clip(s, n) {
   const chars = Array.from(String(s));
@@ -12,7 +12,7 @@ function baseName(p) {
   return String(p ?? '').split(/[\\/]/).filter(Boolean).pop() ?? '';
 }
 
-function firstWord(command) {
+export function firstWord(command) {
   let rest = String(command ?? '').trim();
   const re = /^(?:"([^"]*)"|'([^']*)'|(\S+))\s*/;
   for (;;) {

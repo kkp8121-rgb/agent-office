@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +8,7 @@ import { loadConfig } from '../server/config.mjs';
 import { Office } from '../server/office.mjs';
 import { Poller } from '../server/poller.mjs';
 import { parseCodexMeta, parseCodexLine, CodexSource } from '../server/codex.mjs';
+import { describeTool } from '../server/sanitize.mjs';
 
 const FIX = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'codex');
 const fixture = (name) => readFileSync(join(FIX, name), 'utf8').trim();
@@ -89,8 +90,32 @@ test('codex: exec tool start exposes first word only', () => {
   assert.ok(!JSON.stringify(e).includes('token'));
   assert.equal(start('await tools.exec_command({cmd:"@\'\nsecret\n\'@ | x"})')[0].text, '명령 실행');
   assert.equal(start('await tools.exec_command({cmd:"$env:TOKEN"})')[0].text, '명령 실행');
-  assert.equal(start('await tools.exec_command({cmd:"TOKEN=abc git push"})')[0].text, '명령 실행');
   assert.equal(start('await tools.other({})')[0].text, '명령 실행');
+  assert.equal(start('await tools.exec_command({cmd:"git status')[0].text, '명령 실행', 'unterminated literal');
+});
+
+test('codex: exec label reads only the first cmd literal and shares Claude\'s firstWord', () => {
+  const start = (input) =>
+    parseCodexLine(line(5, 'response_item', { type: 'custom_tool_call', name: 'exec', call_id: 'c1', input }));
+  // the probe: a later `cmd:'word` inside the command body must never be picked up
+  const probe = start('await tools.exec_command({cmd:"$env:X=1; echo cmd:\'hunter2 x\'"})');
+  assert.equal(probe[0].text, '명령 실행');
+  assert.ok(!JSON.stringify(probe).includes('hunter2'));
+  assert.equal(start('await tools.exec_command({cmd:"C:\\\\tools\\\\git.exe status"})')[0].text, 'git 실행');
+  assert.equal(start('await tools.exec_command({cmd:"FOO=bar git push"})')[0].text, 'git 실행');
+  assert.equal(start('await tools.exec_command({cmd:"git \\"quoted\\" push"})')[0].text, 'git 실행');
+
+  // item_completed goes through the same function
+  const done = (cmd) => parseCodexLine(line(8, 'event_msg', { type: 'item_completed', item: { type: 'CommandExecution', id: 'x', parsed_cmd: [{ cmd }] } }))[0].text;
+  assert.equal(done('FOO=bar git push'), 'git 실행');
+  assert.equal(done('$env:X=1; echo cmd:\'hunter2 x\''), '명령 실행');
+
+  // same answer as the Claude Bash label for the same command string
+  for (const command of ['git status', 'C:\\tools\\git.exe status', 'FOO=bar npm run x', '$env:X=1', "@'\nx\n'@", 'curl https://u:p@h/x', '"C:\\Program Files\\Git\\git.exe" log']) {
+    const claude = describeTool('Bash', { command });
+    const codex = done(command);
+    assert.equal(codex, claude, command);
+  }
 });
 
 test('codex: call output and item_completed end the tool', () => {
@@ -396,4 +421,106 @@ test('poller: forced hide holds for a codex session across turns', async (t) => 
   await h.poller.tick(now + 4000);
   assert.equal(h.office.snapshot().floors.some((f) => f.provider === 'codex'), false, 'still hidden after new turns');
   assert.equal(h.office.queryLog({ sessionId: PARENT_ID }).length, 0);
+});
+
+// ---- fix round 1 -----------------------------------------------------------------------------
+
+test('codex: startedAt after restart matches long-running value for a rollout larger than startBytes', async (t) => {
+  const h = fake(t, { tail: { startBytes: 2000 } });
+  const now = Date.now();
+  const first = meta(now - 60000, PARENT_ID) + started(now - 59000);
+  const file = h.rollout(PARENT_ID, first);
+  const running = new CodexSource(h.cfg); // sees the file from its first line on
+  assert.equal((await running.poll(now - 30000)).sessions[0].startedAt, now - 60000);
+  let filler = '';
+  for (let i = 0; i < 40; i++) filler += ev(now - 58000 + i * 100, 'token_count', { info: null });
+  appendFileSync(file, filler);
+  assert.ok(Buffer.byteLength(first + filler) > h.cfg.tail.startBytes * 2);
+  const longRunning = (await running.poll(now)).sessions[0].startedAt;
+  const restarted = (await new CodexSource(h.cfg).poll(now)).sessions[0].startedAt; // window starts mid-file
+  assert.equal(longRunning, now - 60000);
+  assert.equal(restarted, longRunning);
+});
+
+test('codex: a finished, unlisted rollout holds no FileTail and resumes from its offset', async (t) => {
+  const h = fake(t);
+  const now = Date.now();
+  const file = h.rollout(EXEC_ID, meta(now - 5000, EXEC_ID, { source: 'exec', originator: 'codex_exec' }) + started(now - 4000) + complete(now - 3000));
+  const src = new CodexSource(h.cfg);
+  await src.poll(now);
+  assert.equal(src.tailCount, 1, 'listed rollout keeps its tail');
+  const gone = now - 3000 + h.cfg.codex.execKeepMs + 1;
+  assert.equal((await src.poll(gone)).sessions.length, 0);
+  assert.equal(src.tailCount, 0, 'finished and unlisted: tail released');
+
+  const more = started(gone + 500);
+  appendFileSync(file, more);
+  const before = src.bytesRead;
+  const r = await src.poll(gone + 1000);
+  assert.equal(src.bytesRead - before, Buffer.byteLength(more), 'only the appended bytes are read');
+  assert.equal(r.sessions.length, 1);
+  assert.equal(r.sessions[0].startedAt, gone + 500, 'a new period');
+  assert.equal(r.sessionEvents.get(EXEC_ID).filter((e) => e.kind === 'end').length, 0, 'nothing is replayed');
+  assert.equal(src.tailCount, 1);
+});
+
+test('codex: a rollout that is a directory or a symlink is never watched', async (t) => {
+  const h = fake(t);
+  const now = Date.now();
+  h.rollout(PARENT_ID, meta(now - 5000, PARENT_ID) + started(now - 4000));
+  const d = new Date(now);
+  const pad = (n) => String(n).padStart(2, '0');
+  const day = join(h.dir, 'sessions', String(d.getFullYear()), pad(d.getMonth() + 1), pad(d.getDate()));
+  mkdirSync(join(day, 'rollout-2026-10-28T00-00-00-folder.jsonl'));
+  const target = join(h.dir, 'real.txt');
+  writeFileSync(target, meta(now - 5000, EXEC_ID) + started(now - 4000));
+  try {
+    symlinkSync(target, join(day, `rollout-2026-10-28T00-00-01-${EXEC_ID}.jsonl`));
+  } catch {
+    // symlinks need a privilege on some Windows setups: the folder case above still runs
+  }
+  const r = await new CodexSource(h.cfg).poll(now);
+  assert.deepEqual(r.sessions.map((s) => s.sessionId), [PARENT_ID]);
+});
+
+test('codex: item_completed with only item.id leaves nothing in working', async (t) => {
+  const h = withBoth(t);
+  const now = Date.now();
+  const call = (id) => line(now - 3000, 'response_item', { type: 'custom_tool_call', name: 'exec', call_id: id, input: 'await tools.exec_command({cmd:"git status"})' });
+  const item = line(now - 2000, 'event_msg', { type: 'item_completed', item: { type: 'CommandExecution', id: 'exec-uuid-1', parsed_cmd: [{ type: 'unknown', cmd: 'git status' }], status: 'completed' } });
+  const output = (id) => line(now - 1000, 'response_item', { type: 'custom_tool_call_output', call_id: id, output: 'x' });
+  // real order: call, item_completed (own id, no call_id), output
+  h.rollout(EXEC_ID, meta(now - 5000, EXEC_ID, { source: 'exec', originator: 'codex_exec' }) + started(now - 4000) + call('c1') + item + output('c1'));
+  // item_completed alone, without the output line
+  h.rollout(PARENT_ID, meta(now - 5000, PARENT_ID) + started(now - 4000) + call('c2') + item);
+  await h.poller.tick(now);
+  const floors = h.office.snapshot().floors.filter((f) => f.provider === 'codex');
+  assert.equal(floors.length, 2);
+  for (const f of floors) {
+    assert.notEqual(f.lead.state, 'working', f.title);
+    assert.equal(f.lead.bubble, '생각 중…');
+  }
+});
+
+test('codex: a hidden floor with a busy sub-agent shows neither the agent nor its events', async (t) => {
+  const h = withBoth(t);
+  const now = Date.now();
+  const toolCall = (ms, cmd) => line(ms, 'response_item', { type: 'custom_tool_call', name: 'exec', call_id: `c${ms}`, input: `await tools.exec_command({cmd:"${cmd}"})` });
+  h.rollout(PARENT_ID, meta(now - 9000, PARENT_ID) + started(now - 8000));
+  const child = h.rollout(CHILD_ID, childMeta(now - 7000, CHILD_ID, PARENT_ID, 'worker') + started(now - 6000) + toolCall(now - 5000, 'git status'));
+  await h.poller.tick(now);
+  assert.equal(h.office.snapshot().floors.find((f) => f.provider === 'codex').agents.length, 1);
+  assert.ok(h.office.queryLog({ sessionId: PARENT_ID }).length > 0, 'the agent start is logged while visible');
+
+  assert.equal(h.office.hide(PARENT_ID), true);
+  appendFileSync(child, toolCall(now + 500, 'npm install'));
+  const second = '66666666-6666-4666-8666-666666666666';
+  h.rollout(second, childMeta(now + 600, second, PARENT_ID, 'scout', '/root/more') + started(now + 700) + toolCall(now + 800, 'ls'));
+  await h.poller.tick(now + 1500);
+
+  const snap = JSON.stringify(h.office.snapshot());
+  for (const needle of [PARENT_ID, CHILD_ID, second, 'codex', 'npm', 'git', '도담', '별이']) assert.ok(!snap.includes(needle), `snapshot: ${needle}`);
+  assert.equal(h.office.queryLog({ sessionId: PARENT_ID }).length, 0);
+  assert.equal(h.office.queryLog().filter((e) => e.sessionId === PARENT_ID).length, 0);
+  assert.equal(h.office.drainLog().filter((e) => e.sessionId === PARENT_ID).length, 0);
 });

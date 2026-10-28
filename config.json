@@ -7,7 +7,7 @@
   "agent": { "doneLingerMs": 15000, "staleMs": 600000, "bubbleShowMs": 8000, "abandonMs": 1800000 },
   "floor": { "leaveMs": 5000, "nameMaxChars": 30, "missTicks": 2 },
   "workflow": { "scriptHeadBytes": 65536 },
-  "codex": { "enabled": true, "headBytes": 262144, "idleKeepMs": 1800000, "execKeepMs": 60000 },
+  "codex": { "enabled": true, "headBytes": 262144, "idleKeepMs": 1800000, "execKeepMs": 60000, "cwdMaxChars": 500 },
   "server": { "ssePingMs": 25000, "maxBodyBytes": 1024 },
   "ui": { "bubbleMaxChars": 16, "logDomCap": 300 },
   "roles": {

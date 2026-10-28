@@ -15,8 +15,13 @@ export class FileTail {
   #carryLen = 0;
   #skipping = false;
 
-  constructor(path, { startBytes, chunkBytes, maxLineBytes }) {
+  /** `offset` (optional): resume at a line start returned by `lineStart` instead of starting at the end window. */
+  constructor(path, { startBytes, chunkBytes, maxLineBytes, offset = 0 }) {
     this.#path = path;
+    if (offset > 0) {
+      this.#offset = offset;
+      this.#started = true;
+    }
     this.#startBytes = startBytes;
     this.#max = maxLineBytes;
     this.#buf = Buffer.allocUnsafe(chunkBytes);
@@ -24,6 +29,11 @@ export class FileTail {
 
   get offset() {
     return this.#offset;
+  }
+
+  /** Where an incomplete trailing line begins (equals `offset` when the last read ended on a line end). */
+  get lineStart() {
+    return this.#offset - this.#carryLen;
   }
 
   #reset() {

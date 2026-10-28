@@ -27,7 +27,7 @@ test('config: AGENT_OFFICE_CODEX_HOME sets codexHome, codex block from config.js
   try {
     const cfg = loadConfig();
     assert.equal(cfg.codexHome, 'X:/fake-codex');
-    assert.deepEqual(cfg.codex, { enabled: true, headBytes: 262144, idleKeepMs: 1800000, execKeepMs: 60000 });
+    assert.deepEqual(cfg.codex, { enabled: true, headBytes: 262144, idleKeepMs: 1800000, execKeepMs: 60000, cwdMaxChars: 500 });
     assert.equal(cfg.roles['codex:__lead'].name, '하나');
   } finally { if (prev === undefined) delete process.env.AGENT_OFFICE_CODEX_HOME; else process.env.AGENT_OFFICE_CODEX_HOME = prev; }
 });

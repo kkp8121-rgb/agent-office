@@ -2,19 +2,17 @@
 // Only today's and yesterday's `sessions/YYYY/MM/DD/rollout-*.jsonl` under the codex home are ever opened;
 // nothing else there (auth.json, config.toml, history, logs ...) is listed, stat-ed or read. Rollout lines are
 // untrusted and full of private text, so the parsers below are whitelists: they copy only the named fields.
-import { open, readdir, stat } from 'node:fs/promises';
+import { lstat, open, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { FileTail } from './tail.mjs';
-import { clip } from './sanitize.mjs';
+import { clip, firstWord, MAX_LEN } from './sanitize.mjs';
 
 /** @typedef {import('./parse.mjs').Ev} Ev */
 /** @typedef {import('./sessions.mjs').Session} Session */
 /** @typedef {import('./agents.mjs').AgentMeta} AgentMeta */
 
-const MAX_LEN = 80; // same label cap as sanitize.mjs
 const ROLLOUT_NAME = /^rollout-[\w.-]+\.jsonl$/; // also excludes the old .jsonl.zst files
 const SAFE_ID = /^[\w.-]+$/;
-const MAX_CWD = 500;
 
 const isObj = (v) => typeof v === 'object' && v !== null;
 const timeOf = (v) => (typeof v === 'string' ? Date.parse(v) || 0 : 0);
@@ -27,7 +25,7 @@ const folderOf = (cwd) => String(cwd ?? '').split(/[\\/]/).filter(Boolean).pop()
  * instructions, which must never be kept.
  * @returns {null | {id:string, cwd:string, kind:'exec'|'interactive'|'subagent', parentId:string|null, agentRole:string|null, taskName:string, startedAt:number}}
  */
-export function parseCodexMeta(text) {
+export function parseCodexMeta(text, cwdMax = MAX_LEN) {
   let o;
   try {
     o = JSON.parse(text);
@@ -44,7 +42,7 @@ export function parseCodexMeta(text) {
   const path = typeof spawn.agent_path === 'string' ? spawn.agent_path.split('/').filter(Boolean).pop() ?? '' : '';
   return {
     id: p.id,
-    cwd: typeof p.cwd === 'string' ? clip(p.cwd, MAX_CWD) : '',
+    cwd: typeof p.cwd === 'string' ? clip(p.cwd, cwdMax) : '',
     kind: sub ? 'subagent' : exec ? 'exec' : 'interactive',
     parentId: typeof spawn.parent_thread_id === 'string' && SAFE_ID.test(spawn.parent_thread_id) ? spawn.parent_thread_id : null,
     agentRole: typeof spawn.agent_role === 'string' && spawn.agent_role ? clip(spawn.agent_role, MAX_LEN) : null,
@@ -55,19 +53,37 @@ export function parseCodexMeta(text) {
 
 // ---- lines -----------------------------------------------------------------------------------
 
-/** First word of a command, only when the whole first token is plain letters, digits, `_`, `.` or `-`. */
-function wordFromCommand(cmd) {
-  const m = typeof cmd === 'string' ? /^\s*([\p{L}\p{N}_.-]+)(?=[\s;|&)]|$)/u.exec(cmd) : null;
-  return m ? m[1] : '';
+const CMD_OPEN = /\bcmd:\s*(["'`])/;
+const JS_ESCAPES = { n: '\n', t: '\t', r: '\r' };
+
+/**
+ * `input` of an exec call is JS source like `await tools.exec_command({cmd:"git status"})`. Only the value of the
+ * FIRST `cmd:` literal is taken (unescaped up to its closing quote); text after it is never scanned, so a
+ * `cmd:` inside the command body cannot be picked up. Unterminated or missing: ''.
+ */
+function cmdFromInput(input) {
+  const m = typeof input === 'string' ? CMD_OPEN.exec(input) : null;
+  if (!m) return '';
+  let out = '';
+  for (let i = m.index + m[0].length; i < input.length; i++) {
+    const c = input[i];
+    if (c === m[1]) return out;
+    if (c === '\\') {
+      i++;
+      if (i >= input.length) return '';
+      out += JS_ESCAPES[input[i]] ?? input[i];
+    } else {
+      out += c;
+    }
+  }
+  return '';
 }
 
-/** `input` of an exec call is JS source like `await tools.exec_command({cmd:"git status"})`: only the quoted cmd's first word. */
-function wordFromInput(input) {
-  const m = typeof input === 'string' ? /\bcmd:\s*["'`]([\p{L}\p{N}_.-]+)(?=[\s;|&)"'`]|$)/u.exec(input) : null;
-  return m ? m[1] : '';
-}
-
-const execLabel = (word) => (word ? clip(`${word} 실행`, MAX_LEN) : '명령 실행');
+/** Label from a command string through the one shared first-word filter (sanitize.mjs, same as Claude's Bash label). */
+const execLabel = (cmd) => {
+  const word = firstWord(cmd);
+  return word ? clip(`${word} 실행`, MAX_LEN) : '명령 실행';
+};
 const plainName = (v) => (typeof v === 'string' && /^[\w.-]+$/.test(v) ? clip(v, MAX_LEN) : '');
 const tool = (ts, id, name, text) => ({ kind: 'tool', ts, toolUseId: id, name, text: clip(text, MAX_LEN) });
 const done = (ts, id) => ({ kind: 'toolDone', ts, toolUseId: id });
@@ -101,7 +117,7 @@ function functionCall(p, ts) {
 
 function customToolCall(p, ts) {
   const name = typeof p.name === 'string' ? p.name : '';
-  if (name === 'exec') return tool(ts, callId(p), 'Bash', execLabel(wordFromInput(p.input)));
+  if (name === 'exec') return tool(ts, callId(p), 'Bash', execLabel(cmdFromInput(p.input)));
   const plain = plainName(name);
   return tool(ts, callId(p), plain || 'tool', plain ? `${plain} 사용 중` : '도구 사용 중');
 }
@@ -113,7 +129,7 @@ function itemCompleted(p, ts) {
     case 'CommandExecution': {
       const first = Array.isArray(item.parsed_cmd) && isObj(item.parsed_cmd[0]) ? item.parsed_cmd[0].cmd : '';
       // `exec_result` is not a logged tool name: the start of the call already wrote the log line.
-      return [tool(ts, id, 'exec_result', execLabel(wordFromCommand(first))), done(ts, id)];
+      return [tool(ts, id, 'exec_result', execLabel(first)), done(ts, id)];
     }
     case 'Extension':
       if (item.kind === 'image_gen.generation') return [tool(ts, id, 'image_gen', '그림 그리는 중'), done(ts, id)];
@@ -180,6 +196,14 @@ export function parseCodexLine(text) {
 
 // ---- source ----------------------------------------------------------------------------------
 
+async function isRegularFile(path) {
+  try {
+    return (await lstat(path)).isFile();
+  } catch {
+    return false;
+  }
+}
+
 const pad2 = (n) => String(n).padStart(2, '0');
 
 /** `sessions/YYYY/MM/DD` for the local date `daysAgo` days before `now`. */
@@ -192,6 +216,14 @@ function dayDir(home, now, daysAgo) {
 export class CodexSource {
   /** Total rollout bytes read so far (lets tests prove that an idle poll reads nothing). */
   bytesRead = 0;
+
+  /** Number of open FileTails (finished, unlisted rollouts hold none). */
+  get tailCount() {
+    let n = 0;
+    for (const rec of this.#recs.values()) if (rec.tail) n++;
+    return n;
+  }
+
   #cfg;
   #tickNo = 0;
   #recs = new Map(); // path -> rollout record
@@ -233,12 +265,16 @@ export class CodexSource {
         if (e?.code === 'ENOENT' || e?.code === 'ENOTDIR') continue; // no such day yet
         return; // transient error: keep the current watch list
       }
-      for (const n of names) if (ROLLOUT_NAME.test(n)) found.add(join(dir, n));
+      for (const n of names) {
+        const path = join(dir, n);
+        // Only regular files are watched: a symlink or folder named rollout-*.jsonl is never opened.
+        if (ROLLOUT_NAME.test(n) && (this.#recs.has(path) || (await isRegularFile(path)))) found.add(path);
+      }
     }
     for (const path of found) {
       if (!this.#recs.has(path)) {
         this.#recs.set(path, {
-          path, size: -1, meta: null, ignored: false, tail: null,
+          path, size: -1, meta: null, ignored: false, tail: null, resumeAt: 0,
           turn: 'none', lastTs: 0, activeFrom: null, titleSent: false, pending: [],
         });
       }
@@ -248,12 +284,14 @@ export class CodexSource {
 
   async #read(rec, now) {
     if (rec.ignored) return;
-    const { size } = await stat(rec.path);
+    const st = await lstat(rec.path);
+    if (!st.isFile()) return;
+    const { size } = st;
     if (size === rec.size) return;
     rec.meta ??= await this.#readMeta(rec, size);
     if (!rec.meta) return;
 
-    rec.tail ??= new FileTail(rec.path, this.#cfg.tail);
+    rec.tail ??= new FileTail(rec.path, { ...this.#cfg.tail, offset: rec.resumeAt });
     const before = rec.tail.offset;
     const lines = await rec.tail.poll();
     this.bytesRead += rec.tail.offset >= before ? rec.tail.offset - before : rec.tail.offset;
@@ -262,6 +300,9 @@ export class CodexSource {
     // exactly where it would have begun had the server been running all along.
     const keepMs = this.#keepMs(rec);
     const first = rec.lastTs === 0;
+    // A window that starts mid-file cannot see where the period began: default to the session start, so the value
+    // does not depend on how big the file is (a hidden floor's record must still match after a restart).
+    if (first && rec.meta.startedAt > 0) rec.activeFrom = rec.meta.startedAt;
     let prev = 0;
     for (const text of lines) {
       const e = parseEntry(text);
@@ -328,6 +369,7 @@ export class CodexSource {
     }
     const finished = (rec) => rec.turn === 'end' || rec.lastTs < abandonedBefore;
 
+    const listedRecs = new Set();
     for (const rec of byId.values()) {
       if (rec.meta.kind === 'subagent') continue;
       const own = !finished(rec);
@@ -340,6 +382,8 @@ export class CodexSource {
         continue;
       }
       rec.activeFrom ??= now;
+      listedRecs.add(rec);
+      for (const k of mine) listedRecs.add(k);
       const id = rec.meta.id;
       out.sessions.push({ provider: 'codex', pid: 0, sessionId: id, cwd: rec.meta.cwd, status: own ? 'busy' : 'waiting', name: '', startedAt: rec.activeFrom });
 
@@ -367,7 +411,14 @@ export class CodexSource {
       }
     }
     // Events are delivered once: whatever was read for unlisted files is dropped, as a Claude tail would drop it.
-    for (const rec of this.#recs.values()) rec.pending = [];
+    for (const rec of this.#recs.values()) {
+      rec.pending = [];
+      // A finished rollout that is not listed holds no FileTail (64 KB buffer); it resumes from its line offset.
+      if (rec.tail && rec.meta && !listedRecs.has(rec) && finished(rec)) {
+        rec.resumeAt = rec.tail.lineStart;
+        rec.tail = null;
+      }
+    }
     return out;
   }
 }
