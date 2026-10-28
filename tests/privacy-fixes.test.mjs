@@ -225,7 +225,7 @@ test('F20: a sub-agent silent for longer than abandonMs does not cover the silen
   h.rollout(CHILD_ID, childMeta(t0 + 3000, CHILD_ID, PARENT_ID) + started(t0 + 4000) + ev(t0 + 40 * MIN, 'token_count') + ev(t0 + 45 * MIN, 'token_count'));
   const s = (await new CodexSource(h.cfg).poll(t0 + 47 * MIN + 1000)).sessions.find((x) => x.sessionId === PARENT_ID);
   assert.ok(h.cfg.agent.abandonMs < 39 * MIN);
-  assert.equal(s.startedAt, t0 + 47 * MIN, 'a new period');
+  assert.equal(s.startedAt, t0 + 40 * MIN, 'a new period, begun by the sub-agent line that ended the hole');
 });
 
 test('F20: the busy span before a sub-agent was abandoned still covers the parent silence', async (t) => {
