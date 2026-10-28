@@ -34,3 +34,13 @@ test('sanitize: clip counts code points', () => {
   assert.equal(clip('abc', 4), 'abc');
   assert.equal(clip('😀😀😀', 2), '😀…');
 });
+test('sanitize: bash first word never leaks env assignments, URLs or stray quotes', () => {
+  assert.equal(describeTool('Bash', {command:'API_KEY=sk-live-123 node run.mjs'}), 'node 실행');
+  assert.equal(describeTool('Bash', {command:'"FOO=secret" cmd'}), 'cmd 실행');
+  assert.equal(describeTool('Bash', {command:'https://x.io/a?token=zz'}), '명령 실행');
+  assert.equal(describeTool('Bash', {command:'"abc secret=1 more'}), '명령 실행');
+  assert.equal(describeTool('Bash', {command:'   git status'}), 'git 실행');
+  assert.equal(describeTool('Bash', {command:''}), '명령 실행');
+  assert.equal(describeTool('Bash', {}), '명령 실행');
+  assert.equal(describeTool('Bash', {command:'A=1 B=2'}), '명령 실행');
+});

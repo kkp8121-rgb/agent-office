@@ -13,9 +13,18 @@ function baseName(p) {
 }
 
 function firstWord(command) {
-  const m = String(command ?? '').trim().match(/^(?:"([^"]*)"|'([^']*)'|(\S+))/);
-  const token = m ? (m[1] ?? m[2] ?? m[3]) : '';
-  return baseName(token).replace(/\.(exe|cmd|bat|ps1)$/i, '');
+  let rest = String(command ?? '').trim();
+  const re = /^(?:"([^"]*)"|'([^']*)'|(\S+))\s*/;
+  for (;;) {
+    const m = rest.match(re);
+    if (!m) return '';
+    rest = rest.slice(m[0].length);
+    const token = m[1] ?? m[2] ?? m[3];
+    if (/^[A-Za-z_]\w*=/.test(token)) continue; // leading NAME=value assignment
+    if (token.includes('://')) return '';
+    const word = baseName(token).replace(/\.(exe|cmd|bat|ps1)$/i, '');
+    return /^[\w.+-]+$/.test(word) ? word : '';
+  }
 }
 
 function fileLabel(verb) {
