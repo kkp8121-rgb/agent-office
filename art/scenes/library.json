@@ -1,0 +1,91 @@
+{
+  "shellPrompt": "Use your image generation tool to edit the attached image library.png: output the SAME room (same pixel-art style, same isometric camera angle, same walls, windows with sky view, paintings, wall lamps, whiteboard, wooden door with its door frame, lighting, same 16:9 aspect ratio, same tan background outside the room) but with EVERY free-standing floor object removed: no desks, chairs, monitors, desk lamps, plants, potted plants, sofa, armchair, coffee table, small side tables, floor lamps, globe, small cabinets standing away from the walls, no square stools or crates. Keep every rug exactly where it is (the long red and green rugs and the red rugs). Keep the tall bookshelves with the ladder on the back and left walls, the long low bookshelf under the windows and the low cabinet under the whiteboard, drawn as part of the wall. Keep the thick dark wooden ledge along the front edge of the room. Only the empty room shell with wooden floor, rugs, walls, windows and wall-mounted items remains. Save the result as shell.png in the current directory.",
+  "shell": {
+    "ref": "assets/floors/library.png",
+    "size": [
+      1024,
+      576
+    ],
+    "floorIoU": 0.997
+  },
+  "sheets": [
+    {
+      "id": "s1",
+      "rows": 2,
+      "ref": "assets/floors/library.png",
+      "pieces": [
+        "desk",
+        "chair",
+        "lead-desk",
+        "sofa",
+        "armchair",
+        "globe"
+      ],
+      "prompt": "Use your image generation tool to create a sprite sheet of 6 separate furniture objects in EXACTLY the same pixel-art style, palette, dark outlines, pixel size and same camera angle as the objects in the attached library.png. Layout: TWO rows of 3 objects with wide empty gaps between all objects, each object alone and fully separated, on a flat solid #FF00FF magenta background (no shadow on the floor, no floor, no glow). Objects, row 1 left to right: 1) a dark wooden library desk with drawers seen from the FRONT, with a computer monitor on it whose BACK faces the viewer (we see the back of the monitor) and a green banker's desk lamp, no chair; 2) a dark green leather office chair with armrests and a tall backrest, seen from the FRONT (the seat faces the viewer), nobody sitting in it; 3) a wider dark wooden manager desk seen from the FRONT, back of its monitor facing the viewer, with a small flat grey document tray (inbox) with papers on its left end and a brass lamp, no chair. Row 2 left to right: 4) a red leather sofa with two cushions seen from the front; 5) a green leather armchair for one person seen from the front; 6) a wooden stand holding a globe, about waist high. Do not use magenta anywhere inside the objects. Canvas 2:1 wide. Save as sheet.png in the current directory."
+    },
+    {
+      "id": "s2",
+      "rows": 2,
+      "ref": "assets/floors/library.png",
+      "pieces": [
+        "plant-big",
+        "plant-small",
+        "lamp",
+        "cabinet",
+        "table",
+        "stool"
+      ],
+      "prompt": "Use your image generation tool to create a sprite sheet of 6 separate objects in EXACTLY the same pixel-art style, palette, dark outlines, pixel size and same camera angle as the objects in the attached library.png. Layout: TWO rows of 3 objects with wide empty gaps between all objects, each object alone and fully separated, on a flat solid #FF00FF magenta background (no shadow on the floor, no floor, no glow). Objects, row 1 left to right: 1) a tall leafy green plant in a square cream stone planter (about 2 times as tall as wide); 2) a small green plant in a small round white pot (about as tall as wide); 3) a tall standing brass floor lamp with a cream lampshade. Row 2 left to right: 4) a small low dark wooden side cabinet with drawers and a glowing brass table lamp on top, seen from the front; 5) a small round dark wooden side table with a few books on it; 6) a square dark wooden cushioned stool seat (box shaped, low). Do not use magenta anywhere inside the objects. Canvas 2:1 wide. Save as sheet.png in the current directory."
+    }
+  ],
+  "kinds": {
+    "desk": {
+      "piece": "s1/piece-0",
+      "width": 83
+    },
+    "chair": {
+      "piece": "s1/piece-1",
+      "height": 50
+    },
+    "lead-desk": {
+      "piece": "s1/piece-2",
+      "width": 106
+    },
+    "sofa": {
+      "piece": "s1/piece-3",
+      "width": 126
+    },
+    "armchair": {
+      "piece": "s1/piece-4",
+      "width": 50
+    },
+    "globe": {
+      "piece": "s1/piece-5",
+      "height": 52
+    },
+    "plant-big": {
+      "piece": "s2/piece-0",
+      "height": 74
+    },
+    "plant-small": {
+      "piece": "s2/piece-1",
+      "height": 36
+    },
+    "lamp": {
+      "piece": "s2/piece-2",
+      "height": 72
+    },
+    "cabinet": {
+      "piece": "s2/piece-3",
+      "height": 46
+    },
+    "table": {
+      "piece": "s2/piece-4",
+      "height": 34
+    },
+    "stool": {
+      "piece": "s2/piece-5",
+      "width": 42
+    }
+  }
+}
