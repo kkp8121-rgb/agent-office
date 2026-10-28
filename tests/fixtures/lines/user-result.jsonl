@@ -1,0 +1,1 @@
+{"type":"user","timestamp":"2026-10-28T06:48:49.000Z","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"SECRET-RESULT"}]},"toolUseResult":{"stdout":"SECRET-RESULT"}}

@@ -1,0 +1,1 @@
+{"type":"user","timestamp":"2026-10-28T06:48:50.000Z","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_3","content":"SECRET-RESULT"}]},"toolUseResult":{"status":"async_launched","taskType":"local_workflow","workflowName":"review-changes","runId":"wf_abc","scriptPath":"C:/x/s.js"}}

@@ -1,0 +1,1 @@
+{"type":"assistant","timestamp":"2026-10-28T06:48:44.441Z","sessionId":"s1","isSidechain":false,"message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"npm run build --prefix front","description":"프론트 빌드 확인"}}],"stop_reason":null}}

@@ -1,0 +1,1 @@
+{"type":"assistant","timestamp":"2026-10-28T06:48:45.000Z","sessionId":"s1","message":{"content":[{"type":"tool_use","id":"toolu_2","name":"Agent","input":{"subagent_type":"worker","description":"기록 조사","prompt":"SECRET-PROMPT"}}],"stop_reason":null}}

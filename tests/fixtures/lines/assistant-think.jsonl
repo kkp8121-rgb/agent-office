@@ -1,0 +1,2 @@
+{"type":"assistant","timestamp":"2026-10-28T06:48:46.000Z","message":{"content":[{"type":"thinking","thinking":"SECRET-THOUGHT"}],"stop_reason":null}}
+{"type":"assistant","timestamp":"2026-10-28T06:48:47.000Z","message":{"content":[{"type":"text","text":"SECRET-ANSWER"}],"stop_reason":null}}
