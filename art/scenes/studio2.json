@@ -16,7 +16,7 @@
   ],
   "kinds": {
     "desk":         { "piece": "s1/piece-0", "width": 83 },
-    "chair":        { "piece": "s1/piece-1", "height": 58 },
+    "chair":        { "piece": "s1/piece-1", "height": 50 },
     "lead-desk":    { "piece": "s1/piece-2", "width": 104 },
     "table":        { "piece": "s1/piece-4", "width": 72 },
     "lamp":         { "piece": "s1/piece-5", "height": 68 },
