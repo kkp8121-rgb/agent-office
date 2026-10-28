@@ -1,0 +1,45 @@
+{
+  "port": 47800,
+  "pollMs": 1500,
+  "agentScanEveryTicks": 2,
+  "tail": { "startBytes": 262144, "chunkBytes": 65536, "maxLineBytes": 4194304 },
+  "log": { "cap": 2000, "backfillMinutes": 30, "mergeWindowMs": 20000, "sendCap": 200 },
+  "agent": { "doneLingerMs": 15000, "staleMs": 600000, "bubbleShowMs": 8000 },
+  "floor": { "leaveMs": 5000 },
+  "ui": { "bubbleMaxChars": 16, "logDomCap": 300 },
+  "roles": {
+    "__lead":               { "key": "lead",                 "name": "유나", "role": "팀장" },
+    "scout":                { "key": "scout",                "name": "다온", "role": "정찰" },
+    "worker-low":           { "key": "worker-low",           "name": "소미", "role": "막내" },
+    "worker":               { "key": "worker",               "name": "서진", "role": "개발" },
+    "worker-high":          { "key": "worker-high",          "name": "하린", "role": "선임" },
+    "architect":            { "key": "architect",            "name": "세아", "role": "설계" },
+    "architect-high":       { "key": "architect-high",       "name": "은재", "role": "수석" },
+    "Explore":              { "key": "explore",              "name": "루아", "role": "탐색" },
+    "Plan":                 { "key": "plan",                 "name": "지안", "role": "기획" },
+    "code-critic":          { "key": "code-critic",          "name": "시온", "role": "검토" },
+    "security-reviewer":    { "key": "security-reviewer",    "name": "보라", "role": "보안" },
+    "performance-reviewer": { "key": "performance-reviewer", "name": "예린", "role": "성능" },
+    "i18n-reviewer":        { "key": "i18n-reviewer",        "name": "가온", "role": "번역" },
+    "a11y-reviewer":        { "key": "a11y-reviewer",        "name": "미루", "role": "접근성" },
+    "frontend":             { "key": "frontend",             "name": "채원", "role": "프론트" },
+    "backend":              { "key": "backend",              "name": "아린", "role": "백엔드" },
+    "app":                  { "key": "app",                  "name": "리아", "role": "앱" },
+    "__default":            { "key": "default",              "name": "나래", "role": "지원" }
+  },
+  "spriteHeight": 64,
+  "designOrder": ["studio"],
+  "layouts": {
+    "studio": {
+      "image": "studio.png",
+      "size": [768, 512],
+      "entrance": [96, 420],
+      "lead": [350, 446],
+      "tray": [405, 446],
+      "sofa": [660, 292],
+      "board": [16, 12, 300, 92],
+      "desks": [[250,262],[332,262],[415,262],[500,262],[235,362],[327,362],[420,362],[512,362]],
+      "aisle": [[290,312],[372,312],[455,312],[540,312],[250,470],[520,470]]
+    }
+  }
+}

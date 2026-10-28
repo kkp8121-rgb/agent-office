@@ -1,0 +1,23 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { loadConfig } from '../server/config.mjs';
+
+test('config: defaults from config.json', () => {
+  const cfg = loadConfig();
+  assert.equal(cfg.port, 47800);
+  assert.equal(cfg.roles.worker.name, '서진');
+  assert.equal(cfg.layouts.studio.desks.length, 8);
+  for (const d of cfg.designOrder) assert.ok(cfg.layouts[d], d);
+});
+test('config: AGENT_OFFICE_CLAUDE_HOME sets claudeHome', () => {
+  const prev = process.env.AGENT_OFFICE_CLAUDE_HOME;
+  process.env.AGENT_OFFICE_CLAUDE_HOME = 'X:/fake-claude';
+  try { assert.equal(loadConfig().claudeHome, 'X:/fake-claude'); }
+  finally { if (prev === undefined) delete process.env.AGENT_OFFICE_CLAUDE_HOME; else process.env.AGENT_OFFICE_CLAUDE_HOME = prev; }
+});
+test('config: overrides deep-merge, root is absolute', () => {
+  const cfg = loadConfig({ log: { cap: 5 } });
+  assert.equal(cfg.log.cap, 5);
+  assert.equal(cfg.log.sendCap, 200);
+  assert.ok(cfg.root.length > 3);
+});
