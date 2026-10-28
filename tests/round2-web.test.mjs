@@ -73,6 +73,13 @@ test('F16a: no aisle spot overlaps a desk-row character', () => {
   }
 });
 
+test('F16a: aisle spots do not overlap each other', () => {
+  for (const d of cfg.designOrder) {
+    const { aisle } = cfg.layouts[d];
+    aisle.forEach((a, i) => aisle.slice(i + 1).forEach((b) => assert.ok(!hit(a, b), `${d}: aisle ${a} overlaps ${b}`)));
+  }
+});
+
 test('F16b: 30 sub-agents never share a coordinate and stay inside the floor', () => {
   for (const d of cfg.designOrder) {
     const o = new Office(loadConfig({ designOrder: [d] }), EMPTY);
@@ -81,6 +88,10 @@ test('F16b: 30 sub-agents never share a coordinate and stay inside the floor', (
     const slots = floorOf(o, 's1').agents.map((a) => a.slot);
     assert.equal(new Set(slots.map((s) => `${s.x},${s.y}`)).size, 30, d);
     const [w, h] = cfg.layouts[d].size;
+    const area = (p, q) => Math.max(0, 44 - Math.abs(p.x - q.x)) * Math.max(0, 64 - Math.abs(p.y - q.y)) / (44 * 64);
+    let worst = 0;
+    slots.forEach((p, i) => slots.slice(i + 1).forEach((q) => { worst = Math.max(worst, area(p, q)); }));
+    assert.ok(worst <= 0.5, `${d}: worst overlap ${worst}`);
     for (const s of slots) assert.ok(s.x >= 0 && s.x <= w && s.y >= 0 && s.y <= h, `${d}: ${s.x},${s.y}`);
   }
 });
