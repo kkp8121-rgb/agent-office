@@ -7,7 +7,7 @@ Writes art/scenes-check/<design>.png with four panels, top to bottom:
                        lead seat, tray queue, idle points and spots (+ front overlay)
   2. overlay           footprints, walkable grid, depth lines, point numbers, frontMask
   3. depth tests       zoomed tiles: in front of / behind desk and big plant
-  4. old vs new        assets/floors/<design>.png over the new composite
+  4. old vs new        art/floors/<design>.png over the new composite
 
 Geometry is resolved here (same rules as web/scene.mjs). When scripts/check-scenes.mjs exists
 the engine's own grid is read with `--json <design>` and drawn instead of the local one, and the
@@ -363,7 +363,7 @@ def main():
     comp = draw_scene(r, shell, atlas, front, stand, sit, scene_chars(r), cfg)
     ov = overlay(r, shell, g, nav, dep)
     tiles = depth_tiles(r, shell, atlas, front, stand, sit, cfg)
-    old_path = os.path.join(ROOT, "assets", "floors", design + ".png")
+    old_path = os.path.join(ROOT, "art", "floors", design + ".png")
     old = Image.open(old_path).convert("RGBA").resize(comp.size, Image.LANCZOS) if os.path.exists(old_path) else Image.new("RGBA", comp.size)
     W = comp.width
     sheet = Image.new("RGBA", (W, comp.height * 4 + tiles.height + 30), (20, 20, 20, 255))

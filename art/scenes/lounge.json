@@ -1,7 +1,7 @@
 {
   "shellPrompt": "Use your image generation tool to edit the attached image lounge.png: output the SAME room (same pixel-art style, same isometric camera angle, same brick walls, windows with sky view, paintings, wall pendant lights, whiteboard, door with its door frame, lighting, same 16:9 aspect ratio, same cream background outside the room) but with EVERY free-standing floor object removed: no desks, chairs, monitors, desk plants, potted plants standing on the floor, sofa, coffee table, floor lamp, bar stools, no leaf plants next to the walls, no small tables. Keep every rug and floor mat exactly where it is (the red patterned rugs, the green mats, the door mat). Keep the two tall bookshelves flush against the back wall, the wooden cabinet with the coffee machine and cups, and the long bar counter along the right wall, drawn as part of the wall. Keep the low brown wall ledges and planter boxes along the front edge of the room. Only the empty room shell with wooden floor, rugs, walls, windows and wall-mounted items remains. Save the result as shell.png in the current directory.",
   "shell": {
-    "ref": "assets/floors/lounge.png",
+    "ref": "art/floors/lounge.png",
     "size": [
       1024,
       576
@@ -13,7 +13,7 @@
     {
       "id": "s1",
       "rows": 2,
-      "ref": "assets/floors/lounge.png",
+      "ref": "art/floors/lounge.png",
       "pieces": [
         "desk",
         "chair",
@@ -27,7 +27,7 @@
     {
       "id": "s2",
       "rows": 2,
-      "ref": "assets/floors/lounge.png",
+      "ref": "art/floors/lounge.png",
       "pieces": [
         "plant-big",
         "plant-rubber",

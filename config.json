@@ -54,18 +54,5 @@
   "scenesDir": "assets/scenes",
   "nav": { "cellPx": 8, "inflatePx": 12, "snapRadiusCells": 6, "pathCache": 256, "overflowSearchPx": 200, "overflowMaxOverlap": 0.35, "spriteWidthPx": 44, "trayRowPx": 28, "arrivalGapPx": 24 },
   "depth": { "sliceTolerancePx": 6, "sliceWidthPx": 16, "sliceOverlapPx": 1, "pickMarginPx": 22, "zBase": 1000, "frontZ": 7000, "faceTopPx": 24, "seatShowPx": 28 },
-  "designOrder": ["studio2", "lounge", "library", "greenhouse"],
-  "layouts": {
-    "studio": {
-      "image": "studio.png",
-      "size": [768, 512],
-      "entrance": [96, 420],
-      "lead": [350, 446],
-      "tray": [405, 446],
-      "sofa": [660, 292],
-      "board": [16, 12, 300, 92],
-      "desks": [[250,262],[332,262],[415,262],[500,262],[235,362],[327,362],[420,362],[512,362]],
-      "aisle": [[290,312],[372,312],[455,312],[540,312],[250,470],[520,470]]
-    }
-  }
+  "designOrder": ["studio2", "lounge", "library", "greenhouse"]
 }

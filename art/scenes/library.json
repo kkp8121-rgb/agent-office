@@ -1,7 +1,7 @@
 {
   "shellPrompt": "Use your image generation tool to edit the attached image library.png: output the SAME room (same pixel-art style, same isometric camera angle, same walls, windows with sky view, paintings, wall lamps, whiteboard, wooden door with its door frame, lighting, same 16:9 aspect ratio, same tan background outside the room) but with EVERY free-standing floor object removed: no desks, chairs, monitors, desk lamps, plants, potted plants, sofa, armchair, coffee table, small side tables, floor lamps, globe, small cabinets standing away from the walls, no square stools or crates. Keep every rug exactly where it is (the long red and green rugs and the red rugs). Keep the tall bookshelves with the ladder on the back and left walls, the long low bookshelf under the windows and the low cabinet under the whiteboard, drawn as part of the wall. Keep the thick dark wooden ledge along the front edge of the room. Only the empty room shell with wooden floor, rugs, walls, windows and wall-mounted items remains. Save the result as shell.png in the current directory.",
   "shell": {
-    "ref": "assets/floors/library.png",
+    "ref": "art/floors/library.png",
     "size": [
       1024,
       576
@@ -12,7 +12,7 @@
     {
       "id": "s1",
       "rows": 2,
-      "ref": "assets/floors/library.png",
+      "ref": "art/floors/library.png",
       "pieces": [
         "desk",
         "chair",
@@ -26,7 +26,7 @@
     {
       "id": "s2",
       "rows": 2,
-      "ref": "assets/floors/library.png",
+      "ref": "art/floors/library.png",
       "pieces": [
         "plant-big",
         "plant-small",

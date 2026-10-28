@@ -12,7 +12,7 @@ test('config: defaults from config.json', () => {
   const cfg = loadConfig();
   assert.equal(cfg.port, 47800);
   assert.equal(cfg.roles.worker.name, '서진');
-  assert.equal(cfg.layouts.studio.desks.length, 8);
+  assert.equal(cfg.layouts, undefined);
   for (const d of cfg.designOrder) assert.ok(cfg.scenes[d], `every design in designOrder has a scene: ${d}`);
 });
 test('config: AGENT_OFFICE_CLAUDE_HOME sets claudeHome', () => {

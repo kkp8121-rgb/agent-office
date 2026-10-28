@@ -32,13 +32,13 @@
 
 ## 그림 다시 뽑기
 
-Codex 의 imagegen 으로 그림을 만든 뒤 `art\snap.py` 로 격자에 맞춥니다. 프롬프트는 `art\prompts.json`(캐릭터), `art\scenes\<방>.json`(방), `art\sit\prompts.json`(앉은 자세)에 있습니다. 결과는 `assets\` 아래에 둡니다. 옛 한 장짜리 배경 `assets\floors\*.png` 는 점검·비교용으로만 남아 있고 화면에는 쓰지 않습니다.
+Codex 의 imagegen 으로 그림을 만든 뒤 `art\snap.py` 로 격자에 맞춥니다. 프롬프트는 `art\prompts.json`(캐릭터), `art\scenes\<방>.json`(방), `art\sit\prompts.json`(앉은 자세)에 있습니다. 결과는 `assets\` 아래에 둡니다. 옛 한 장짜리 배경 `art\floors\*.png` 는 방을 다시 뽑을 때 쓰는 참고 그림이고 화면에는 쓰지 않습니다.
 
 ### 방(장면) 그림 — 껍데기 + 오브젝트
 
 층 그림은 모두 장면입니다. `designOrder` 의 방마다 `assets\scenes\<방>\scene.json` 이 있어야 하고, 없거나 형식이 틀리면 서버가 시작하지 않습니다. 방(`assets\scenes\<방>\`)은 한 장짜리 배경이 아니라 빈 방 껍데기(`shell.png`), 가구 모음(`objects.png`), 필요하면 앞 덮개(`front.png`), 배치 데이터(`scene.json`)로 이루어집니다. 프롬프트와 목표 크기는 방마다 `art\scenes\<방>.json` 에 있습니다. 원본(Codex 결과)은 저장소 밖 작업 폴더에 두고 `--work` 또는 환경변수 `AGENT_OFFICE_ART_WORK` 로 알려 줍니다.
 
-1. 껍데기: `codex exec` 로 `assets\floors\<방>.png` 를 편집해 가구만 지운 방을 받고(러그·벽에 붙은 책장은 유지), `python art\snap.py shell <입력> assets\scenes\<방>\shell.png --size 1024x512` 로 줄입니다.
+1. 껍데기: `codex exec` 로 `art\floors\<방>.png` 를 편집해 가구만 지운 방을 받고(러그·벽에 붙은 책장은 유지), `python art\snap.py shell <입력> assets\scenes\<방>\shell.png --size 1024x512` 로 줄입니다.
 2. 가구 시트: 마젠타(`#FF00FF`) 배경에 물건 6개 안팎을 두 줄로 뽑고, `python art\snap.py sheet <시트.png> <작업폴더>\s1 --rows 2` 로 조각(`piece-<번호>.png`)을 나눕니다.
 3. 아틀라스: `art\scenes\<방>.json` 의 `kinds` 에 조각과 목표 폭·높이를 적고 `python art\atlas.py <방>` 을 실행하면 `objects.png` 가 만들어지고 `scene.json` 의 `kinds[*].rect` 만 갱신됩니다.
 4. 앞 덮개가 필요하면 `scene.json` 의 `frontMask` 를 적고 `python art\front.py <방>` 을 실행합니다.
