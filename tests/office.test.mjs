@@ -66,6 +66,8 @@ test('office: hidden record is dropped when its session ends', () => {
   const o = setup();
   assert.equal(o.hide('s1'), true);
   assert.equal(o.saved().hidden.length, 1);
+  o.syncSessions([], 1500);
+  assert.equal(o.saved().hidden.length, 1, 'one missed call keeps the record');
   o.syncSessions([], 2000);
   assert.deepEqual(o.saved().hidden, []);
   assert.equal(o.snapshot().floors.length, 0, 'leaving floor of a hidden session stays hidden');
@@ -252,6 +254,7 @@ test('office: saved() is a copy and savedVersion counts changes', () => {
   s.names.z = 'z';
   assert.equal(o.saved().hidden.length, 1);
   assert.deepEqual(o.saved().names, { s1: 'a' });
+  o.syncSessions([], 1500);
   o.syncSessions([], 2000);
   assert.equal(o.savedVersion, v0 + 3, 'dropping a hidden record bumps too');
 });
@@ -397,6 +400,7 @@ test('office: logSince is the backfill window, raised to the moment a hide recor
   assert.equal(o.logSince('s1', 1000 + day), 1000);
   o.hide('s1');
   // ending: the hide record is dropped when the session is no longer live
+  o.syncSessions([S('s2', { startedAt: 2000 })], 4500);
   o.syncSessions([S('s2', { startedAt: 2000 })], 5000);
   assert.equal(o.logSince('s1', 6000), 5000);
   assert.equal(o.logSince('s2', 6000), 6000 - day);
