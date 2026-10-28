@@ -314,7 +314,7 @@ export class CodexSource {
       if (!this.#recs.has(path)) {
         this.#recs.set(path, {
           path, size: -1, meta: null, ignored: false, tail: null, resumeAt: 0,
-          turn: 'none', lastTs: 0, activeFrom: null, titleSent: false, pending: [], hot: false, runs: null, busy: null,
+          turn: 'none', lastTs: 0, activeFrom: null, batchFrom: null, titleSent: false, pending: [], hot: false, runs: null, busy: null,
         });
       }
     }
@@ -355,7 +355,8 @@ export class CodexSource {
       const e = parseEntry(text);
       if (!e) continue;
       const ts = e.ts > 0 ? e.ts : now;
-      if (rec.activeFrom === null) rec.activeFrom = ts;
+      if (first && rec.activeFrom === null) rec.activeFrom = ts;
+      rec.batchFrom = Math.min(rec.batchFrom ?? ts, ts);
       if (e.turn) rec.turn = e.turn;
       if (first) {
         if (prev > 0 && ts - prev <= runGap) runs.at(-1)[1] = Math.max(runs.at(-1)[1], ts);
@@ -463,7 +464,9 @@ export class CodexSource {
         rec.titleSent = false;
         continue;
       }
-      rec.activeFrom ??= now;
+      // A period opened from silence began with the earliest line any rollout of the family wrote in this batch (the
+      // coverage rule above, applied to what was just read), whichever of them wrote it.
+      rec.activeFrom ??= Math.min(rec.batchFrom ?? Infinity, ...mine.map((k) => k.batchFrom ?? Infinity), now);
       listedRecs.add(rec);
       for (const k of mine) listedRecs.add(k);
       const id = rec.meta.id;
@@ -495,6 +498,7 @@ export class CodexSource {
     // Events are delivered once: whatever was read for unlisted files is dropped, as a Claude tail would drop it.
     for (const rec of this.#recs.values()) {
       rec.pending = [];
+      rec.batchFrom = null;
       rec.runs = rec.busy = null;
       rec.hot = listedRecs.has(rec) || (!rec.meta && !rec.ignored); // a first line still being written stays watched
       // A finished rollout that is not listed holds no FileTail (64 KB buffer); it resumes from its line offset.

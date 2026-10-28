@@ -113,6 +113,61 @@ test('F20: parent and sub-agent silent longer than idleKeepMs start a new period
   assert.equal((await new CodexSource(h.cfg).poll(next + 100)).sessions[0].startedAt, next);
 });
 
+/** Parent and sub-agent go quiet for 80 minutes (the floor leaves), then one of them writes. */
+function quietThenWrite(h, now) {
+  const t0 = now - 120 * MIN;
+  const parent = h.rollout(PARENT_ID, meta(t0, PARENT_ID) + started(t0 + 1000) + ev(t0 + 2000, 'token_count'));
+  const child = h.rollout(CHILD_ID, childMeta(t0 + 3000, CHILD_ID, PARENT_ID) + started(t0 + 4000));
+  return { t0, T: t0 + 80 * MIN, parent, child };
+}
+
+test('F20: a period opened by a sub-agent line starts at that line, live and after a restart', async (t) => {
+  const h = fake(t);
+  const { t0, T, parent, child } = quietThenWrite(h, Date.now());
+  const running = new CodexSource(h.cfg);
+  assert.equal((await running.poll(t0 + 5000)).sessions[0].startedAt, t0);
+  assert.equal((await running.poll(t0 + 70 * MIN)).sessions.length, 0, 'both silent: the floor left');
+  appendFileSync(child, ev(T, 'token_count'));
+  assert.equal((await running.poll(T + 1500)).sessions[0].startedAt, T, 'sub-agent line opens the period');
+  appendFileSync(parent, ev(T + 20000, 'token_count'));
+  assert.equal((await running.poll(T + 21500)).sessions[0].startedAt, T, 'long-running server');
+  assert.equal((await new CodexSource(h.cfg).poll(T + 21500)).sessions[0].startedAt, T, 'fresh server');
+});
+
+test('F20: sub-agent line before the parent line in one batch: the earlier one starts the period, live and restarted', async (t) => {
+  const h = fake(t);
+  const { t0, T, parent, child } = quietThenWrite(h, Date.now());
+  const running = new CodexSource(h.cfg);
+  await running.poll(t0 + 5000);
+  assert.equal((await running.poll(t0 + 70 * MIN)).sessions.length, 0);
+  appendFileSync(child, ev(T, 'token_count'));
+  appendFileSync(parent, ev(T + 20000, 'token_count'));
+  assert.equal((await running.poll(T + 21500)).sessions[0].startedAt, T, 'long-running server');
+  assert.equal((await new CodexSource(h.cfg).poll(T + 21500)).sessions[0].startedAt, T, 'fresh server');
+});
+
+test('F20: a forced hide survives a restart when a sub-agent line opened the period', async (t) => {
+  const h = fake(t);
+  const claudeHome = mkdtempSync(join(tmpdir(), 'codex-r2-claude-'));
+  t.after(() => rmSync(claudeHome, { recursive: true, force: true }));
+  h.cfg.claudeHome = claudeHome;
+  const { t0, T, parent, child } = quietThenWrite(h, Date.now());
+  const office = new Office(h.cfg, { hidden: [], names: {} });
+  const poller = new Poller(h.cfg, office);
+  await poller.tick(t0 + 5000);
+  await poller.tick(t0 + 70 * MIN);
+  appendFileSync(child, ev(T, 'token_count'));
+  await poller.tick(T + 1500);
+  assert.equal(office.hide(PARENT_ID), true);
+  appendFileSync(parent, ev(T + 20000, 'token_count'));
+  await poller.tick(T + 21500);
+  assert.equal(office.snapshot().floors.some((f) => f.provider === 'codex'), false, 'live');
+  const office2 = new Office(h.cfg, office.saved());
+  await new Poller(h.cfg, office2).tick(T + 21500);
+  assert.equal(office2.snapshot().floors.some((f) => f.provider === 'codex'), false, 'restart');
+  assert.equal(office2.saved().hidden.length, 1, 'the hide record is kept');
+});
+
 test('F38: CodexSource.bytesRead sums FileTail.lastRead, not the offset difference of a mid-file start', async (t) => {
   const h = fake(t, { tail: { startBytes: 2000 }, codex: { headBytes: 4096 } });
   const now = Date.now();
