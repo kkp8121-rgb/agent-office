@@ -45,6 +45,7 @@ export class Office {
     this.hiddenMiss = new Map(); // sessionId -> consecutive syncSessions calls its hide record's session was absent
     this.logMark = new Map(); // sessionId -> first ts not yet logged when its floor left (a resume must not log the window again)
     this.departedTitles = new Map(); // sessionId -> last title of a floor that left, for the log page
+    this.departedColors = new Map(); // sessionId -> palette index of a floor that left, for the log page
     this.evicted = new WeakSet(); // entries that left the ring (a merge must not revive them)
     this.logSeq = 0;
 
@@ -168,6 +169,7 @@ export class Office {
   #createFloor(s) {
     const { roles } = this.cfg;
     const design = this.#pickDesign();
+    const colorIndex = this.#pickColor();
     const lead = (s.provider === 'codex' && roles['codex:__lead']) || roles.__lead;
     return {
       sessionId: s.sessionId,
@@ -180,6 +182,7 @@ export class Office {
       hidden: false,
       seq: this.floorSeq++,
       design,
+      colorIndex,
       aiTitle: '',
       lead: { name: lead.name, role: lead.role, sprite: lead.key, head: '', state: 'idle', bubble: '', lastRead: null },
       boardLine: '',
@@ -205,6 +208,13 @@ export class Office {
       if (used.get(d) < used.get(best)) best = d;
     }
     return best;
+  }
+
+  /** Palette index least used among the visible floors; ties go to the lowest index. */
+  #pickColor() {
+    const used = new Array(this.cfg.ui.sessionPalette.length).fill(0);
+    for (const f of this.floors.values()) if (!f.hidden && f.colorIndex < used.length) used[f.colorIndex]++;
+    return used.indexOf(Math.min(...used));
   }
 
   /** Remembers the first ts of the session not yet logged, so a resumed floor does not log the same window again. */
@@ -355,14 +365,24 @@ export class Office {
     }
   }
 
-  /** Smallest free index over [...desks, ...aisle]; beyond that, stacked on the last aisle spot. */
+  /** Smallest free index over [...desks, ...aisle]; beyond that, round r revisits the aisle spots shifted by ui.overflowShifts[r - 1]. */
   #allocSlot(f) {
-    const { desks, aisle } = this.cfg.layouts[f.design];
+    const { desks, aisle, size } = this.cfg.layouts[f.design];
+    const { overflowShifts, overflowMarginPx } = this.cfg.ui;
     let i = 0;
     while (f.usedSlots.has(i)) i++;
     f.usedSlots.add(i);
-    const p = i < desks.length ? desks[i] : (aisle[Math.min(i - desks.length, aisle.length - 1)] ?? desks.at(-1));
-    return { x: p[0], y: p[1], i };
+    const k = i - desks.length;
+    if (k < aisle.length) {
+      const p = k < 0 ? desks[i] : aisle[k];
+      return { x: p[0], y: p[1], i };
+    }
+    const round = Math.floor(k / aisle.length) - 1; // 0 for the first lap over the aisle
+    const base = aisle[k % aisle.length];
+    const [dx, dy] = overflowShifts[round % overflowShifts.length];
+    const x = Math.min(Math.max(base[0] + dx, overflowMarginPx), size[0] - overflowMarginPx);
+    const y = Math.min(Math.max(base[1] + dy, this.cfg.spriteHeight), size[1] - 4);
+    return { x, y, i };
   }
 
   // One board line per floor: the most recently reported run owns it, and the line clears when that run is done.
@@ -401,7 +421,10 @@ export class Office {
     for (const f of [...this.floors.values()]) {
       if (f.leavingAt !== null && now - f.leavingAt >= floor.leaveMs) {
         this.floors.delete(f.sessionId);
-        if (!f.hidden) this.departedTitles.set(f.sessionId, this.#titleOf(f));
+        if (!f.hidden) {
+          this.departedTitles.set(f.sessionId, this.#titleOf(f));
+          this.departedColors.set(f.sessionId, f.colorIndex);
+        }
         this.#pruneTitles();
         changed = true;
         continue;
@@ -429,7 +452,11 @@ export class Office {
 
   #pruneTitles() {
     const inLog = new Set(this.ring.map((e) => e.sessionId));
-    for (const id of this.departedTitles.keys()) if (!inLog.has(id)) this.departedTitles.delete(id);
+    for (const id of this.departedTitles.keys()) {
+      if (inLog.has(id)) continue;
+      this.departedTitles.delete(id);
+      this.departedColors.delete(id);
+    }
   }
 
   /** Title per session id for the log page: live floors as shown, departed ones as last seen; hidden sessions never appear. */
@@ -440,6 +467,18 @@ export class Office {
       const f = this.floors.get(id);
       const title = f ? (f.hidden ? undefined : this.#titleOf(f)) : this.departedTitles.get(id);
       if (title !== undefined) out[id] = title;
+    }
+    return out;
+  }
+
+  /** Palette index per session id for the log page, the same rules as logTitles. */
+  logColors(sessionIds) {
+    const out = {};
+    for (const id of sessionIds) {
+      if (this.hiddenRecs.has(id)) continue;
+      const f = this.floors.get(id);
+      const index = f ? (f.hidden ? undefined : f.colorIndex) : this.departedColors.get(id);
+      if (index !== undefined) out[id] = index;
     }
     return out;
   }
@@ -455,6 +494,7 @@ export class Office {
         provider: f.provider,
         floorNo: i + 1,
         design: f.design,
+        colorIndex: f.colorIndex,
         title,
         autoTitle,
         folder: f.folder,

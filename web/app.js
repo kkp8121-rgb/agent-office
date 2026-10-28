@@ -114,6 +114,8 @@ function setBubble(rec, bubble, since) {
   if (key === rec.bubKey) return;
   rec.bubKey = key;
   const empty = bubble === '';
+  rec.since = since;
+  rec.hasBubble = !empty;
   rec.bubTxt.classList.toggle('empty', empty);
   rec.bubDot.classList.toggle('empty', empty);
   if (empty) return;
@@ -223,6 +225,12 @@ function createFloor(fv) {
   return rec;
 }
 
+/** Full speech bubbles only for the `max` characters that spoke last; the rest show the small dot, so a crowded floor stays readable. */
+function limitBubbles(recs, max) {
+  const speaking = [...recs].filter((a) => a.hasBubble && a.state !== 'done' && a.state !== 'stale').sort((a, b) => b.since - a.since);
+  speaking.forEach((a, i) => a.el.classList.toggle('quiet', i >= max));
+}
+
 function renderFloor(fv, elm) {
   const rec = floorRecs.get(fv.sessionId);
   setText(rec.fno, `${fv.floorNo}F`);
@@ -263,6 +271,7 @@ function renderFloor(fv, elm) {
       rec.agents.delete(key);
     }
   }
+  limitBubbles(rec.agents.values(), ui.ui.bubbleFullMax);
   rec.populated = true;
 }
 
@@ -386,6 +395,7 @@ function syncOrder(parent, elms) {
 
 function render(state) {
   lastNow = state.now;
+  for (const f of state.floors) setColor(f.sessionId, f.colorIndex);
   // Forced hide: a hidden id stays out until a snapshot has lacked it and then has it again (a re-run).
   const present = new Set(state.floors.map((f) => f.sessionId));
   for (const [id, rec] of [...forcedHidden]) {
@@ -450,7 +460,29 @@ async function setHidden(sessionId, hidden) {
 
 // ---------- log ----------
 
-/** Entries arrive oldest-first in a batch; the newest row sits on top. A repeated id updates its row in place. */
+/** Remembers a session's palette index and repaints its log rows when it changed. */
+function setColor(sessionId, index) {
+  if (index === undefined || sessionColorIdx.get(sessionId) === index) return;
+  sessionColorIdx.set(sessionId, index);
+  for (const row of logRows.values()) if (row.dataset.sid === sessionId) row.style.setProperty('--c', colorOf(sessionId));
+}
+
+const colorAsked = new Set(); // sessions whose colour was already requested from /api/log
+/** Log rows of sessions that left before this page loaded have no floor: ask the log page's source once per session. */
+async function learnColors(sessionIds) {
+  for (const sid of sessionIds) {
+    if (sessionColorIdx.has(sid) || colorAsked.has(sid)) continue;
+    colorAsked.add(sid);
+    try {
+      const r = await fetch(`/api/log?session=${encodeURIComponent(sid)}&limit=1`);
+      if (r.ok) setColor(sid, (await r.json()).colors?.[sid]);
+    } catch {
+      // the row keeps its neutral colour
+    }
+  }
+}
+
+/** Entries arrive oldest-first in a batch; the newest row sits on top, rows are kept newest-first by ts. A repeated id updates its row and moves it when its ts changed. */
 function appendLog(entries) {
   for (const e of entries) {
     if (forcedHidden.has(e.sessionId)) continue;
@@ -458,12 +490,18 @@ function appendLog(entries) {
     if (!row) {
       row = createLogRow(e);
       logRows.set(e.id, row);
-      let before = logEl.firstElementChild;
-      while (before && Number(before.dataset.ts) > e.ts) before = before.nextElementSibling;
-      logEl.insertBefore(row, before);
+    } else if (Number(row.dataset.ts) !== e.ts) {
+      row.remove();
+    } else {
+      fillLogRow(row, e);
+      continue;
     }
+    let before = logEl.firstElementChild;
+    while (before && Number(before.dataset.ts) > e.ts) before = before.nextElementSibling;
+    logEl.insertBefore(row, before);
     fillLogRow(row, e);
   }
+  learnColors(new Set(entries.map((e) => e.sessionId)));
   while (logEl.childElementCount > ui.ui.logDomCap) {
     const last = logEl.lastElementChild;
     logRows.delete(last.dataset.id);
@@ -524,6 +562,7 @@ async function init() {
     if (!document.hidden) retryTimer = setTimeout(init, RECONNECT_MS);
     return;
   }
+  sessionPalette = ui.ui.sessionPalette;
   connEl.hidden = true;
   if (document.hidden) document.body.classList.add('paused');
   else connect();
