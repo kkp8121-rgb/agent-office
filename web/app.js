@@ -5,12 +5,13 @@
 // Visual constants (how things look/move, not planning numbers; those come from /api/ui).
 const WALK_PX_PER_SEC = 150;
 const WALK_MIN_MS = 350;
-const TRAY_SPREAD_PX = 16;
 const RECONNECT_MS = 3000;
 const DONE_STALE_MS = 4000; // a done agent older than this is not walked to the tray again after a reload
 
 const $ = (id) => document.getElementById(id);
+const appEl = $('app');
 const floorsEl = $('floors');
+const panelEl = $('panel');
 const sessionsEl = $('sessions');
 const logEl = $('log');
 const emptyEl = $('empty');
@@ -36,6 +37,16 @@ function layoutOf(design) {
   return ui.layouts[design] ?? ui.layouts[Object.keys(ui.layouts)[0]];
 }
 
+/** Scales the floors down (CSS zoom) so the widest one fits beside the panel, or above it in a narrow window. */
+function fitFloors() {
+  const cs = getComputedStyle(appEl);
+  const sideBySide = cs.flexDirection === 'row';
+  const avail = appEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+    - (sideBySide ? panelEl.offsetWidth + parseFloat(cs.columnGap) : 0);
+  const widest = Math.max(0, ...[...floorRecs.values()].map((r) => r.layout.size[0]));
+  floorsEl.style.zoom = widest > avail ? String(Math.max(avail, 0) / widest) : '';
+}
+
 function showConn(text) {
   connEl.textContent = text;
   connEl.hidden = false;
@@ -50,16 +61,19 @@ function createChar(av, stage, startAt) {
   const body = el('div', 'body');
   const flip = el('div', 'flip');
   const spr = el('div', 'spr');
+  const tagRoot = el('div', 'agt'); // name tags live in their own layer above every character, so no bubble can cover one
   const tag = el('div', 'tag');
+  tagRoot.append(tag);
   const zz = el('div', 'zz', 'zZ');
   const img = makeSprite(av.sprite);
   spr.append(img);
   flip.append(spr);
   body.append(flip);
-  root.append(bubTxt, bubDot, body, tag, zz);
+  root.append(bubTxt, bubDot, body, zz);
   root.style.zIndex = String(Math.round(startAt.y));
   root.style.transform = `translate(${startAt.x}px, ${startAt.y}px)`;
-  const rec = { el: root, bubTxt, bubDot, flip, tag, img, sprite: av.sprite, x: startAt.x, y: startAt.y, state: '', bubKey: null, arrived: false };
+  tagRoot.style.transform = root.style.transform;
+  const rec = { el: root, tagRoot, bubTxt, bubDot, flip, tag, img, sprite: av.sprite, x: startAt.x, y: startAt.y, state: '', bubKey: null, arrived: false };
   recOf.set(root, rec);
   const settle = (e) => {
     if (e.target !== root || e.propertyName !== 'transform') return;
@@ -73,13 +87,14 @@ function createChar(av, stage, startAt) {
   };
   root.addEventListener('transitionend', settle);
   root.addEventListener('transitioncancel', settle);
-  stage.append(root);
+  stage.append(root, tagRoot);
   return rec;
 }
 
 /** Moves a character in a straight line; the duration follows the distance. */
 function walkTo(elm, x, y) {
   const rec = recOf.get(elm);
+  const { tagRoot } = rec;
   const dx = x - rec.x;
   const dy = y - rec.y;
   const dist = Math.hypot(dx, dy);
@@ -88,10 +103,10 @@ function walkTo(elm, x, y) {
   elm.style.zIndex = String(Math.round(y));
   if (dist < 1) return;
   rec.arrived = false;
-  elm.style.transitionDuration = `${Math.max(WALK_MIN_MS, (dist / WALK_PX_PER_SEC) * 1000)}ms`;
+  elm.style.transitionDuration = tagRoot.style.transitionDuration = `${Math.max(WALK_MIN_MS, (dist / WALK_PX_PER_SEC) * 1000)}ms`;
   rec.flip.classList.toggle('left', dx < 0);
   elm.classList.add('walking');
-  elm.style.transform = `translate(${x}px, ${y}px)`;
+  elm.style.transform = tagRoot.style.transform = `translate(${x}px, ${y}px)`;
 }
 
 function setBubble(rec, bubble, since) {
@@ -122,8 +137,9 @@ function renderAgent(av, floorEl) {
   const isLead = av.key === 'lead';
   let rec = frec.agents.get(av.key);
   const done = av.state === 'done';
+  // finished agents line up leftwards from the tray (the lead stands to its right), every other row shifted half a step
   const target = done
-    ? { x: layout.tray[0] + ((av.slot.i % 3) - 1) * TRAY_SPREAD_PX, y: layout.tray[1] }
+    ? { x: layout.tray[0] - ((av.slot.i % 3) + (Math.floor(av.slot.i / 3) % 2) / 2) * ui.ui.traySpreadPx, y: layout.tray[1] }
     : { x: av.slot.x, y: av.slot.y };
 
   if (!rec) {
@@ -131,7 +147,10 @@ function renderAgent(av, floorEl) {
     const startAt = frec.populated && !isLead && !done ? { x: layout.entrance[0], y: layout.entrance[1] } : target;
     rec = createChar(av, frec.stage, startAt);
     frec.agents.set(av.key, rec);
-    if (frec.populated && !isLead) rec.el.classList.add('enter-in');
+    if (frec.populated && !isLead) {
+      rec.el.classList.add('enter-in');
+      rec.tagRoot.classList.add('enter-in');
+    }
     if (frec.populated && !isLead && !done) void rec.el.offsetWidth; // commit the start point before the walk
   }
 
@@ -148,6 +167,7 @@ function renderAgent(av, floorEl) {
     if (rec.state) rec.el.classList.remove(`st-${rec.state}`);
     rec.state = av.state;
     rec.el.classList.add(`st-${av.state}`);
+    rec.tagRoot.classList.toggle('done', done); // finished agents stand together on the tray: their tags would pile up
   }
   if (done && !frec.populated && lastNow - av.since > DONE_STALE_MS) rec.el.classList.add('gone'); // already reported before this page loaded
 
@@ -239,6 +259,7 @@ function renderFloor(fv, elm) {
   for (const [key, a] of [...rec.agents]) {
     if (!keys.has(key)) {
       a.el.remove();
+      a.tagRoot.remove();
       rec.agents.delete(key);
     }
   }
@@ -258,15 +279,15 @@ function createRow(fv) {
   const edit = el('button', 'mini', '✎');
   edit.type = 'button';
   edit.title = '이름 바꾸기';
-  edit.setAttribute('aria-label', '이름 바꾸기');
   edit.addEventListener('click', () => startRename(fv.sessionId, nm, title));
   const eye = el('button', 'eye', '숨김');
   eye.type = 'button';
+  eye.title = '이 세션 숨기기';
   eye.addEventListener('click', () => {
     if (window.confirm('이 세션을 다시 실행할 때까지 안 보입니다')) setHidden(fv.sessionId, true);
   });
   root.append(el('i', 'dot'), nm, edit, eye);
-  const rec = { el: root, nm, title, meta };
+  const rec = { el: root, nm, title, meta, edit, eye };
   rowRecs.set(fv.sessionId, rec);
   return rec;
 }
@@ -274,6 +295,8 @@ function createRow(fv) {
 function renderRow(fv, rec) {
   setText(rec.title, fv.title);
   rec.title.title = fv.autoTitle;
+  rec.edit.setAttribute('aria-label', `${fv.title} 이름 바꾸기`);
+  rec.eye.setAttribute('aria-label', `${fv.title} 숨기기`);
   const subs = fv.agents.filter((a) => a.state !== 'done').length;
   setText(rec.meta, `${fv.floorNo}F · ${PROVIDER_TEXT[fv.provider] ?? fv.provider} · 서브 ${subs}${fv.workflows > 0 ? ` · 워크플로 ${fv.workflows}` : ''}`);
 }
@@ -351,6 +374,7 @@ function removeSession(sessionId, withLog = true) {
   }
   lastFloors.delete(sessionId);
   emptyEl.hidden = floorRecs.size > 0;
+  fitFloors();
 }
 
 /** Puts `elms` into `parent` in this order, touching only the elements that are out of place. */
@@ -386,6 +410,7 @@ function render(state) {
   syncOrder(floorsEl, floorEls);
   syncOrder(sessionsEl, rowEls);
   emptyEl.hidden = list.length > 0;
+  fitFloors();
 }
 
 async function refreshState() {
@@ -471,6 +496,7 @@ function pause() {
 async function resume() {
   document.body.classList.remove('paused');
   connEl.hidden = true;
+  if (!ui) return init(); // the first /api/ui failed while the tab was in front
   await refreshState();
   if (document.hidden) return; // hidden again while the state was loading: stay paused
   connect();
@@ -488,13 +514,18 @@ $('quit').addEventListener('click', async () => {
   showConn('서버를 껐습니다. 이 창은 닫아도 됩니다.');
 });
 
-(async function init() {
+window.addEventListener('resize', fitFloors);
+
+async function init() {
   try {
     ui = await (await fetch('/api/ui')).json();
   } catch {
-    showConn('서버에 연결하지 못했습니다');
+    showConn('서버에 연결하지 못했습니다. 다시 시도하는 중…');
+    if (!document.hidden) retryTimer = setTimeout(init, RECONNECT_MS);
     return;
   }
+  connEl.hidden = true;
   if (document.hidden) document.body.classList.add('paused');
   else connect();
-})();
+}
+init();

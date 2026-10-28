@@ -37,21 +37,22 @@ async function load() {
   if (sessionSel.value) params.set('session', sessionSel.value);
   if (nameSel.value) params.set('name', nameSel.value);
   let state;
-  let entries;
+  let log;
   try {
-    [state, entries] = await Promise.all([getJson('/api/state'), getJson(`/api/log?${params}`)]);
+    [state, log] = await Promise.all([getJson('/api/state'), getJson(`/api/log?${params}`)]);
   } catch {
     if (mine === seq) metaEl.textContent = '기록을 불러오지 못했습니다. 서버가 켜져 있는지 확인하세요.';
     return;
   }
   if (mine !== seq) return;
+  const { entries, titles: known, capped } = log;
 
   // Options come only from live floors (the server leaves hidden ones out) and from what the log returned.
-  const titles = new Map(state.floors.map((f) => [f.sessionId, f.title]));
-  const sessions = new Map(titles);
+  const live = new Map(state.floors.map((f) => [f.sessionId, f.title]));
+  const sessions = new Map(live);
   const names = new Set();
   for (const e of entries) {
-    if (!sessions.has(e.sessionId)) sessions.set(e.sessionId, `지난 세션 ${e.sessionId.slice(0, 8)}`);
+    if (!sessions.has(e.sessionId)) sessions.set(e.sessionId, sessionLabel(e.sessionId, live, known));
     names.add(e.name);
   }
   const wantSid = sessionSel.value;
@@ -66,7 +67,7 @@ async function load() {
     fillLogRow(row, e);
     logEl.append(row);
   }
-  setText(metaEl, entries.length ? `${entries.length}건 · 최신 순` : '기록이 없습니다');
+  setText(metaEl, logMetaText(entries.length, capped));
 }
 
 sessionSel.addEventListener('change', load);

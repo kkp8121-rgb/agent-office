@@ -17,7 +17,7 @@ body {
 button { font: inherit; color: inherit; cursor: pointer; }
 [hidden] { display: none !important; }
 
-#app { display: flex; gap: 16px; padding: 16px; align-items: flex-start; justify-content: center; }
+#app { display: flex; gap: 16px; padding: 16px; align-items: flex-start; justify-content: safe center; }
 #floors { flex: none; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 
 /* ---- floor ---- */
@@ -54,12 +54,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 /* ---- character: position layer (.ag) / facing layer (.flip) / gesture layer (.spr) ---- */
-.ag {
+.ag, .agt {
   position: absolute; left: 0; top: 0; width: 0; height: 0;
   transition: transform var(--walk-ms) linear;
 }
+/* the name-tag layer follows each character with the same walk but paints above all of them (characters stack by y) */
+.agt { z-index: 8000; pointer-events: none; }
+.agt.done { display: none; }
 .ag.gone { opacity: 0; transition: transform var(--walk-ms) linear, opacity .35s; }
-.ag.enter-in { animation: fadein .45s ease-out; }
+.ag.enter-in, .agt.enter-in { animation: fadein .45s ease-out; }
 .body { position: absolute; left: -22px; top: -64px; width: 44px; height: 64px; }
 .body::before {
   content: ""; position: absolute; left: 6px; right: 6px; bottom: -2px; height: 6px; border-radius: 50%;
@@ -135,6 +138,7 @@ body.paused *, body.paused *::before, body.paused *::after { animation-play-stat
 .log-head a { font-weight: 400; font-size: 11px; color: var(--muted); }
 #sessions, #log { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
 #sessions:empty { display: none; }
+#sessions { flex: none; max-height: 40vh; overflow: auto; }
 #empty { padding: 8px 10px; color: var(--muted); }
 #empty[hidden] { display: none; }
 #log { flex: 1 1 auto; min-height: 120px; overflow: auto; }
@@ -164,6 +168,13 @@ body.paused *, body.paused *::before, body.paused *::after { animation-play-stat
 #conn {
   position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 99999;
   background: var(--ink); color: var(--paper); padding: 6px 14px; border-radius: 6px;
+}
+
+/* narrow window: the panel goes under the floors, which scale to the width (see fitFloors in app.js) */
+@media (max-width: 1099px) {
+  #app { flex-direction: column; align-items: center; }
+  #panel { width: 100%; max-width: 1024px; position: static; max-height: none; }
+  #panel #log { flex: none; max-height: 40vh; }
 }
 
 /* ---- full log page ---- */
