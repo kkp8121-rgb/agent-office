@@ -107,9 +107,9 @@ test('office: desks fill first, then aisle, then overflow index', () => {
   const slots = floorOf(o, 's1').agents.map((a) => a.slot);
   L.desks.forEach((d, i) => assert.deepEqual(slots[i], { x: d[0], y: d[1], i }));
   L.aisle.forEach((p, k) => assert.deepEqual(slots[L.desks.length + k], { x: p[0], y: p[1], i: L.desks.length + k }));
-  const last = L.aisle.at(-1);
-  assert.deepEqual(slots[total], { x: last[0], y: last[1], i: total });
-  assert.deepEqual(slots[total + 1], { x: last[0], y: last[1], i: total + 1 });
+  // overflow no longer stacks: it revisits the aisle spots, shifted (details in round2-web.test.mjs)
+  assert.equal(slots[total].i, total);
+  assert.notDeepEqual([slots[total].x, slots[total].y], [slots[total + 1].x, slots[total + 1].y]);
   // freed desk 0 is reused by the next newcomer
   o.syncAgents('s1', metas.map((m, i) => (i === 0 ? { ...m, finished: true } : m)), 2000);
   o.tick(2000 + cfg.agent.doneLingerMs);

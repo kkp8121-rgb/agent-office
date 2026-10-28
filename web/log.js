@@ -40,12 +40,15 @@ async function load() {
   let log;
   try {
     [state, log] = await Promise.all([getJson('/api/state'), getJson(`/api/log?${params}`)]);
+    if (!sessionPalette.length) sessionPalette = (await getJson('/api/ui')).ui.sessionPalette;
   } catch {
     if (mine === seq) metaEl.textContent = '기록을 불러오지 못했습니다. 서버가 켜져 있는지 확인하세요.';
     return;
   }
   if (mine !== seq) return;
-  const { entries, titles: known, capped } = Array.isArray(log) ? { entries: log } : log; // an older server answers with a bare array
+  const { entries, titles: known, colors, capped } = Array.isArray(log) ? { entries: log } : log; // an older server answers with a bare array
+  for (const f of state.floors) sessionColorIdx.set(f.sessionId, f.colorIndex);
+  for (const [sid, index] of Object.entries(colors ?? {})) sessionColorIdx.set(sid, index);
 
   // Options come only from live floors (the server leaves hidden ones out) and from what the log returned.
   const live = new Map(state.floors.map((f) => [f.sessionId, f.title]));

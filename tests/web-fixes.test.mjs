@@ -10,15 +10,11 @@ function loadLogrow() {
   return (expr) => vm.runInContext(expr, ctx);
 }
 
-test('web: session hue depends only on the id, not on first-seen order', () => {
-  const a = loadLogrow();
-  const b = loadLogrow();
-  const ids = ['s-aaaa', 's-bbbb', 's-cccc', 's-dddd'];
-  const forward = ids.map((id) => a(`hueOf(${JSON.stringify(id)})`));
-  const backward = [...ids].reverse().map((id) => b(`hueOf(${JSON.stringify(id)})`)).reverse();
-  assert.deepEqual(forward, backward);
-  for (const h of forward) assert.ok(Number.isInteger(h) && h >= 0 && h < 360);
-  assert.ok(new Set(forward).size > 1);
+test('web: session colour comes from the server palette index, grey while unknown', () => {
+  const run = loadLogrow();
+  run(`sessionPalette = ['#111111', '#222222']; sessionColorIdx.set('s-a', 1)`);
+  assert.equal(run(`colorOf('s-a')`), '#222222');
+  assert.equal(run(`colorOf('s-unknown')`), '#8a6a42');
 });
 
 test('web: session label prefers live title, then remembered title, then id prefix', () => {

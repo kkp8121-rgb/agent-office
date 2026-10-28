@@ -96,6 +96,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .bub.txt:not(.fresh) { visibility: hidden; }
 .bub.dot:not(.fresh) { visibility: visible; }
 .st-stale .bub, .st-done .bub { display: none; }
+/* only the last few speakers of a floor keep the full bubble (ui.bubbleFullMax); everyone else shows the dot at once */
+.ag.quiet .bub.txt { display: none; }
+.ag.quiet .bub.dot { animation: none; visibility: visible; }
 .zz {
   display: none; position: absolute; left: 14px; bottom: 58px; font-weight: 800; font-size: 12px; color: #6a5aa8;
   animation: zz 2.4s ease-in-out infinite;

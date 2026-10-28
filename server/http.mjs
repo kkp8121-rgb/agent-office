@@ -168,7 +168,7 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
 
   const isVisible = (sessionId) => office.snapshot().floors.some((f) => f.sessionId === sessionId);
 
-  /** {entries, titles, capped}: entries newest first; titles by session id for those entries; capped when the limit cut the list.
+  /** {entries, titles, colors, capped}: entries newest first; titles and palette indexes by session id for those entries; capped when the limit cut the list.
    * `session` must be a safe id (400 otherwise); `limit` falls back to log.pageLimit and is clamped to [1, log.cap]. */
   function sendLog(res, query) {
     const params = new URLSearchParams(query);
@@ -183,8 +183,8 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
     const limit = params.get('limit') === null || params.get('limit') === '' || !Number.isFinite(asked) ? cfg.log.pageLimit : Math.trunc(asked);
     filter.limit = Math.min(Math.max(limit, 1), cfg.log.cap);
     const entries = office.queryLog(filter);
-    const titles = office.logTitles([...new Set(entries.map((e) => e.sessionId))]);
-    return sendJson(res, 200, { entries, titles, capped: entries.length === filter.limit });
+    const ids = [...new Set(entries.map((e) => e.sessionId))];
+    return sendJson(res, 200, { entries, titles: office.logTitles(ids), colors: office.logColors(ids), capped: entries.length === filter.limit });
   }
 
   async function handlePost(path, body, res) {
