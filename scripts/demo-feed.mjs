@@ -1,6 +1,7 @@
 // Demo feeder: builds a fake ~/.claude (two sessions) and keeps feeding it so the office has something to show.
 //   node scripts/demo-feed.mjs <tmpHome>
-//   AGENT_OFFICE_CLAUDE_HOME=<tmpHome> AGENT_OFFICE_CODEX_HOME=<empty dir> AGENT_OFFICE_PORT=47811 node server/main.mjs
+//   AGENT_OFFICE_CLAUDE_HOME=<tmpHome> AGENT_OFFICE_CODEX_HOME=<empty dir> AGENT_OFFICE_DATA_DIR=<tmp data dir> AGENT_OFFICE_PORT=47811 node server/main.mjs
+// AGENT_OFFICE_DATA_DIR keeps the demo's hide/rename records out of the repo's data/ folder (and the real instance's).
 // Every 2 s: tool lines, new subagents, finished subagents. To simulate "run the session again" (same sessionId,
 // new process), write the sessionId into <tmpHome>/rerun.txt. The sessions' pids are child processes of this script;
 // they are stopped when the script exits (and they exit by themselves if this script is killed).

@@ -54,8 +54,10 @@ export async function launch(cfg, { spawn: spawnFn, probe: probeFn = probe, noBr
   return action;
 }
 
+export const DETACHED_OPTIONS = { detached: true, stdio: 'ignore', windowsHide: true };
+
 function detachedSpawn(command, args) {
-  spawn(command, args, { detached: true, stdio: 'ignore' }).unref();
+  spawn(command, args, DETACHED_OPTIONS).unref();
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
