@@ -390,6 +390,7 @@ export class Office {
         lead: { name: f.lead.name, role: f.lead.role, sprite: f.lead.sprite, state: f.lead.state, bubble: f.lead.bubble },
         board: { title, line: f.boardLine },
         reports: f.reports,
+        workflows: f.workflows.size,
         agents: [...f.agents.values()].map((a) => ({
           key: a.key,
           agentId: a.agentId,

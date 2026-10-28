@@ -336,10 +336,12 @@ test('office: log is a ring capped at cfg.log.cap and heads are clipped', () => 
 
 test('office: workflow board line', () => {
   const o = setup();
+  assert.equal(floorOf(o, 's1').workflows, 0);
   o.applySessionEvents('s1', [
     { kind: 'workflowLaunch', ts: 1000, runId: '', workflowName: 'ignored', scriptPath: 'x' },
     { kind: 'workflowLaunch', ts: 1000, runId: 'r1', workflowName: 'review-changes', scriptPath: 'C:/w/review.mjs' },
   ], 1000);
+  assert.equal(floorOf(o, 's1').workflows, 1);
   assert.deepEqual(o.workflowRuns('s1'), [{ runId: 'r1', name: 'review-changes', scriptPath: 'C:/w/review.mjs' }]);
   o.setWorkflowProgress('s1', 'r1', { name: 'review-changes', phases: ['Review', 'Verify'], current: 'Verify' });
   assert.equal(floorOf(o, 's1').board.line, 'review-changes · Verify 2/2');

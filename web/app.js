@@ -102,6 +102,9 @@ function createChar(av, stage, startAt) {
   recOf.set(root, rec);
   const settle = (e) => {
     if (e.target !== root || e.propertyName !== 'transform') return;
+    // A cancel caused by a retarget leaves a newer walk running: only the latest walk's end (or a cancel with no
+    // walk left, as when pause() switches transitions off) settles.
+    if (e.type === 'transitioncancel' && root.getAnimations().some((a) => a.transitionProperty === 'transform' && a.playState === 'running')) return;
     root.classList.remove('walking');
     flip.classList.remove('left');
     rec.arrived = true;
@@ -311,7 +314,7 @@ function renderRow(fv, rec) {
   setText(rec.title, fv.title);
   rec.title.title = fv.autoTitle;
   const subs = fv.agents.filter((a) => a.state !== 'done').length;
-  setText(rec.meta, `${fv.floorNo}F · ${PROVIDER_TEXT[fv.provider] ?? fv.provider} · 서브 ${subs}`);
+  setText(rec.meta, `${fv.floorNo}F · ${PROVIDER_TEXT[fv.provider] ?? fv.provider} · 서브 ${subs}${fv.workflows > 0 ? ` · 워크플로 ${fv.workflows}` : ''}`);
 }
 
 // ---------- rename ----------
@@ -532,6 +535,7 @@ async function resume() {
   document.body.classList.remove('paused');
   connEl.hidden = true;
   await refreshState();
+  if (document.hidden) return; // hidden again while the state was loading: stay paused
   connect();
 }
 

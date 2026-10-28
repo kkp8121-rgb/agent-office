@@ -98,7 +98,7 @@ agent-office/
  *             state:'enter'|'working'|'thinking'|'done'|'stale', bubble:string, since:number}} AgentView */
 /** @typedef {{sessionId:string, provider:'claude'|'codex', floorNo:number, design:string, title:string, autoTitle:string, folder:string, status:'busy'|'waiting'|'leaving',
  *             lead:{name:string, role:string, sprite:string, state:string, bubble:string},
- *             board:{title:string, line:string}, reports:number, agents:AgentView[]}} FloorView */
+ *             board:{title:string, line:string}, reports:number, workflows:number, agents:AgentView[]}} FloorView */
 /** @typedef {{floors:FloorView[], now:number}} State */
 /** @typedef {{id:string, ts:number, sessionId:string, name:string, role:string, sprite:string, head:string, text:string}} LogEntry */
 ```
