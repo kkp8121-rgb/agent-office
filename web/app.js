@@ -387,7 +387,10 @@ function freshTimes(frec, rec) {
 
 function playFidget(rec, name) {
   clearGestures(rec);
-  (name === 'look' ? rec.flip : rec.body).classList.add(`fid-${name}`);
+  // Members woken by the same floor tick start a few hundred ms apart, so a crowd does not move in step.
+  const el = name === 'look' ? rec.flip : rec.body;
+  el.style.setProperty('--fid-delay', `${Math.round(between(rec.rng, amb.fidgetJitterMs))}ms`);
+  el.classList.add(`fid-${name}`);
 }
 
 function doFidget(frec, rec) {

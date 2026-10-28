@@ -16,7 +16,7 @@
           "sessionPalette": ["#d9534f", "#2f80d0", "#2e9e5b", "#d98a1e", "#8e5bd0", "#12a3a8", "#d6458f", "#7a8f1d", "#8a6a42", "#4f5fd6"],
           "ambient": {
             "enabled": true, "tickMinMs": 1000, "firstDelayMs": [3000, 20000],
-            "fidgetEveryMs": [8000, 40000], "fidgetMs": 1200,
+            "fidgetEveryMs": [8000, 40000], "fidgetMs": 1200, "fidgetJitterMs": [0, 3000],
             "fidgets": { "seated": ["look", "lean", "stretch"], "standing": ["look", "lean", "stretch", "hop"] },
             "tripEveryMs": { "working": [240000, 600000], "thinking": [30000, 90000], "idle": [45000, 150000], "stale": [60000, 180000] },
             "leadTourEveryMs": [40000, 120000], "leadTourDesks": 3,
