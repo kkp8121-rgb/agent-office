@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { decide, probe } from '../server/launch.mjs';
+import { decide, probe, launch } from '../server/launch.mjs';
 
 test('decide: our app answering -> open', () => {
   assert.equal(decide({ up: true, body: { app: 'agent-office', pid: 1 } }), 'open');
@@ -57,9 +57,8 @@ test('probe: hung server times out -> start-side "down" result', async () => {
 });
 
 // ---- launch(): spawner injected, no real window ----
-import { launch } from '../server/launch.mjs';
 
-const cfg = { port: 47999, root: 'C:\root', launch: { healthTimeoutMs: 800 } };
+const cfg = { port: 47999, root: 'C:\\root', launch: { healthTimeoutMs: 800 } };
 const fakeProbe = (result) => async () => result;
 
 test('launch: nothing answering -> spawns the server once, minimized, with --open', async () => {

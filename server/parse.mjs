@@ -1,6 +1,9 @@
 // Turns one transcript JSONL line into privacy-safe events. Transcript lines are untrusted:
 // this never throws and never copies prompts, answers, thinking or tool results.
-import { describeTool, clip } from './sanitize.mjs';
+import { describeTool, clip, MAX_LEN } from './sanitize.mjs';
+
+const NAME_MAX = 200; // title, run id, workflow name
+const PATH_MAX = 1024; // scriptPath is only read from, never shown: a longer one is dropped, not clipped
 
 const isObj = (v) => typeof v === 'object' && v !== null;
 const str = (v, n) => (typeof v === 'string' ? clip(v, n) : '');
@@ -16,8 +19,8 @@ function toolEvent(block, ts) {
     text: describeTool(name, input),
   };
   if (name === 'Agent') {
-    if (typeof input.subagent_type === 'string') ev.agentType = clip(input.subagent_type, 80);
-    if (typeof input.description === 'string') ev.description = clip(input.description, 80);
+    if (typeof input.subagent_type === 'string') ev.agentType = clip(input.subagent_type, MAX_LEN);
+    if (typeof input.description === 'string') ev.description = clip(input.description, MAX_LEN);
   }
   return ev;
 }
@@ -28,7 +31,7 @@ function parseObject(o) {
   const evs = [];
 
   if (o.type === 'ai-title') {
-    const title = str(o.aiTitle, 200);
+    const title = str(o.aiTitle, NAME_MAX);
     return title ? [{ kind: 'title', ts: 0, title }] : [];
   }
 
@@ -53,9 +56,9 @@ function parseObject(o) {
       evs.push({
         kind: 'workflowLaunch',
         ts,
-        runId: str(r.runId, 200),
-        workflowName: str(r.workflowName, 200),
-        scriptPath: str(r.scriptPath, 200),
+        runId: str(r.runId, NAME_MAX),
+        workflowName: str(r.workflowName, NAME_MAX),
+        scriptPath: typeof r.scriptPath === 'string' && r.scriptPath.length <= PATH_MAX ? r.scriptPath : '',
       });
     }
     return evs;

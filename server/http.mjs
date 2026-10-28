@@ -22,6 +22,8 @@ const TYPES = {
 };
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico']);
 const IMAGE_CACHE = 'max-age=3600';
+// Sent with every response: the page must never be framed by another site (clickjacking of hide / quit).
+const SECURITY_HEADERS = { 'X-Frame-Options': 'DENY', 'Content-Security-Policy': "frame-ancestors 'none'" };
 const STATIC_DIRS = ['web', 'assets'];
 
 const isObj = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -61,11 +63,12 @@ function readBody(req, max) {
   });
 }
 
-export function createServer(cfg, office, { onSavedChange, onShutdown } = {}) {
+export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConnect } = {}) {
   const clients = new Set(); // open SSE responses
-  let lastStateJson = JSON.stringify(office.snapshot().floors);
+  let lastStateJson = null; // last floors JSON sent; null = send the next state in full
 
   const server = http.createServer((req, res) => {
+    for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
     handle(req, res).catch((e) => {
       console.error('요청 처리 실패:', e?.message ?? e);
       if (!res.headersSent) sendText(res, 500, 'server error');
@@ -85,20 +88,26 @@ export function createServer(cfg, office, { onSavedChange, onShutdown } = {}) {
 
   function openEvents(res) {
     res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
-    res.write(frame('state', office.snapshot()));
+    const snap = office.snapshot();
+    res.write(frame('state', snap));
+    if (clients.size === 0) lastStateJson = JSON.stringify(snap.floors); // only client: in sync now; an older client's baseline is never overwritten
     res.write(frame('log', office.queryLog({ limit: cfg.log.sendCap }).reverse()));
     clients.add(res);
     res.on('close', () => clients.delete(res));
+    onSseConnect?.();
   }
 
   /** Sends `state` only when it differs from the last one sent, and every new or updated log entry. */
   server.broadcast = () => {
     const entries = office.drainLog(); // drained even without clients so entries never pile up
+    if (clients.size === 0) { // nobody to send to: skip the snapshot and its stringify; the next client gets a full state
+      lastStateJson = null;
+      return;
+    }
     const snap = office.snapshot();
     const json = JSON.stringify(snap.floors);
     const changed = json !== lastStateJson;
     lastStateJson = json;
-    if (clients.size === 0) return;
     for (const res of clients) {
       if (changed) res.write(frame('state', snap));
       if (entries.length) res.write(frame('log', entries));
