@@ -1,0 +1,91 @@
+{
+  "shellPrompt": "Use your image generation tool to edit the attached image greenhouse.png: output the SAME greenhouse room (same pixel-art style, same isometric camera angle, same glass walls and roof frame, door frame and glass door at the front, glass railing with flower beds along the front edge, hanging vines, wall art, wall lamps, whiteboard, light wood floor boards, lighting, same 16:9 aspect ratio, same green background outside the room) but with EVERY free-standing floor object removed: no desks, chairs, monitors, potted plants standing on the floor, sofa, coffee table, floor lamps, side tables, free-standing bookshelves or cabinets away from the walls. Keep the door frame exactly where it is. Keep every green rug exactly where it is. Keep the bookshelves and low cabinets that stand flush against the back or side walls, drawn as part of the wall. Only the empty room shell with wooden floor, rugs, glass walls, door, railing and flower beds, and wall-mounted items remains. Save the result as shell.png in the current directory.",
+  "shell": {
+    "ref": "assets/floors/greenhouse.png",
+    "size": [
+      1024,
+      576
+    ],
+    "floorIoU": 0.982
+  },
+  "sheets": [
+    {
+      "id": "s1",
+      "rows": 2,
+      "ref": "assets/floors/greenhouse.png",
+      "pieces": [
+        "desk",
+        "chair",
+        "lead-desk",
+        "table",
+        "cabinet",
+        "sofa"
+      ],
+      "prompt": "Use your image generation tool to create a sprite sheet of 6 separate furniture objects in EXACTLY the same pixel-art style, palette, dark outlines, pixel size and same camera angle as the objects in the attached greenhouse.png. Layout: TWO rows of 3 objects with wide empty gaps between all objects, each object alone and fully separated, on a flat solid #FF00FF magenta background (no shadow on the floor, no floor, no glow). Objects, row 1 left to right: 1) a light wooden office desk seen from the FRONT, with a black computer monitor on it whose BACK faces the viewer (we see the back of the monitor), a small potted plant on the desk, no chair; 2) a green mesh office swivel chair with armrests and a tall backrest, seen from the FRONT (the seat faces the viewer), nobody sitting in it; 3) a wider light wooden manager desk seen from the FRONT, back of its monitor facing the viewer, with a small flat grey document tray (inbox) with papers on its left end and a small white flower vase, no chair. Row 2 left to right: 4) a round light wooden coffee table with a small plant on it; 5) a low wide light wooden cabinet (credenza) with a few books and a small plant on top, seen from the front, about 2.5 times as wide as it is tall; 6) a cream fabric sofa with a green cushion seen from the front. Do not use magenta anywhere inside the objects. Canvas 2:1 wide. Save as sheet.png in the current directory."
+    },
+    {
+      "id": "s2",
+      "rows": 2,
+      "ref": "assets/floors/greenhouse.png",
+      "pieces": [
+        "plant-palm",
+        "plant-monstera",
+        "plant-fern",
+        "plant-small",
+        "plant-shrub",
+        "lamp"
+      ],
+      "prompt": "Use your image generation tool to create a sprite sheet of 6 separate objects in EXACTLY the same pixel-art style, palette, dark outlines, pixel size and same camera angle as the plants and objects in the attached greenhouse.png. Layout: TWO rows of 3 objects with wide empty gaps between all objects, each object alone and fully separated, on a flat solid #FF00FF magenta background (no shadow on the floor, no floor, no glow). Objects, row 1 left to right: 1) a tall leafy palm-type plant in a round white pot (tall, about 2.5 times as tall as wide); 2) a medium monstera plant with broad dark green leaves in a round white pot; 3) a bushy fern in a grey square pot. Row 2 left to right: 4) a small plant in a small round white pot (about as tall as wide); 5) a round bushy flowering shrub with white and pink flowers in a terracotta pot; 6) a tall standing floor lamp with a cream lampshade. Do not use magenta anywhere inside the objects. Canvas 2:1 wide. Save as sheet.png in the current directory."
+    }
+  ],
+  "kinds": {
+    "desk": {
+      "piece": "s1/piece-0",
+      "width": 83
+    },
+    "chair": {
+      "piece": "s1/piece-1",
+      "height": 50
+    },
+    "lead-desk": {
+      "piece": "s1/piece-2",
+      "width": 104
+    },
+    "table": {
+      "piece": "s1/piece-3",
+      "width": 58
+    },
+    "cabinet": {
+      "piece": "s1/piece-4",
+      "width": 92
+    },
+    "sofa": {
+      "piece": "s1/piece-5",
+      "width": 122
+    },
+    "plant-palm": {
+      "piece": "s2/piece-0",
+      "height": 80
+    },
+    "plant-monstera": {
+      "piece": "s2/piece-1",
+      "height": 66
+    },
+    "plant-fern": {
+      "piece": "s2/piece-2",
+      "height": 54
+    },
+    "plant-small": {
+      "piece": "s2/piece-3",
+      "height": 36
+    },
+    "plant-shrub": {
+      "piece": "s2/piece-4",
+      "height": 44
+    },
+    "lamp": {
+      "piece": "s2/piece-5",
+      "height": 68
+    }
+  }
+}
