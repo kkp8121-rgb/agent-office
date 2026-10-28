@@ -7,6 +7,7 @@
   "agent": { "doneLingerMs": 15000, "staleMs": 600000, "bubbleShowMs": 8000, "abandonMs": 1800000 },
   "floor": { "leaveMs": 5000, "nameMaxChars": 30, "missTicks": 2 },
   "workflow": { "scriptHeadBytes": 65536 },
+  "codex": { "enabled": true, "headBytes": 262144, "idleKeepMs": 1800000, "execKeepMs": 60000 },
   "server": { "ssePingMs": 25000, "maxBodyBytes": 1024 },
   "ui": { "bubbleMaxChars": 16, "logDomCap": 300 },
   "roles": {
@@ -27,7 +28,15 @@
     "frontend":             { "key": "frontend",             "name": "채원", "role": "프론트" },
     "backend":              { "key": "backend",              "name": "아린", "role": "백엔드" },
     "app":                  { "key": "app",                  "name": "리아", "role": "앱" },
-    "__default":            { "key": "default",              "name": "나래", "role": "지원" }
+    "__default":            { "key": "default",              "name": "나래", "role": "지원" },
+    "codex:__lead":         { "key": "lead",                 "name": "하나", "role": "팀장" },
+    "codex:scout":          { "key": "scout",                "name": "별이", "role": "정찰" },
+    "codex:worker_low":     { "key": "worker-low",           "name": "보미", "role": "막내" },
+    "codex:worker":         { "key": "worker",               "name": "도담", "role": "개발" },
+    "codex:worker_high":    { "key": "worker-high",          "name": "한결", "role": "선임" },
+    "codex:architect":      { "key": "architect",            "name": "라온", "role": "설계" },
+    "codex:architect_high": { "key": "architect-high",       "name": "새봄", "role": "수석" },
+    "codex:__default":      { "key": "default",              "name": "누리", "role": "지원" }
   },
   "spriteHeight": 64,
   "designOrder": ["studio"],

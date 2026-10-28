@@ -1,4 +1,4 @@
-// One poll round: live sessions -> transcript tails -> subagent scan -> workflow journals -> Office.
+// One poll round: live sessions (Claude + Codex) -> transcript tails -> subagent scan -> workflow journals -> Office.
 // Idle rounds cost a directory listing, a few small reads and one fstat per open transcript.
 import { open, stat } from 'node:fs/promises';
 import { isAbsolute, join, sep } from 'node:path';
@@ -7,6 +7,7 @@ import { parseLine } from './parse.mjs';
 import { listLiveSessions, findSessionPaths } from './sessions.mjs';
 import { listAgents } from './agents.mjs';
 import { WorkflowJournal, phasesFromScript } from './workflows.mjs';
+import { CodexSource } from './codex.mjs';
 
 const SAFE_RUN_ID = /^[\w-]+$/; // runId becomes a folder name
 
@@ -36,6 +37,7 @@ export class Poller {
   bytesRead = 0;
   #cfg;
   #office;
+  #codex;
   #tickNo = 0;
   #lastSeen = new Map(); // sessionId -> {session, missed}: absence is debounced per session
   #metaCache = new Map();
@@ -44,15 +46,19 @@ export class Poller {
   constructor(cfg, office) {
     this.#cfg = cfg;
     this.#office = office;
+    this.#codex = cfg.codex?.enabled ? new CodexSource(cfg) : null;
   }
 
   async tick(now) {
     const scan = this.#tickNo++ % this.#cfg.agentScanEveryTicks === 0;
-    // Provider seam: a second session source adds its sessions to `live` and polls its own
-    // transcripts after the sync, so Office sees one merged session list.
-    const listed = [...(await this.#listClaudeSessions())];
+    // Provider seam: every source adds its sessions to `listed`, so Office sees one merged session list
+    // (and the absence debounce covers both). Codex has already read its rollouts when the list is built;
+    // its events are applied after the sync, once the floors exist.
+    const codex = await this.#pollCodex(now);
+    const listed = [...(await this.#listClaudeSessions()), ...(codex?.sessions ?? [])];
     const live = this.#syncSessions(listed, now);
     await this.#pollClaudeSessions(live, now, scan);
+    if (codex) this.#applyCodex(codex, now);
   }
 
   // ---- session list ------------------------------------------------------------------------
@@ -90,6 +96,29 @@ export class Poller {
     if (!st?.paths) return;
     const prefix = st.paths.sessionDir + sep;
     for (const key of [...this.#metaCache.keys()]) if (key.startsWith(prefix)) this.#metaCache.delete(key);
+  }
+
+  // ---- Codex rollouts ------------------------------------------------------------------------
+
+  async #pollCodex(now) {
+    if (!this.#codex) return null;
+    try {
+      return await this.#codex.poll(now);
+    } catch (e) {
+      console.error('Codex 확인 실패:', e?.message ?? e);
+      return null; // its sessions are debounced like any other missing session
+    }
+  }
+
+  #applyCodex({ sessionEvents, agents, agentEvents }, now) {
+    const opts = (id) => ({ logSince: this.#office.logSince(id, now) });
+    for (const [id, evs] of sessionEvents) this.#office.applySessionEvents(id, evs, now, opts(id));
+    for (const [id, metas] of agents) this.#office.syncAgents(id, metas, now);
+    for (const [key, evs] of agentEvents) {
+      const cut = key.indexOf('/');
+      const id = key.slice(0, cut);
+      this.#office.applyAgentEvents(id, key.slice(cut + 1), evs, now, opts(id));
+    }
   }
 
   // ---- Claude transcripts ------------------------------------------------------------------

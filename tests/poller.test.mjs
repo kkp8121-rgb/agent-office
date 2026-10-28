@@ -17,6 +17,7 @@ function fake(t, overrides = {}) {
   mkdirSync(join(dir, 'projects', 'P'), { recursive: true });
   const cfg = loadConfig({ agentScanEveryTicks: 1, ...overrides });
   cfg.claudeHome = dir;
+  cfg.codexHome = join(dir, 'no-codex'); // never read the real ~/.codex in tests
   const office = new Office(cfg, EMPTY);
   const poller = new Poller(cfg, office);
   const sessionFile = join(dir, 'sessions', `${process.pid}.json`);

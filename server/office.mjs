@@ -155,7 +155,7 @@ export class Office {
   #createFloor(s) {
     const { designOrder, roles } = this.cfg;
     const design = designOrder[this.floorsCreated++ % designOrder.length];
-    const lead = roles.__lead;
+    const lead = (s.provider === 'codex' && roles['codex:__lead']) || roles.__lead;
     return {
       sessionId: s.sessionId,
       provider: 'claude',
@@ -267,9 +267,7 @@ export class Office {
 
   #enterAgent(f, m, now) {
     const { roles, log } = this.cfg;
-    const entry = typeof m.agentType === 'string' && !m.agentType.startsWith('__') && Object.hasOwn(roles, m.agentType)
-      ? roles[m.agentType]
-      : roles.__default;
+    const entry = this.#roleFor(f, m.agentType);
     const wf = m.workflow;
     const head = clip(wf ? `${wf.phase} · ${wf.label}` : m.description ?? '', log.headMaxChars);
     const slot = this.#allocSlot(f);
@@ -291,6 +289,21 @@ export class Office {
     };
     f.agents.set(m.agentId, a);
     this.#log(f, a, now, LOG_START);
+  }
+
+  /** Claude floors know Claude role names, Codex floors the `codex:` ones; anything else gets the provider's default. */
+  #roleFor(f, agentType) {
+    const { roles } = this.cfg;
+    const codex = f.provider === 'codex';
+    const prefix = codex ? 'codex:' : '';
+    const known =
+      typeof agentType === 'string' &&
+      agentType.startsWith(prefix) &&
+      !agentType.slice(prefix.length).startsWith('__') &&
+      (codex || !agentType.startsWith('codex:')) &&
+      Object.hasOwn(roles, agentType);
+    if (known) return roles[agentType];
+    return (codex && roles['codex:__default']) || roles.__default;
   }
 
   #allocName(f, base) {

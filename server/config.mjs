@@ -22,6 +22,7 @@ export function loadConfig(overrides = {}) {
   const cfg = merge(file, overrides);
   cfg.root = ROOT;
   cfg.claudeHome = process.env.AGENT_OFFICE_CLAUDE_HOME || path.join(os.homedir(), '.claude');
+  cfg.codexHome = process.env.AGENT_OFFICE_CODEX_HOME || path.join(os.homedir(), '.codex');
   if (process.env.AGENT_OFFICE_PORT) cfg.port = Number(process.env.AGENT_OFFICE_PORT);
   return cfg;
 }

@@ -21,3 +21,13 @@ test('config: overrides deep-merge, root is absolute', () => {
   assert.equal(cfg.log.sendCap, 200);
   assert.ok(cfg.root.length > 3);
 });
+test('config: AGENT_OFFICE_CODEX_HOME sets codexHome, codex block from config.json', () => {
+  const prev = process.env.AGENT_OFFICE_CODEX_HOME;
+  process.env.AGENT_OFFICE_CODEX_HOME = 'X:/fake-codex';
+  try {
+    const cfg = loadConfig();
+    assert.equal(cfg.codexHome, 'X:/fake-codex');
+    assert.deepEqual(cfg.codex, { enabled: true, headBytes: 262144, idleKeepMs: 1800000, execKeepMs: 60000 });
+    assert.equal(cfg.roles['codex:__lead'].name, '하나');
+  } finally { if (prev === undefined) delete process.env.AGENT_OFFICE_CODEX_HOME; else process.env.AGENT_OFFICE_CODEX_HOME = prev; }
+});

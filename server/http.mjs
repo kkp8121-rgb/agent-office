@@ -151,7 +151,8 @@ export function createServer(cfg, office, { onSavedChange, onShutdown } = {}) {
 
   function uiConfig() {
     const roles = {};
-    for (const r of Object.values(cfg.roles)) roles[r.key] = { name: r.name, role: r.role };
+    // Codex roles reuse the Claude sprite keys, so they must not overwrite the Claude names here.
+    for (const [k, r] of Object.entries(cfg.roles)) if (!k.startsWith('codex:')) roles[r.key] = { name: r.name, role: r.role };
     return { spriteHeight: cfg.spriteHeight, layouts: cfg.layouts, ui: cfg.ui, bubbleShowMs: cfg.agent.bubbleShowMs, roles };
   }
 
