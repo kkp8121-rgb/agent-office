@@ -35,29 +35,30 @@ export function decide(result) {
   return result.body?.app === APP_ID ? 'open' : 'conflict';
 }
 
-function openBrowser(url) {
-  if (process.env.AGENT_OFFICE_NO_BROWSER) return;
-  spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();
-}
-
-function startServer(cfg) {
-  const args = ['/c', 'start', SERVER_WINDOW_TITLE, '/min', 'node', join(cfg.root, 'server', 'main.mjs')];
-  if (!process.env.AGENT_OFFICE_NO_BROWSER) args.push('--open');
-  spawn('cmd', args, { detached: true, stdio: 'ignore' }).unref();
-}
-
-async function main() {
-  const cfg = loadConfig();
+/**
+ * One launcher pass. deps.spawn(command, args) starts a detached process; deps.probe answers /health.
+ * Injectable so tests never open a window. Returns the action taken.
+ */
+export async function launch(cfg, { spawn: spawnFn, probe: probeFn = probe, noBrowser = false, log = console.error } = {}) {
   const url = `http://127.0.0.1:${cfg.port}/`;
-  const action = decide(await probe(cfg.port, cfg.launch.healthTimeoutMs));
+  const action = decide(await probeFn(cfg.port, cfg.launch.healthTimeoutMs));
   if (action === 'open') {
-    openBrowser(url);
+    if (!noBrowser) spawnFn('cmd', ['/c', 'start', '', url]);
   } else if (action === 'start') {
-    startServer(cfg);
+    const args = ['/c', 'start', SERVER_WINDOW_TITLE, '/min', 'node', join(cfg.root, 'server', 'main.mjs')];
+    if (!noBrowser) args.push('--open');
+    spawnFn('cmd', args);
   } else {
-    console.error(`포트 ${cfg.port} 을 다른 프로그램이 쓰고 있습니다 — config.json 의 port 를 바꾸세요`);
-    process.exitCode = 1;
+    log(`포트 ${cfg.port} 을 다른 프로그램이 쓰고 있습니다 — config.json 의 port 를 바꾸세요`);
   }
+  return action;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) await main();
+function detachedSpawn(command, args) {
+  spawn(command, args, { detached: true, stdio: 'ignore' }).unref();
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  const action = await launch(loadConfig(), { spawn: detachedSpawn, noBrowser: !!process.env.AGENT_OFFICE_NO_BROWSER });
+  if (action === 'conflict') process.exitCode = 1;
+}

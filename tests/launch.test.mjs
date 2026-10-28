@@ -55,3 +55,44 @@ test('probe: hung server times out -> start-side "down" result', async () => {
     assert.equal(r.up, false);
   } finally { s.close(); s.closeAllConnections(); }
 });
+
+// ---- launch(): spawner injected, no real window ----
+import { launch } from '../server/launch.mjs';
+
+const cfg = { port: 47999, root: 'C:\root', launch: { healthTimeoutMs: 800 } };
+const fakeProbe = (result) => async () => result;
+
+test('launch: nothing answering -> spawns the server once, minimized, with --open', async () => {
+  const calls = [];
+  const action = await launch(cfg, { spawn: (c, a) => calls.push([c, a]), probe: fakeProbe({ up: false }) });
+  assert.equal(action, 'start');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], 'cmd');
+  assert.ok(calls[0][1].includes('/min'));
+  assert.ok(calls[0][1].includes('--open'));
+  assert.ok(calls[0][1].some((a) => a.endsWith('main.mjs')));
+});
+test('launch: healthy /health -> no server spawn, only the browser opener', async () => {
+  const calls = [];
+  const action = await launch(cfg, { spawn: (c, a) => calls.push([c, a]), probe: fakeProbe({ up: true, body: { app: 'agent-office', pid: 1 } }) });
+  assert.equal(action, 'open');
+  assert.equal(calls.length, 1);
+  assert.ok(!calls[0][1].some((a) => String(a).endsWith('main.mjs')));
+  assert.equal(calls[0][1].at(-1), 'http://127.0.0.1:47999/');
+});
+test('launch: noBrowser + healthy -> spawns nothing; noBrowser + down -> no --open', async () => {
+  const calls = [];
+  const spawn = (c, a) => calls.push(a);
+  await launch(cfg, { spawn, noBrowser: true, probe: fakeProbe({ up: true, body: { app: 'agent-office' } }) });
+  assert.equal(calls.length, 0);
+  await launch(cfg, { spawn, noBrowser: true, probe: fakeProbe({ up: false }) });
+  assert.equal(calls.length, 1);
+  assert.ok(!calls[0].includes('--open'));
+});
+test('launch: foreign app on the port -> spawns nothing, Korean message names the port', async () => {
+  const calls = []; const logs = [];
+  const action = await launch(cfg, { spawn: (c, a) => calls.push(a), log: (m) => logs.push(m), probe: fakeProbe({ up: true, body: { app: 'x' } }) });
+  assert.equal(action, 'conflict');
+  assert.equal(calls.length, 0);
+  assert.match(logs[0], /포트 47999 을/);
+});
