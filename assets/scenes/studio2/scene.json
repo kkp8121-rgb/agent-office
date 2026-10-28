@@ -1,0 +1,438 @@
+{
+ "version": 1,
+ "design": "studio2",
+ "size": [1024, 512],
+ "shell": "shell.png",
+ "front": null,
+ "atlas": "objects.png",
+ "board": [16, 8, 300, 48],
+ "reports": [-36, -62],
+ "sign": null,
+ "walkable": [
+  [[22, 308], [250, 176], [730, 135], [1005, 346], [603, 479], [366, 479], [14, 322]]
+ ],
+ "blocked": [
+  [[234, 186], [292, 182], [292, 206], [234, 210]],
+  [[527, 150], [635, 141], [635, 168], [527, 177]],
+  [[732, 140], [784, 178], [784, 200], [732, 162]],
+  [[882, 258], [928, 296], [928, 318], [882, 280]]
+ ],
+ "frontMask": [],
+ "door": {
+  "at": [925, 338],
+  "face": "left"
+ },
+ "kinds": {
+  "desk": {
+   "rect": [0, 90, 83, 54],
+   "anchor": [41, 53],
+   "footprint": [[-41, -16], [41, -16], [41, 0], [-41, 0]],
+   "blocks": true,
+   "depth": "auto",
+   "seat": {
+    "at": [0, -38],
+    "sitAt": [0, -36],
+    "approach": [0, 22],
+    "visit": [-40, 18],
+    "face": "right"
+   }
+  },
+  "chair": {
+   "rect": [282, 0, 41, 58],
+   "anchor": [20, 57],
+   "footprint": [[-12, -8], [12, -8], [12, 0], [-12, 0]],
+   "blocks": false,
+   "depth": "auto"
+  },
+  "lead-desk": {
+   "rect": [382, 0, 104, 56],
+   "anchor": [52, 55],
+   "footprint": [[-52, -16], [52, -16], [52, 0], [-52, 0]],
+   "blocks": true,
+   "depth": "auto"
+  },
+  "table": {
+   "rect": [156, 90, 72, 32],
+   "anchor": [36, 31],
+   "footprint": [[-34, -14], [34, -14], [34, 0], [-34, 0]],
+   "blocks": true,
+   "depth": "auto"
+  },
+  "lamp": {
+   "rect": [174, 0, 26, 68],
+   "anchor": [13, 67],
+   "footprint": [[-6, -5], [6, -5], [6, 0], [-6, 0]],
+   "blocks": true,
+   "depth": "auto"
+  },
+  "sofa": {
+   "rect": [0, 0, 122, 89],
+   "anchor": [61, 88],
+   "footprint": [[-58, -24], [58, -24], [58, 0], [-58, 0]],
+   "blocks": true,
+   "depth": "auto"
+  },
+  "plant-big": {
+   "rect": [123, 0, 50, 74],
+   "anchor": [25, 73],
+   "footprint": [[-12, -10], [12, -10], [12, 0], [-12, 0]],
+   "blocks": true,
+   "depth": "auto"
+  },
+  "plant-rubber": {
+   "rect": [201, 0, 45, 66],
+   "anchor": [22, 65],
+   "footprint": [[-11, -9], [11, -9], [11, 0], [-11, 0]],
+   "blocks": true,
+   "depth": "auto"
+  },
+  "plant-fern": {
+   "rect": [324, 0, 57, 58],
+   "anchor": [28, 57],
+   "footprint": [[-14, -10], [14, -10], [14, 0], [-14, 0]],
+   "blocks": true,
+   "depth": "auto"
+  },
+  "plant-snake": {
+   "rect": [247, 0, 34, 62],
+   "anchor": [17, 61],
+   "footprint": [[-10, -8], [10, -8], [10, 0], [-10, 0]],
+   "blocks": true,
+   "depth": "auto"
+  },
+  "plant-small": {
+   "rect": [122, 90, 33, 36],
+   "anchor": [16, 35],
+   "footprint": [[-8, -6], [8, -6], [8, 0], [-8, 0]],
+   "blocks": true,
+   "depth": "auto"
+  },
+  "plant-shrub": {
+   "rect": [84, 90, 37, 44],
+   "anchor": [18, 43],
+   "footprint": [[-10, -8], [10, -8], [10, 0], [-10, 0]],
+   "blocks": true,
+   "depth": "auto"
+  }
+ },
+ "objects": [
+  {
+   "id": "desk-1",
+   "kind": "desk",
+   "at": [338, 229]
+  },
+  {
+   "id": "chair-1",
+   "kind": "chair",
+   "at": [338, 189]
+  },
+  {
+   "id": "desk-2",
+   "kind": "desk",
+   "at": [450, 229]
+  },
+  {
+   "id": "chair-2",
+   "kind": "chair",
+   "at": [450, 189]
+  },
+  {
+   "id": "desk-3",
+   "kind": "desk",
+   "at": [571, 229]
+  },
+  {
+   "id": "chair-3",
+   "kind": "chair",
+   "at": [571, 189]
+  },
+  {
+   "id": "desk-4",
+   "kind": "desk",
+   "at": [685, 229]
+  },
+  {
+   "id": "chair-4",
+   "kind": "chair",
+   "at": [685, 189]
+  },
+  {
+   "id": "desk-5",
+   "kind": "desk",
+   "at": [322, 307]
+  },
+  {
+   "id": "chair-5",
+   "kind": "chair",
+   "at": [322, 267]
+  },
+  {
+   "id": "desk-6",
+   "kind": "desk",
+   "at": [447, 307]
+  },
+  {
+   "id": "chair-6",
+   "kind": "chair",
+   "at": [447, 267]
+  },
+  {
+   "id": "desk-7",
+   "kind": "desk",
+   "at": [576, 307]
+  },
+  {
+   "id": "chair-7",
+   "kind": "chair",
+   "at": [576, 267]
+  },
+  {
+   "id": "desk-8",
+   "kind": "desk",
+   "at": [700, 307]
+  },
+  {
+   "id": "chair-8",
+   "kind": "chair",
+   "at": [700, 267]
+  },
+  {
+   "id": "desk-9",
+   "kind": "desk",
+   "at": [308, 395]
+  },
+  {
+   "id": "chair-9",
+   "kind": "chair",
+   "at": [308, 355]
+  },
+  {
+   "id": "desk-10",
+   "kind": "desk",
+   "at": [443, 395]
+  },
+  {
+   "id": "chair-10",
+   "kind": "chair",
+   "at": [443, 355]
+  },
+  {
+   "id": "desk-11",
+   "kind": "desk",
+   "at": [581, 395]
+  },
+  {
+   "id": "chair-11",
+   "kind": "chair",
+   "at": [581, 355]
+  },
+  {
+   "id": "desk-12",
+   "kind": "desk",
+   "at": [716, 395]
+  },
+  {
+   "id": "chair-12",
+   "kind": "chair",
+   "at": [716, 355]
+  },
+  {
+   "id": "lead-desk",
+   "kind": "lead-desk",
+   "at": [510, 463]
+  },
+  {
+   "id": "lead-chair",
+   "kind": "chair",
+   "at": [510, 421]
+  },
+  {
+   "id": "sofa-1",
+   "kind": "sofa",
+   "at": [122, 296]
+  },
+  {
+   "id": "table-1",
+   "kind": "table",
+   "at": [190, 322]
+  },
+  {
+   "id": "lamp-1",
+   "kind": "lamp",
+   "at": [46, 306]
+  },
+  {
+   "id": "plant-1",
+   "kind": "plant-big",
+   "at": [392, 174]
+  },
+  {
+   "id": "plant-2",
+   "kind": "plant-rubber",
+   "at": [505, 168]
+  },
+  {
+   "id": "plant-3",
+   "kind": "plant-big",
+   "at": [704, 152]
+  },
+  {
+   "id": "plant-4",
+   "kind": "plant-rubber",
+   "at": [205, 208]
+  },
+  {
+   "id": "plant-5",
+   "kind": "plant-fern",
+   "at": [800, 206]
+  },
+  {
+   "id": "plant-6",
+   "kind": "plant-shrub",
+   "at": [400, 470]
+  },
+  {
+   "id": "plant-7",
+   "kind": "plant-snake",
+   "at": [622, 468]
+  },
+  {
+   "id": "plant-8",
+   "kind": "plant-big",
+   "at": [990, 338]
+  },
+  {
+   "id": "plant-9",
+   "kind": "plant-rubber",
+   "at": [850, 250]
+  },
+  {
+   "id": "plant-10",
+   "kind": "plant-small",
+   "at": [72, 334]
+  },
+  {
+   "id": "plant-11",
+   "kind": "plant-snake",
+   "at": [28, 324]
+  }
+ ],
+ "seats": [
+  "desk-1",
+  "desk-2",
+  "desk-3",
+  "desk-4",
+  "desk-5",
+  "desk-6",
+  "desk-7",
+  "desk-8",
+  "desk-9",
+  "desk-10",
+  "desk-11",
+  "desk-12"
+ ],
+ "lead": {
+  "desk": "lead-desk",
+  "at": [510, 425],
+  "sitAt": [510, 427],
+  "approach": [438, 428],
+  "face": "left"
+ },
+ "tray": {
+  "object": "lead-desk",
+  "queue": [[436, 438], [412, 438], [388, 438], [364, 438], [340, 438], [316, 438], [590, 438], [614, 438], [638, 438], [662, 438], [332, 413], [356, 413]]
+ },
+ "idle": [
+  {
+   "at": [374, 266],
+   "face": "right"
+  },
+  {
+   "at": [490, 266],
+   "face": "left"
+  },
+  {
+   "at": [610, 266],
+   "face": "right"
+  },
+  {
+   "at": [375, 352],
+   "face": "left"
+  },
+  {
+   "at": [512, 352],
+   "face": "right"
+  },
+  {
+   "at": [650, 352],
+   "face": "left"
+  }
+ ],
+ "overflow": [
+  {
+   "at": [775, 262],
+   "face": "left"
+  },
+  {
+   "at": [775, 300],
+   "face": "left"
+  },
+  {
+   "at": [775, 338],
+   "face": "left"
+  },
+  {
+   "at": [775, 376],
+   "face": "left"
+  },
+  {
+   "at": [820, 281],
+   "face": "left"
+  },
+  {
+   "at": [820, 319],
+   "face": "left"
+  },
+  {
+   "at": [820, 357],
+   "face": "left"
+  },
+  {
+   "at": [815, 390],
+   "face": "left"
+  }
+ ],
+ "spots": [
+  {
+   "id": "window",
+   "kind": "window",
+   "at": [225, 235],
+   "face": "left",
+   "pair": [262, 262]
+  },
+  {
+   "id": "board",
+   "kind": "whiteboard",
+   "at": [805, 238],
+   "face": "right"
+  },
+  {
+   "id": "sofa",
+   "kind": "sofa",
+   "at": [248, 326],
+   "face": "left"
+  },
+  {
+   "id": "plant",
+   "kind": "plant",
+   "at": [900, 322],
+   "face": "right"
+  },
+  {
+   "id": "shelf",
+   "kind": "shelf",
+   "at": [858, 296],
+   "face": "right"
+  }
+ ]
+}
