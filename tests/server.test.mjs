@@ -295,17 +295,23 @@ function logCtx(t, extra = {}) {
 
 test('server: /api/log filters by session and excludes hidden', async (t) => {
   const c = await logCtx(t);
-  const all = JSON.parse((await req(c, 'GET', '/api/log')).body);
+  const getLog = async (q = '') => JSON.parse((await req(c, 'GET', `/api/log${q}`)).body).entries;
+  const all = await getLog();
   assert.deepEqual(all.map((e) => e.text), ['에스투 작업', '에스원 작업']); // newest first
-  const one = JSON.parse((await req(c, 'GET', '/api/log?session=s1')).body);
+  const one = await getLog('?session=s1');
   assert.deepEqual(one.map((e) => e.text), ['에스원 작업']);
   const name = one[0].name;
-  assert.equal(JSON.parse((await req(c, 'GET', `/api/log?name=${encodeURIComponent(name)}`)).body).length >= 1, true);
-  assert.deepEqual(JSON.parse((await req(c, 'GET', '/api/log?name=%EC%97%86%EC%9D%8C')).body), []);
+  assert.equal((await getLog(`?name=${encodeURIComponent(name)}`)).length >= 1, true);
+  assert.deepEqual(await getLog('?name=%EC%97%86%EC%9D%8C'), []);
   assert.equal((await req(c, 'GET', '/api/log', { host: 'evil.test' })).status, 403);
+  const body = JSON.parse((await req(c, 'GET', '/api/log')).body);
+  assert.deepEqual(Object.keys(body.titles).sort(), ['s1', 's2']);
+  assert.equal(body.titles.s1, c.office.snapshot().floors.find((f) => f.sessionId === 's1').title);
+  assert.equal(body.capped, false);
   await post(c, '/api/hide', { sessionId: 's1' });
-  assert.deepEqual(JSON.parse((await req(c, 'GET', '/api/log')).body).map((e) => e.text), ['에스투 작업']);
-  assert.deepEqual(JSON.parse((await req(c, 'GET', '/api/log?session=s1')).body), []);
+  assert.deepEqual(Object.keys(JSON.parse((await req(c, 'GET', '/api/log')).body).titles), ['s2']);
+  assert.deepEqual((await getLog()).map((e) => e.text), ['에스투 작업']);
+  assert.deepEqual(await getLog('?session=s1'), []);
 });
 
 test('server: /api/log rejects bad session id', async (t) => {
@@ -318,11 +324,14 @@ test('server: /api/log rejects bad session id', async (t) => {
 test('server: /api/log clamps limit', async (t) => {
   const cfg = loadConfig({ log: { pageLimit: 1 } });
   const c = await logCtx(t, { cfg });
-  const n = async (q) => JSON.parse((await req(c, 'GET', `/api/log${q}`)).body).length;
+  const n = async (q) => JSON.parse((await req(c, 'GET', `/api/log${q}`)).body).entries.length;
   assert.equal(await n(''), 1); // default = log.pageLimit
   assert.equal(await n('?limit=abc'), 1);
   assert.equal(await n('?limit=0'), 1); // clamped up to 1
   assert.equal(await n('?limit=-5'), 1);
   assert.equal(await n('?limit=2'), 2);
   assert.equal(await n('?limit=999999'), 2); // all there is, capped by log.cap
+  const capped = async (q) => JSON.parse((await req(c, 'GET', `/api/log${q}`)).body).capped;
+  assert.equal(await capped('?limit=1'), true);
+  assert.equal(await capped('?limit=3'), false);
 });

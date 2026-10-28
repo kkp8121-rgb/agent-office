@@ -9,12 +9,14 @@ const BUBBLE_THINKING = '생각 중…';
 const BUBBLE_STALE = '응답 없음';
 const LOG_START = '시작';
 const LOG_DONE = '완료 · 보고함에 제출';
+const LOG_ABANDONED = '응답 없이 종료';
 
 const READ_TOOLS = new Set(['Read', 'Grep', 'Glob']);
 const LOGGED_TOOLS = new Set(['Bash', 'Edit', 'MultiEdit', 'NotebookEdit', 'Write', 'Agent', 'Skill', 'Workflow']);
 const isLogged = (name) => LOGGED_TOOLS.has(name) || name.startsWith('mcp__');
 
-const UNSAFE_NAME_CHARS = /[\p{Cc}\p{Zl}\p{Zp}]/gu;
+// Control characters plus Unicode format characters (bidi overrides, zero-width): none may reach the screen.
+const UNSAFE_NAME_CHARS = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
 
 const isFiniteNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
@@ -33,13 +35,16 @@ export class Office {
     /** Increments on every change to what saved() returns. */
     this.savedVersion = 0;
     this.floors = new Map(); // sessionId -> floor
-    this.floorsCreated = 0; // never decremented: drives design rotation
+    this.floorsCreated = 0; // never decremented: breaks ties between equally used designs
     this.floorSeq = 0;
     this.hiddenRecs = new Map(); // sessionId -> {sessionId, pid, startedAt}
     this.names = new Map(); // sessionId -> renamed title
     this.ring = []; // LogEntry[], oldest first
     this.pending = new Set(); // entries created/updated since the last drainLog()
     this.unhiddenAt = new Map(); // sessionId -> when its hide record was dropped (memory only, pruned after backfillMinutes)
+    this.hiddenMiss = new Map(); // sessionId -> consecutive syncSessions calls its hide record's session was absent
+    this.logMark = new Map(); // sessionId -> first ts not yet logged when its floor left (a resume must not log the window again)
+    this.departedTitles = new Map(); // sessionId -> last title of a floor that left, for the log page
     this.evicted = new WeakSet(); // entries that left the ring (a merge must not revive them)
     this.logSeq = 0;
 
@@ -91,15 +96,15 @@ export class Office {
       this.#bump();
     }
     f.hidden = true;
+    this.departedTitles.delete(sessionId);
     this.#purgeLog(sessionId);
     return true;
   }
 
-  /** Log cutoff for a session's events: backfill window, but never earlier than the moment it was unhidden. */
+  /** Log cutoff for a session's events: backfill window, but never earlier than its unhide moment or what was logged before its floor left. */
   logSince(sessionId, now) {
     const floor = now - this.cfg.log.backfillMinutes * 60000;
-    const at = this.unhiddenAt.get(sessionId);
-    return at === undefined ? floor : Math.max(floor, at);
+    return Math.max(floor, this.unhiddenAt.get(sessionId) ?? floor, this.logMark.get(sessionId) ?? floor);
   }
 
   // ---- sessions (floors) -------------------------------------------------------------------
@@ -110,13 +115,19 @@ export class Office {
 
     const backfillMs = this.cfg.log.backfillMinutes * 60000;
     for (const [id, at] of this.unhiddenAt) if (at < now - backfillMs) this.unhiddenAt.delete(id);
+    for (const [id, at] of this.logMark) if (at < now - backfillMs) this.logMark.delete(id);
 
+    // A hide record goes only after its session was absent for missTicks calls in a row: one listing hiccup
+    // (also the first one after a restart) must not undo a forced hide.
     for (const id of [...this.hiddenRecs.keys()]) {
-      if (!liveIds.has(id)) {
+      const misses = liveIds.has(id) ? 0 : (this.hiddenMiss.get(id) ?? 0) + 1;
+      if (misses >= this.cfg.floor.missTicks) {
         this.hiddenRecs.delete(id);
+        this.hiddenMiss.delete(id);
         this.unhiddenAt.set(id, now);
         this.#bump();
-      }
+      } else if (misses > 0) this.hiddenMiss.set(id, misses);
+      else this.hiddenMiss.delete(id);
     }
 
     for (const s of live) {
@@ -129,9 +140,10 @@ export class Office {
       f.pid = s.pid;
       f.startedAt = s.startedAt;
       f.provider = s.provider ?? 'claude';
-      f.cwd = s.cwd;
       f.folder = folderOf(s.cwd);
       f.status = s.status === 'busy' ? 'busy' : 'waiting';
+      // The session file is the authority for waiting: a turn that ended without an end event must not leave the lead busy.
+      if (f.status === 'waiting' && (f.lead.state === 'working' || f.lead.state === 'thinking')) this.#setState(f.lead, 'idle', '', now);
 
       const rec = this.hiddenRecs.get(s.sessionId);
       if (rec && (rec.pid !== s.pid || rec.startedAt !== s.startedAt)) {
@@ -148,20 +160,20 @@ export class Office {
       if (!liveIds.has(f.sessionId) && f.leavingAt === null) {
         f.leavingAt = now;
         f.status = 'leaving';
+        this.#markLogged(f.sessionId);
       }
     }
   }
 
   #createFloor(s) {
-    const { designOrder, roles } = this.cfg;
-    const design = designOrder[this.floorsCreated++ % designOrder.length];
+    const { roles } = this.cfg;
+    const design = this.#pickDesign();
     const lead = (s.provider === 'codex' && roles['codex:__lead']) || roles.__lead;
     return {
       sessionId: s.sessionId,
       provider: 'claude',
       pid: s.pid,
       startedAt: s.startedAt,
-      cwd: '',
       folder: '',
       status: 'waiting',
       leavingAt: null,
@@ -171,12 +183,35 @@ export class Office {
       aiTitle: '',
       lead: { name: lead.name, role: lead.role, sprite: lead.key, head: '', state: 'idle', bubble: '', lastRead: null },
       boardLine: '',
+      boardRun: '', // runId that owns boardLine
       workflows: new Map(), // runId -> {name, scriptPath}
+      doneRuns: new Set(), // runIds the poller reported done
       agents: new Map(), // agentId -> agent
       usedNames: new Set([lead.name]),
       usedSlots: new Set(),
       reports: 0,
     };
+  }
+
+  /** Least used design among the visible floors; ties go to the first in rotation order from the creation counter. */
+  #pickDesign() {
+    const { designOrder } = this.cfg;
+    const used = new Map(designOrder.map((d) => [d, 0]));
+    for (const f of this.floors.values()) if (!f.hidden && used.has(f.design)) used.set(f.design, used.get(f.design) + 1);
+    const start = this.floorsCreated++ % designOrder.length;
+    let best = designOrder[start];
+    for (let k = 1; k < designOrder.length; k++) {
+      const d = designOrder[(start + k) % designOrder.length];
+      if (used.get(d) < used.get(best)) best = d;
+    }
+    return best;
+  }
+
+  /** Remembers the first ts of the session not yet logged, so a resumed floor does not log the same window again. */
+  #markLogged(sessionId) {
+    let newest = 0;
+    for (const e of this.ring) if (e.sessionId === sessionId && e.ts > newest) newest = e.ts;
+    if (newest > 0) this.logMark.set(sessionId, newest + 1);
   }
 
   /** Name/slot bookkeeping for an agent that is leaving the floor. */
@@ -253,7 +288,10 @@ export class Office {
     for (const m of metas) {
       const a = f.agents.get(m.agentId);
       if (!a) {
-        if (!m.finished) this.#enterAgent(f, m, now);
+        if (!m.finished && !m.abandoned) this.#enterAgent(f, m, now);
+      } else if (m.abandoned && !m.finished && a.state !== 'done') {
+        this.#logDone(f, a, now, LOG_ABANDONED); // gone silent: released without a report
+        this.#releaseAgent(f, a);
       } else if (m.finished && a.state !== 'done') {
         a.state = 'done';
         a.bubble = '';
@@ -288,7 +326,8 @@ export class Office {
       lastRead: null,
     };
     f.agents.set(m.agentId, a);
-    this.#log(f, a, now, LOG_START);
+    const startTs = m.mtimeMs > 0 ? m.mtimeMs : now; // discovered at server start: when it really started
+    if (startTs >= this.logSince(f.sessionId, now)) this.#log(f, a, startTs, LOG_START);
   }
 
   /** Claude floors know Claude role names, Codex floors the `codex:` ones; anything else gets the provider's default. */
@@ -326,16 +365,26 @@ export class Office {
     return { x: p[0], y: p[1], i };
   }
 
-  // One board line per floor: the most recently reported run wins, so runId is not needed here.
-  setWorkflowProgress(sessionId, _runId, p) {
+  // One board line per floor: the most recently reported run owns it, and the line clears when that run is done.
+  setWorkflowProgress(sessionId, runId, p) {
     const f = this.floors.get(sessionId);
     if (!f) return;
+    if (p.done) {
+      f.doneRuns.add(runId);
+      if (f.boardRun === runId) {
+        f.boardLine = '';
+        f.boardRun = '';
+      }
+      return;
+    }
+    f.doneRuns.delete(runId);
     const max = this.cfg.log.headMaxChars;
-    const name = clip(p.name, max);
-    const current = clip(p.current, max);
+    const name = clip(p.name ?? '', max);
+    const current = clip(p.current ?? '', max);
     const phases = Array.isArray(p.phases) ? p.phases : [];
     const idx = phases.indexOf(p.current);
-    f.boardLine = phases.length && idx >= 0 ? `${name} · ${current} ${idx + 1}/${phases.length}` : `${name} · ${current}`;
+    f.boardRun = runId;
+    f.boardLine = !current ? name : phases.length && idx >= 0 ? `${name} · ${current} ${idx + 1}/${phases.length}` : `${name} · ${current}`;
   }
 
   workflowRuns(sessionId) {
@@ -352,6 +401,8 @@ export class Office {
     for (const f of [...this.floors.values()]) {
       if (f.leavingAt !== null && now - f.leavingAt >= floor.leaveMs) {
         this.floors.delete(f.sessionId);
+        if (!f.hidden) this.departedTitles.set(f.sessionId, this.#titleOf(f));
+        this.#pruneTitles();
         changed = true;
         continue;
       }
@@ -372,12 +423,33 @@ export class Office {
 
   // ---- views -------------------------------------------------------------------------------
 
+  #titleOf(f) {
+    return this.names.get(f.sessionId) ?? (f.aiTitle || f.folder);
+  }
+
+  #pruneTitles() {
+    const inLog = new Set(this.ring.map((e) => e.sessionId));
+    for (const id of this.departedTitles.keys()) if (!inLog.has(id)) this.departedTitles.delete(id);
+  }
+
+  /** Title per session id for the log page: live floors as shown, departed ones as last seen; hidden sessions never appear. */
+  logTitles(sessionIds) {
+    const out = {};
+    for (const id of sessionIds) {
+      if (this.hiddenRecs.has(id)) continue;
+      const f = this.floors.get(id);
+      const title = f ? (f.hidden ? undefined : this.#titleOf(f)) : this.departedTitles.get(id);
+      if (title !== undefined) out[id] = title;
+    }
+    return out;
+  }
+
   snapshot() {
     const visible = [...this.floors.values()].filter((f) => !f.hidden);
     visible.sort((a, b) => a.startedAt - b.startedAt || a.seq - b.seq);
     const views = visible.map((f, i) => {
       const autoTitle = f.aiTitle || f.folder;
-      const title = this.names.get(f.sessionId) ?? autoTitle;
+      const title = this.#titleOf(f);
       return {
         sessionId: f.sessionId,
         provider: f.provider,
@@ -390,7 +462,7 @@ export class Office {
         lead: { name: f.lead.name, role: f.lead.role, sprite: f.lead.sprite, state: f.lead.state, bubble: f.lead.bubble },
         board: { title, line: f.boardLine },
         reports: f.reports,
-        workflows: f.workflows.size,
+        workflows: [...f.workflows.keys()].filter((id) => !f.doneRuns.has(id)).length,
         agents: [...f.agents.values()].map((a) => ({
           key: a.key,
           agentId: a.agentId,
@@ -412,10 +484,6 @@ export class Office {
   #evict(e) {
     this.evicted.add(e);
     this.pending.delete(e);
-  }
-
-  #isHidden(sessionId) {
-    return this.floors.get(sessionId)?.hidden === true;
   }
 
   /** Hidden floors record nothing, so nothing from the hidden period can resurface later. */
@@ -460,10 +528,10 @@ export class Office {
     actor.lastRead = { entry, count: 1, ts };
   }
 
-  #logDone(f, actor, ts) {
+  #logDone(f, actor, ts, text = LOG_DONE) {
     if (actor.endLogged) return;
     actor.endLogged = true;
-    this.#log(f, actor, ts, LOG_DONE);
+    this.#log(f, actor, ts, text);
   }
 
   #purgeLog(sessionId) {
@@ -480,21 +548,21 @@ export class Office {
   }
 
   drainLog() {
-    const out = [...this.pending].filter((e) => !this.#isHidden(e.sessionId)).map((e) => ({ ...e }));
+    const out = [...this.pending].map((e) => ({ ...e })); // hide() purges, so nothing hidden is pending
     this.pending.clear();
     return out;
   }
 
+  /** Newest first by ts (ties: later insertion first); the limit applies after sorting. */
   queryLog(f = {}) {
     const limit = f.limit ?? this.cfg.log.sendCap;
     const out = [];
-    for (let i = this.ring.length - 1; i >= 0 && out.length < limit; i--) {
+    for (let i = this.ring.length - 1; i >= 0; i--) {
       const e = this.ring[i];
-      if (this.#isHidden(e.sessionId)) continue;
       if (f.sessionId !== undefined && e.sessionId !== f.sessionId) continue;
       if (f.name !== undefined && e.name !== f.name) continue;
-      out.push({ ...e });
+      out.push(e);
     }
-    return out;
+    return out.sort((a, b) => b.ts - a.ts).slice(0, limit).map((e) => ({ ...e }));
   }
 }

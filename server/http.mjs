@@ -159,7 +159,8 @@ export function createServer(cfg, office, { onSavedChange, onShutdown } = {}) {
 
   const isVisible = (sessionId) => office.snapshot().floors.some((f) => f.sessionId === sessionId);
 
-  /** Newest first. `session` must be a safe id (400 otherwise); `limit` falls back to log.pageLimit and is clamped to [1, log.cap]. */
+  /** {entries, titles, capped}: entries newest first; titles by session id for those entries; capped when the limit cut the list.
+   * `session` must be a safe id (400 otherwise); `limit` falls back to log.pageLimit and is clamped to [1, log.cap]. */
   function sendLog(res, query) {
     const params = new URLSearchParams(query);
     const filter = {};
@@ -172,7 +173,9 @@ export function createServer(cfg, office, { onSavedChange, onShutdown } = {}) {
     const asked = Number(params.get('limit'));
     const limit = params.get('limit') === null || params.get('limit') === '' || !Number.isFinite(asked) ? cfg.log.pageLimit : Math.trunc(asked);
     filter.limit = Math.min(Math.max(limit, 1), cfg.log.cap);
-    return sendJson(res, 200, office.queryLog(filter));
+    const entries = office.queryLog(filter);
+    const titles = office.logTitles([...new Set(entries.map((e) => e.sessionId))]);
+    return sendJson(res, 200, { entries, titles, capped: entries.length === filter.limit });
   }
 
   async function handlePost(path, body, res) {
