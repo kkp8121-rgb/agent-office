@@ -12,6 +12,11 @@ function hueOf(sessionId) {
   for (let i = 0; i < sessionId.length; i++) h = Math.imul(h ^ sessionId.charCodeAt(i), 0x01000193);
   return (h >>> 0) % 360;
 }
+/** Finished agents fill a 3-wide grid leftwards from the tray; every other row is shifted half a step and stands one row higher, so no two slots coincide. */
+function trayPos(i, tray, stepPx, rowPx) {
+  const row = Math.floor(i / 3);
+  return { x: tray[0] - ((i % 3) + (row % 2) / 2) * stepPx, y: tray[1] - row * rowPx };
+}
 const colorOf = (sessionId) => `hsl(${hueOf(sessionId)} 55% 42%)`;
 
 const spriteUrl = (key) => `/assets/sprites/${encodeURIComponent(key)}.png`;
@@ -68,7 +73,7 @@ function fillLogRow(row, e) {
 
 /** Session filter label: a live floor's title, else the last title the server remembers, else a bare id prefix. */
 function sessionLabel(sessionId, liveTitles, knownTitles) {
-  return liveTitles.get(sessionId) ?? knownTitles?.[sessionId] ?? `지난 세션 ${sessionId.slice(0, 8)}`;
+  return liveTitles.get(sessionId) ?? (knownTitles && Object.hasOwn(knownTitles, sessionId) ? knownTitles[sessionId] : undefined) ?? `지난 세션 ${sessionId.slice(0, 8)}`;
 }
 
 function logMetaText(count, capped) {

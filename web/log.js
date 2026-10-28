@@ -45,7 +45,7 @@ async function load() {
     return;
   }
   if (mine !== seq) return;
-  const { entries, titles: known, capped } = log;
+  const { entries, titles: known, capped } = Array.isArray(log) ? { entries: log } : log; // an older server answers with a bare array
 
   // Options come only from live floors (the server leaves hidden ones out) and from what the log returned.
   const live = new Map(state.floors.map((f) => [f.sessionId, f.title]));

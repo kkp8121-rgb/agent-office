@@ -10,7 +10,7 @@
   "codex": { "enabled": true, "headBytes": 262144, "idleKeepMs": 1800000, "execKeepMs": 60000, "cwdMaxChars": 500 },
   "launch": { "healthTimeoutMs": 800 },
   "server": { "ssePingMs": 25000, "maxBodyBytes": 1024 },
-  "ui": { "bubbleMaxChars": 16, "logDomCap": 300, "traySpreadPx": 48 },
+  "ui": { "bubbleMaxChars": 16, "logDomCap": 300, "traySpreadPx": 48, "trayRowPx": 14 },
   "roles": {
     "__lead":               { "key": "lead",                 "name": "유나", "role": "팀장" },
     "scout":                { "key": "scout",                "name": "다온", "role": "정찰" },

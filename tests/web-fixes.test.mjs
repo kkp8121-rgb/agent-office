@@ -41,3 +41,19 @@ test('web: config has the tray spread and it clears the character width', () => 
   const cfg = JSON.parse(readFileSync(new URL('../config.json', import.meta.url), 'utf8'));
   assert.ok(cfg.ui.traySpreadPx >= 44);
 });
+
+test('web: tray slots never coincide, even for 24 finished agents', () => {
+  const run = loadLogrow();
+  const cfg = JSON.parse(readFileSync(new URL('../config.json', import.meta.url), 'utf8'));
+  const pts = new Set();
+  for (let i = 0; i < 24; i++) {
+    const p = run(`trayPos(${i}, [400, 500], ${cfg.ui.traySpreadPx}, ${cfg.ui.trayRowPx})`);
+    pts.add(`${p.x},${p.y}`);
+  }
+  assert.equal(pts.size, 24);
+});
+
+test('web: hasOwn title lookup ignores inherited keys', () => {
+  const run = loadLogrow();
+  assert.equal(run(`sessionLabel('constructor', new Map(), {})`), '지난 세션 construc');
+});

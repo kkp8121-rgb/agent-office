@@ -60,6 +60,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 /* the name-tag layer follows each character with the same walk but paints above all of them (characters stack by y) */
 .agt { z-index: 8000; pointer-events: none; }
+.agt .tag { pointer-events: auto; } /* only the tag itself takes the hover that shows the role */
 .agt.done { display: none; }
 .ag.gone { opacity: 0; transition: transform var(--walk-ms) linear, opacity .35s; }
 .ag.enter-in, .agt.enter-in { animation: fadein .45s ease-out; }

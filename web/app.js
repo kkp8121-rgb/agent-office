@@ -139,7 +139,7 @@ function renderAgent(av, floorEl) {
   const done = av.state === 'done';
   // finished agents line up leftwards from the tray (the lead stands to its right), every other row shifted half a step
   const target = done
-    ? { x: layout.tray[0] - ((av.slot.i % 3) + (Math.floor(av.slot.i / 3) % 2) / 2) * ui.ui.traySpreadPx, y: layout.tray[1] }
+    ? trayPos(av.slot.i, layout.tray, ui.ui.traySpreadPx, ui.ui.trayRowPx)
     : { x: av.slot.x, y: av.slot.y };
 
   if (!rec) {
