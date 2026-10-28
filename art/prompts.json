@@ -1,0 +1,22 @@
+{
+  "style": "true pixel art sprite, 16-bit era RPG, about 64 pixels tall, strict pixel grid, 1-pixel dark outline, ~16 colors, flat 2-3 tone shading, no anti-aliasing; anime bishoujo, SD chibi 2.5-3 heads; full body, 3/4 view facing right; fully transparent background, no glow, no shadow; no text. Same art style as the attached reference character, but a clearly different person.",
+  "roles": {
+    "lead": "chestnut brown long ponytail, cream cardigan over white blouse and navy skirt, holding a clipboard, confident team-leader look",
+    "scout": "short bright orange hair with a hairband, green scout vest and scarf, holding a magnifying glass",
+    "worker-low": "pink twin-tails, oversized yellow hoodie with long sleeves, carrying two coffee cups, youngest junior, cheerful",
+    "worker": "golden blonde ponytail, navy hoodie and jeans, holding a laptop, friendly developer",
+    "worker-high": "deep purple side ponytail, black hoodie with headphones around neck, holding a laptop, focused senior developer",
+    "architect": "long silver-white hair, brown drafting vest over white shirt, holding a rolled blueprint scroll",
+    "architect-high": "jet black long hair, round glasses, white blazer, holding a tablet, calm chief architect",
+    "explore": "lime green short hair, explorer jacket with a small backpack, holding a folded map and compass",
+    "plan": "cobalt blue hair in a bun, light grey blazer, holding a notebook and pencil, planner",
+    "code-critic": "crimson red short bob, white lab-coat style jacket, holding a big red pen, sharp reviewer look",
+    "security-reviewer": "dark forest green hair with side braid, dark navy uniform jacket with a shield badge on chest, serious guard look",
+    "performance-reviewer": "hot magenta pink twin buns, sporty tracksuit jacket, holding a stopwatch, energetic",
+    "i18n-reviewer": "light sky blue wavy long hair, beret, holding a thick dictionary book, scholarly",
+    "a11y-reviewer": "coral peach shoulder-length hair, soft orange cardigan, holding a large-print card with a big letter A, gentle",
+    "frontend": "lavender lilac hair with twin low pigtails and a ribbon, pastel pink jacket, holding a tablet showing a colorful UI, stylish",
+    "backend": "charcoal dark gray hair with a short tail, dark hoodie with cable accessories, holding a tiny miniature server rack, cool techie",
+    "app": "olive khaki-brown medium hair with a cap, casual green jacket, holding a smartphone, mobile developer"
+  }
+}
