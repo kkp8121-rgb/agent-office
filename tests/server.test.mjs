@@ -182,6 +182,7 @@ test('server: api/state and api/ui', async (t) => {
   assert.deepEqual(ui.layouts, c.cfg.layouts);
   assert.deepEqual(ui.ui, c.cfg.ui);
   assert.equal(ui.bubbleShowMs, c.cfg.agent.bubbleShowMs);
+  assert.equal(ui.nameMaxChars, c.cfg.floor.nameMaxChars);
   assert.deepEqual(ui.roles.worker, { name: '서진', role: '개발' });
   assert.deepEqual(ui.roles.lead, { name: '유나', role: '팀장' });
   assert.deepEqual(ui.roles.default, { name: '나래', role: '지원' });
