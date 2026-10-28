@@ -39,6 +39,7 @@ export class Office {
     this.names = new Map(); // sessionId -> renamed title
     this.ring = []; // LogEntry[], oldest first
     this.pending = new Set(); // entries created/updated since the last drainLog()
+    this.unhiddenAt = new Map(); // sessionId -> when its hide record was dropped (memory only, pruned after backfillMinutes)
     this.evicted = new WeakSet(); // entries that left the ring (a merge must not revive them)
     this.logSeq = 0;
 
@@ -94,15 +95,26 @@ export class Office {
     return true;
   }
 
+  /** Log cutoff for a session's events: backfill window, but never earlier than the moment it was unhidden. */
+  logSince(sessionId, now) {
+    const floor = now - this.cfg.log.backfillMinutes * 60000;
+    const at = this.unhiddenAt.get(sessionId);
+    return at === undefined ? floor : Math.max(floor, at);
+  }
+
   // ---- sessions (floors) -------------------------------------------------------------------
 
   syncSessions(live, now) {
     this.now = now;
     const liveIds = new Set(live.map((s) => s.sessionId));
 
+    const backfillMs = this.cfg.log.backfillMinutes * 60000;
+    for (const [id, at] of this.unhiddenAt) if (at < now - backfillMs) this.unhiddenAt.delete(id);
+
     for (const id of [...this.hiddenRecs.keys()]) {
       if (!liveIds.has(id)) {
         this.hiddenRecs.delete(id);
+        this.unhiddenAt.set(id, now);
         this.#bump();
       }
     }
@@ -124,6 +136,7 @@ export class Office {
       const rec = this.hiddenRecs.get(s.sessionId);
       if (rec && (rec.pid !== s.pid || rec.startedAt !== s.startedAt)) {
         this.hiddenRecs.delete(s.sessionId); // re-run: visible again
+        this.unhiddenAt.set(s.sessionId, now);
         this.#bump();
         f.hidden = false;
       } else {

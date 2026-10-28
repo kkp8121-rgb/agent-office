@@ -23,25 +23,27 @@ function saveIfChanged() {
   if (office.savedVersion === savedVersion) return saving;
   const version = office.savedVersion;
   const snapshot = office.saved();
-  saving = saving
-    .then(() => saveSaved(dataDir, snapshot))
-    .then(() => { savedVersion = version; })
-    .catch((e) => console.error('숨김·이름 저장 실패:', e?.message ?? e));
-  return saving;
+  const result = saving.then(() => saveSaved(dataDir, snapshot)).then(() => { savedVersion = version; });
+  saving = result.catch(() => {}); // a failed save must not block the next one; callers see the rejection
+  return result;
 }
 
 // ---- server ----
 
 let timer = null;
+let inflight = Promise.resolve(); // the running poll round
 let closing = false;
 
+// Stop accepting first (the server refuses /api/events from then on), then end open streams and sockets,
+// let the running round finish, save, and exit.
 function shutdown() {
   if (closing) return;
   closing = true;
   clearTimeout(timer);
+  const closed = new Promise((resolve) => server.close(resolve));
   server.closeSse();
-  saveIfChanged().finally(() => server.close(() => process.exit(0)));
   server.closeAllConnections();
+  inflight.then(saveIfChanged).then(() => closed).finally(() => process.exit(0));
 }
 
 const server = createServer(cfg, office, { onSavedChange: saveIfChanged, onShutdown: shutdown });
@@ -54,19 +56,33 @@ server.on('error', (e) => {
   throw e;
 });
 
-// ---- poll loop: a timeout chain, so rounds never overlap ----
+// ---- poll loop: a timeout chain, so rounds never overlap and one failure never stops it ----
+
+let lastError = '';
+
+/** Runs one step; an error is logged once per distinct message until a round has no error. */
+async function step(roundFailures, fn) {
+  try {
+    await fn();
+  } catch (e) {
+    const msg = e?.message ?? String(e);
+    roundFailures.push(msg);
+    if (msg !== lastError) console.error('확인 중 오류:', msg);
+    lastError = msg;
+  }
+}
 
 async function round() {
   const now = Date.now();
-  try {
-    await poller.tick(now);
-  } catch (e) {
-    console.error('확인 중 오류:', e?.message ?? e);
-  }
-  office.tick(now);
-  server.broadcast();
-  await saveIfChanged();
-  if (!closing) timer = setTimeout(round, cfg.pollMs);
+  const failures = [];
+  await step(failures, () => poller.tick(now));
+  await step(failures, () => {
+    office.tick(now);
+    server.broadcast();
+  });
+  await step(failures, saveIfChanged);
+  if (failures.length === 0) lastError = '';
+  if (!closing) timer = setTimeout(() => { inflight = round(); }, cfg.pollMs);
 }
 
 server.listen(cfg.port, '127.0.0.1', () => {
@@ -75,7 +91,7 @@ server.listen(cfg.port, '127.0.0.1', () => {
   if (process.argv.includes('--open')) {
     spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();
   }
-  round();
+  inflight = round();
 });
 
 process.on('SIGINT', shutdown);

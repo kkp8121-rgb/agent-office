@@ -1,22 +1,28 @@
 // One poll round: live sessions -> transcript tails -> subagent scan -> workflow journals -> Office.
 // Idle rounds cost a directory listing, a few small reads and one fstat per open transcript.
 import { open, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { isAbsolute, join, sep } from 'node:path';
 import { FileTail } from './tail.mjs';
 import { parseLine } from './parse.mjs';
 import { listLiveSessions, findSessionPaths } from './sessions.mjs';
 import { listAgents } from './agents.mjs';
 import { WorkflowJournal, phasesFromScript } from './workflows.mjs';
 
-const SCRIPT_HEAD_BYTES = 65536;
 const SAFE_RUN_ID = /^[\w-]+$/; // runId becomes a folder name
 
-async function readScriptPhases(scriptPath) {
+/** scriptPath comes from the transcript: only absolute local .js/.mjs paths are opened (a UNC path would open an SMB connection). */
+export function isLocalScriptPath(p) {
+  return typeof p === 'string' && isAbsolute(p) && !/^[\\/]{2}/.test(p) && /\.m?js$/i.test(p);
+}
+
+async function readScriptPhases(scriptPath, headBytes) {
+  if (!isLocalScriptPath(scriptPath)) return [];
   let fh;
   try {
+    if (!(await stat(scriptPath)).isFile()) return [];
     fh = await open(scriptPath, 'r');
-    const buf = Buffer.alloc(SCRIPT_HEAD_BYTES);
-    const { bytesRead } = await fh.read(buf, 0, SCRIPT_HEAD_BYTES, 0);
+    const buf = Buffer.alloc(headBytes);
+    const { bytesRead } = await fh.read(buf, 0, headBytes, 0);
     return phasesFromScript(buf.toString('utf8', 0, bytesRead));
   } catch {
     return []; // missing or unreadable script: progress is shown without a step count
@@ -31,7 +37,7 @@ export class Poller {
   #cfg;
   #office;
   #tickNo = 0;
-  #emptyStreak = 0;
+  #lastSeen = new Map(); // sessionId -> {session, missed}: absence is debounced per session
   #metaCache = new Map();
   #states = new Map(); // sessionId -> per-session tail state
 
@@ -44,8 +50,8 @@ export class Poller {
     const scan = this.#tickNo++ % this.#cfg.agentScanEveryTicks === 0;
     // Provider seam: a second session source adds its sessions to `live` and polls its own
     // transcripts after the sync, so Office sees one merged session list.
-    const live = [...(await this.#listClaudeSessions())];
-    if (!this.#syncSessions(live, now)) return;
+    const listed = [...(await this.#listClaudeSessions())];
+    const live = this.#syncSessions(listed, now);
     await this.#pollClaudeSessions(live, now, scan);
   }
 
@@ -55,22 +61,44 @@ export class Poller {
     return listLiveSessions(this.#cfg.claudeHome);
   }
 
-  /** An empty list only counts once it is seen twice in a row, so one failed read cannot unhide floors. */
-  #syncSessions(live, now) {
-    this.#emptyStreak = live.length === 0 ? this.#emptyStreak + 1 : 0;
-    if (live.length === 0 && this.#emptyStreak < 2) return false;
+  /**
+   * A session missing from the list (half-written or unreadable file) stays in it until it has been missing for
+   * floor.missTicks ticks in a row, so one failed read cannot drop a hide record. Returns the list Office sees.
+   */
+  #syncSessions(listed, now) {
+    const seen = new Set();
+    for (const s of listed) {
+      seen.add(s.sessionId);
+      this.#lastSeen.set(s.sessionId, { session: s, missed: 0 });
+    }
+    const live = [];
+    for (const [id, rec] of [...this.#lastSeen]) {
+      if (!seen.has(id) && ++rec.missed >= this.#cfg.floor.missTicks) {
+        this.#lastSeen.delete(id);
+        this.#dropState(id);
+      } else {
+        live.push(rec.session);
+      }
+    }
     this.#office.syncSessions(live, now);
-    const ids = new Set(live.map((s) => s.sessionId));
-    for (const id of [...this.#states.keys()]) if (!ids.has(id)) this.#states.delete(id);
-    return true;
+    return live;
+  }
+
+  #dropState(id) {
+    const st = this.#states.get(id);
+    this.#states.delete(id);
+    if (!st?.paths) return;
+    const prefix = st.paths.sessionDir + sep;
+    for (const key of [...this.#metaCache.keys()]) if (key.startsWith(prefix)) this.#metaCache.delete(key);
   }
 
   // ---- Claude transcripts ------------------------------------------------------------------
 
   #stateFor(s) {
+    // A re-run (new pid or start time) keeps its tail and offsets: nothing already read is read again.
     let st = this.#states.get(s.sessionId);
-    if (!st || st.pid !== s.pid || st.startedAt !== s.startedAt) {
-      st = { pid: s.pid, startedAt: s.startedAt, paths: null, tail: null, agents: new Map(), runs: new Map() };
+    if (!st) {
+      st = { paths: null, tail: null, agents: new Map(), runs: new Map() };
       this.#states.set(s.sessionId, st);
     }
     return st;
@@ -91,7 +119,7 @@ export class Poller {
     // A session without a transcript yet is searched again only on agent-scan ticks (each miss scans projects/).
     if (!st.paths && scan) st.paths = await findSessionPaths(this.#cfg.claudeHome, id);
     if (!st.paths) return;
-    const opts = { logSince: now - this.#cfg.log.backfillMinutes * 60000 };
+    const opts = { logSince: this.#office.logSince(id, now) };
 
     st.tail ??= new FileTail(st.paths.transcript, this.#cfg.tail);
     const evs = (await this.#pollTail(st.tail)).flatMap(parseLine);
@@ -192,7 +220,7 @@ export class Poller {
       const sig = `${started.size}|${finished.size}|${run.name}`;
       if (sig === run.sig) continue;
       run.sig = sig;
-      run.phases ??= run.scriptPath ? await readScriptPhases(run.scriptPath) : [];
+      run.phases ??= run.scriptPath ? await readScriptPhases(run.scriptPath, this.#cfg.workflow.scriptHeadBytes) : [];
       const current = [...started.values()].at(-1)?.phase ?? '';
       this.#office.setWorkflowProgress(id, run.runId, { name: run.name, phases: run.phases, current });
     }

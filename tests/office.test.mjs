@@ -388,3 +388,23 @@ test('office: events older than logSince drive state but add no log entries', ()
   assert.equal(fresh.length, 1);
   assert.equal(fresh[0].text, 'fresh-bash');
 });
+
+test('office: logSince is the backfill window, raised to the moment a hide record was dropped', () => {
+  const day = cfg.log.backfillMinutes * 60000;
+  const o = setup([S('s1'), S('s2', { startedAt: 2000 })], 1000);
+  assert.equal(o.logSince('s1', 1000 + day), 1000);
+  o.hide('s1');
+  // ending: the hide record is dropped when the session is no longer live
+  o.syncSessions([S('s2', { startedAt: 2000 })], 5000);
+  assert.equal(o.logSince('s1', 6000), 5000);
+  assert.equal(o.logSince('s2', 6000), 6000 - day);
+  // re-run (new start time): the record is dropped as well
+  o.syncSessions([S('s1'), S('s2', { startedAt: 2000 })], 7000);
+  o.hide('s1');
+  o.syncSessions([S('s1', { startedAt: 9999 }), S('s2', { startedAt: 2000 })], 8000);
+  assert.equal(o.logSince('s1', 9000), 8000);
+  // pruned once older than the backfill window
+  o.syncSessions([S('s1', { startedAt: 9999 }), S('s2', { startedAt: 2000 })], 8000 + day + 1);
+  assert.equal(o.unhiddenAt.has('s1'), false);
+  assert.equal(o.logSince('s1', 8000 + day + 1), 8001);
+});

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import net from 'node:net';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,18 +15,21 @@ const S = (id, o = {}) => ({
   provider: 'claude', pid: 100, sessionId: id, cwd: 'C:\\Project', status: 'busy', name: '', startedAt: 1000, ...o,
 });
 
-async function start({ cfg = loadConfig(), sessions = [S('s1')], saved = EMPTY, hooks = {} } = {}) {
+/** Starts a server on an ephemeral port; it is stopped when the test ends, pass or fail. */
+async function start(t, { cfg = loadConfig(), sessions = [S('s1')], saved = EMPTY, hooks = {} } = {}) {
   const office = new Office(cfg, saved);
   office.syncSessions(sessions, 1000);
   const server = createServer(cfg, office, hooks);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const port = server.address().port;
+  let stopping;
   const stop = () =>
-    new Promise((r) => {
+    (stopping ??= new Promise((r) => {
       server.closeSse();
       server.close(r);
       server.closeAllConnections();
-    });
+    }));
+  t.after(stop);
   return { cfg, office, server, port, stop };
 }
 
@@ -45,27 +49,25 @@ function req(ctx, method, path, { headers = {}, body, host, origin } = {}) {
 
 const post = (ctx, path, obj, o = {}) => req(ctx, 'POST', path, { body: JSON.stringify(obj), ...o });
 
-test('server: health', async () => {
-  const c = await start();
+test('server: health', async (t) => {
+  const c = await start(t);
   const r = await req(c, 'GET', '/health');
   assert.equal(r.status, 200);
   assert.deepEqual(JSON.parse(r.body), { app: 'agent-office', pid: process.pid });
-  await c.stop();
 });
 
-test('server: localhost host is accepted, wrong Host is 403', async () => {
-  const c = await start();
+test('server: localhost host is accepted, wrong Host is 403', async (t) => {
+  const c = await start(t);
   assert.equal((await req(c, 'GET', '/health', { host: `localhost:${c.port}` })).status, 200);
   assert.equal((await req(c, 'GET', '/health', { host: 'evil.example' })).status, 403);
   assert.equal((await req(c, 'GET', '/health', { host: `evil.example:${c.port}` })).status, 403);
   assert.equal((await req(c, 'GET', '/health', { host: '127.0.0.1' })).status, 403);
   assert.equal((await req(c, 'GET', '/api/state', { host: 'evil.example' })).status, 403);
-  await c.stop();
 });
 
-test('server: cross-origin POST is 403', async () => {
+test('server: cross-origin POST is 403', async (t) => {
   let saves = 0;
-  const c = await start({ hooks: { onSavedChange: () => saves++ } });
+  const c = await start(t, { hooks: { onSavedChange: () => saves++ } });
   const r = await post(c, '/api/hide', { sessionId: 's1' }, { origin: 'http://evil.example' });
   assert.equal(r.status, 403);
   const noOrigin = await new Promise((resolve, reject) => {
@@ -79,11 +81,10 @@ test('server: cross-origin POST is 403', async () => {
   assert.equal(noOrigin, 403);
   assert.equal(c.office.snapshot().floors.length, 1);
   assert.equal(saves, 0);
-  await c.stop();
 });
 
-test('server: no CORS header on any response', async () => {
-  const c = await start();
+test('server: no CORS header on any response', async (t) => {
+  const c = await start(t);
   const rs = [
     await req(c, 'GET', '/health'),
     await req(c, 'GET', '/api/state'),
@@ -97,18 +98,17 @@ test('server: no CORS header on any response', async () => {
   for (const r of rs) {
     assert.deepEqual(Object.keys(r.headers).filter((k) => k.startsWith('access-control-')), []);
   }
-  await c.stop();
 });
 
-test('server: hide and rename persist across restart', async () => {
+test('server: hide and rename persist across restart', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'saved-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
   const cfg = loadConfig();
   let c;
   const hooks = { onSavedChange: () => saveSaved(dir, c.office.saved()) };
-  c = await start({ cfg, sessions: [S('s1'), S('s2', { startedAt: 2000 })], hooks });
+  c = await start(t, { cfg, sessions: [S('s1'), S('s2', { startedAt: 2000 })], hooks });
   assert.equal((await post(c, '/api/hide', { sessionId: 's1' })).status, 204);
   assert.equal((await post(c, '/api/rename', { sessionId: 's2', name: '내 층' })).status, 204);
-  await c.stop();
 
   const saved = loadSaved(dir);
   assert.deepEqual(saved.hidden, [{ sessionId: 's1', pid: 100, startedAt: 1000 }]);
@@ -119,11 +119,10 @@ test('server: hide and rename persist across restart', async () => {
   next.syncSessions([S('s1'), S('s2', { startedAt: 2000 })], 5000);
   const floors = next.snapshot().floors;
   assert.deepEqual(floors.map((f) => [f.sessionId, f.title]), [['s2', '내 층']]);
-  rmSync(dir, { recursive: true, force: true });
 });
 
-test('server: hide of unknown session is 404; rename with oversized body is 400', async () => {
-  const c = await start();
+test('server: hide of unknown session is 404; rename with oversized body is 400', async (t) => {
+  const c = await start(t);
   assert.equal((await post(c, '/api/hide', { sessionId: 'nope' })).status, 404);
   assert.equal((await post(c, '/api/hide', { sessionId: 5 })).status, 400);
   assert.equal((await req(c, 'POST', '/api/rename', { body: '{not json' })).status, 400);
@@ -131,11 +130,11 @@ test('server: hide of unknown session is 404; rename with oversized body is 400'
   const big = JSON.stringify({ sessionId: 's1', name: 'x'.repeat(2000) });
   assert.equal((await req(c, 'POST', '/api/rename', { body: big })).status, 400);
   assert.equal(c.office.snapshot().floors[0].title, 'Project');
-  await c.stop();
 });
 
-test('server: static path traversal is blocked', async () => {
+test('server: static path traversal is blocked', async (t) => {
   const root = mkdtempSync(join(tmpdir(), 'root-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(root, 'web'));
   mkdirSync(join(root, 'assets'));
   writeFileSync(join(root, 'config.json'), '{"secret":1}');
@@ -143,7 +142,7 @@ test('server: static path traversal is blocked', async () => {
   writeFileSync(join(root, 'web', 'log.html'), '<h1>log</h1>');
   writeFileSync(join(root, 'web', 'app.js'), 'export {}');
   writeFileSync(join(root, 'assets', 'a.png'), Buffer.from([0x89, 0x50]));
-  const c = await start({ cfg: { ...loadConfig(), root } });
+  const c = await start(t, { cfg: { ...loadConfig(), root } });
 
   for (const p of ['/web/../config.json', '/web/%2e%2e/config.json', '/web/..%5Cconfig.json', '/assets/../config.json', '/web/%00', '/web/%zz', '/web/', '/web']) {
     const r = await req(c, 'GET', p);
@@ -163,21 +162,18 @@ test('server: static path traversal is blocked', async () => {
   const png = await req(c, 'GET', '/assets/a.png');
   assert.equal(png.headers['content-type'], 'image/png');
   assert.equal(png.headers['cache-control'], 'max-age=3600');
-  await c.stop();
-  rmSync(root, { recursive: true, force: true });
 });
 
-test('server: / and /log are 404 when the page files do not exist', async () => {
+test('server: / and /log are 404 when the page files do not exist', async (t) => {
   const root = mkdtempSync(join(tmpdir(), 'root-'));
-  const c = await start({ cfg: { ...loadConfig(), root } });
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const c = await start(t, { cfg: { ...loadConfig(), root } });
   assert.equal((await req(c, 'GET', '/')).status, 404);
   assert.equal((await req(c, 'GET', '/log')).status, 404);
-  await c.stop();
-  rmSync(root, { recursive: true, force: true });
 });
 
-test('server: api/state and api/ui', async () => {
-  const c = await start();
+test('server: api/state and api/ui', async (t) => {
+  const c = await start(t);
   const state = JSON.parse((await req(c, 'GET', '/api/state')).body);
   assert.equal(state.floors.length, 1);
   assert.equal(state.floors[0].sessionId, 's1');
@@ -189,7 +185,6 @@ test('server: api/state and api/ui', async () => {
   assert.deepEqual(ui.roles.worker, { name: '서진', role: '개발' });
   assert.deepEqual(ui.roles.lead, { name: '유나', role: '팀장' });
   assert.deepEqual(ui.roles.default, { name: '나래', role: '지원' });
-  await c.stop();
 });
 
 /** Opens /api/events and collects the raw text; `until(text)` resolves the wait. */
@@ -214,8 +209,8 @@ const events = (text) =>
     return [ev.slice(7), JSON.parse(data.slice(6))];
   });
 
-test('server: SSE sends state then log on connect', async () => {
-  const c = await start();
+test('server: SSE sends state then log on connect', async (t) => {
+  const c = await start(t);
   c.office.syncAgents('s1', [], 1000);
   c.office.applySessionEvents('s1', [{ kind: 'tool', ts: 2000, toolUseId: 't1', name: 'Bash', text: '첫 작업' }, { kind: 'tool', ts: 3000, toolUseId: 't2', name: 'Bash', text: '둘째 작업' }], 3000);
   const r = await sse(c, (t) => t.includes('event: log'));
@@ -225,12 +220,11 @@ test('server: SSE sends state then log on connect', async () => {
   assert.deepEqual(evs.map((e) => e[0]), ['state', 'log']);
   assert.equal(evs[0][1].floors.length, 1);
   assert.deepEqual(evs[1][1].map((e) => e.text), ['첫 작업', '둘째 작업']); // oldest first
-  await c.stop();
 });
 
-test('server: SSE broadcasts state only on change, new log entries, and pings', async () => {
+test('server: SSE broadcasts state only on change, new log entries, and pings', async (t) => {
   const cfg = loadConfig({ server: { ssePingMs: 40 } });
-  const c = await start({ cfg });
+  const c = await start(t, { cfg });
   const got = sse(c, (t) => t.includes(': ping') && t.includes('새 작업'));
   await new Promise((r) => setTimeout(r, 20));
   c.server.broadcast(); // nothing changed since connect: no state event
@@ -241,12 +235,11 @@ test('server: SSE broadcasts state only on change, new log entries, and pings', 
   assert.deepEqual(evs.map((e) => e[0]), ['state', 'log', 'state', 'log']);
   assert.equal(evs[2][1].floors[0].lead.bubble, '새 작업');
   assert.deepEqual(evs[3][1].map((e) => e.text), ['새 작업']);
-  await c.stop();
 });
 
-test('server: closed SSE clients are dropped and stop() ends open streams', async () => {
-  const c = await start();
-  const done = sse(c, (t) => t.includes('event: log'));
+test('server: closed SSE clients are dropped and stop() ends open streams', async (t) => {
+  const c = await start(t);
+  const done = sse(c, (text) => text.includes('event: log'));
   await done;
   await new Promise((r) => setTimeout(r, 20));
   assert.equal(c.server.sseClients, 0);
@@ -259,9 +252,9 @@ test('server: closed SSE clients are dropped and stop() ends open streams', asyn
   await ended;
 });
 
-test('server: shutdown replies 204 then calls onShutdown', async () => {
+test('server: shutdown replies 204 then calls onShutdown', async (t) => {
   let called = 0;
-  const c = await start({ hooks: { onShutdown: () => called++ } });
+  const c = await start(t, { hooks: { onShutdown: () => called++ } });
   const r = await req(c, 'POST', '/api/shutdown', { body: '' });
   assert.equal(r.status, 204);
   await new Promise((r2) => setTimeout(r2, 20));
@@ -269,5 +262,22 @@ test('server: shutdown replies 204 then calls onShutdown', async () => {
   const bad = await req(c, 'POST', '/api/shutdown', { body: '', origin: 'http://evil.example' });
   assert.equal(bad.status, 403);
   assert.equal(called, 1);
-  await c.stop();
+});
+
+test('server: /api/events is refused on a connection that outlives server.close()', async (t) => {
+  const c = await start(t);
+  const sock = net.connect(c.port, '127.0.0.1');
+  t.after(() => sock.destroy());
+  await new Promise((r) => sock.once('connect', r));
+  sock.write(`GET /api/events HTTP/1.1\r\nHost: 127.0.0.1:${c.port}\r\n`); // request still being sent: not idle
+  await new Promise((r) => setTimeout(r, 20));
+  const closed = new Promise((r) => c.server.close(r));
+  const reply = new Promise((resolve) => {
+    let text = '';
+    sock.on('data', (d) => { text += d; if (text.includes('\r\n\r\n')) resolve(text); });
+  });
+  sock.write('\r\n');
+  assert.match(await reply, /^HTTP\/1\.1 503/);
+  sock.destroy();
+  await closed;
 });

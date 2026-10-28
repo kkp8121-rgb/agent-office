@@ -74,10 +74,9 @@ export function createServer(cfg, office, { onSavedChange, onShutdown } = {}) {
 
   // ---- security ----------------------------------------------------------------------------
 
-  const allowedHosts = () => {
-    const { port } = server.address();
-    return [`127.0.0.1:${port}`, `localhost:${port}`];
-  };
+  let port = 0; // remembered: server.address() is null once close() has been called
+  server.on('listening', () => { port = server.address().port; });
+  const allowedHosts = () => [`127.0.0.1:${port}`, `localhost:${port}`];
 
   // ---- SSE ---------------------------------------------------------------------------------
 
@@ -204,7 +203,9 @@ export function createServer(cfg, office, { onSavedChange, onShutdown } = {}) {
       case '/health': return sendJson(res, 200, { app: 'agent-office', pid: process.pid });
       case '/api/state': return sendJson(res, 200, office.snapshot());
       case '/api/ui': return sendJson(res, 200, uiConfig());
-      case '/api/events': return openEvents(res);
+      case '/api/events':
+        if (!server.listening) return sendText(res, 503, 'closing', { Connection: 'close' }); // shutting down: no new streams
+        return openEvents(res);
       case '/': return sendStatic(res, 'web', 'index.html');
       case '/log': return sendStatic(res, 'web', 'log.html');
       default:
