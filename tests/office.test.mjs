@@ -97,7 +97,7 @@ test('office: unknown agentType uses 나래·지원', () => {
 });
 
 test('office: desks fill first, then aisle, then overflow index', () => {
-  const L = cfg.layouts.studio;
+  const L = cfg.layouts[cfg.designOrder[0]];
   const total = L.desks.length + L.aisle.length;
   const o = setup();
   const metas = Array.from({ length: total + 2 }, (_, i) => M(`a${i}`));

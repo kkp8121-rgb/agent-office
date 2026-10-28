@@ -1,0 +1,9 @@
+{
+  "common": "isometric 2:1, true pixel art 16-bit cozy game, strict pixel grid, clean 1-pixel outlines, flat 2-3 tone shading, no anti-aliasing; room EMPTY of people; no text, no letters. A wide landscape isometric office floor cutaway (about 16:9, wider than tall) on a plain solid single-color background. Include 10 to 12 empty desks each with a monitor and a chair, arranged in two or more rows with generous aisles between them so a small character can stand in front of each chair; a small table with an inbox tray at the front center (team leader seat); a door (entrance); a blank whiteboard on a wall; a sofa lounge area; and many props: lamps, rugs, bookshelves, potted plants, window views, wall decorations.",
+  "designs": {
+    "studio2": "Bright light-wood development studio, cream walls, sunny windows with city view, green rugs, many plants.",
+    "lounge": "Cafe-style lounge office, natural wood and terracotta tones, a bar table with stools, warm pendant lights, coffee machine corner.",
+    "library": "Study-style library office, dark wood bookshelf walls, desk lamps and standing lamps, deep red and green rugs, warm lighting, a ladder and globe.",
+    "greenhouse": "Glass-ceiling greenhouse office, white iron frame, skylight sunlight, lots of plants and hanging vines, light wood floor, garden outside the glass walls."
+  }
+}
