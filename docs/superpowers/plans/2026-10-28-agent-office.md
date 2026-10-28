@@ -88,14 +88,15 @@ agent-office/
  *          | {kind:'title', ts:number, title:string}
  *          | {kind:'workflowLaunch', ts:number, runId:string, workflowName:string, scriptPath:string}} Ev */
 // server/sessions.mjs
-/** @typedef {{pid:number, sessionId:string, cwd:string, status:string, name:string, startedAt:number}} Session */
+/** @typedef {{provider:'claude'|'codex', pid:number, sessionId:string, cwd:string, status:string, name:string, startedAt:number}} Session */
+// provider: Task 3 의 Claude 세션은 항상 'claude'. 'codex' 는 Task 11(Codex 대응)이 만든다. Office 는 provider 를 FloorView 에 그대로 싣는다.
 // server/agents.mjs
 /** @typedef {{agentId:string, agentType:string, description:string, finished:boolean, transcriptPath:string, mtimeMs:number,
  *             workflow: null | {runId:string, phase:string, label:string}}} AgentMeta */
 // server/office.mjs — 브라우저로 나가는 모양
 /** @typedef {{key:string, agentId:string, name:string, role:string, sprite:string, slot:{x:number,y:number,i:number},
  *             state:'enter'|'working'|'thinking'|'done'|'stale', bubble:string, since:number}} AgentView */
-/** @typedef {{sessionId:string, floorNo:number, design:string, title:string, autoTitle:string, folder:string, status:'busy'|'waiting'|'leaving',
+/** @typedef {{sessionId:string, provider:'claude'|'codex', floorNo:number, design:string, title:string, autoTitle:string, folder:string, status:'busy'|'waiting'|'leaving',
  *             lead:{name:string, role:string, sprite:string, state:string, bubble:string},
  *             board:{title:string, line:string}, reports:number, agents:AgentView[]}} FloorView */
 /** @typedef {{floors:FloorView[], now:number}} State */
