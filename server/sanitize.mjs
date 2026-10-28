@@ -14,14 +14,21 @@ function baseName(p) {
 
 export function firstWord(command) {
   let rest = String(command ?? '').trim();
-  const re = /^(?:"([^"]*)"|'([^']*)'|(\S+))\s*/;
+  // A quoted token must end at a blank: `"A=1"SECRET` is one word to the shell, not an assignment and a command.
+  const re = /^(?:"([^"]*)"|'([^']*)'|(\S+))(?:(\s+)|$)/;
   for (;;) {
     const m = rest.match(re);
     if (!m) return '';
     rest = rest.slice(m[0].length);
     const token = m[1] ?? m[2] ?? m[3];
-    if (/^[A-Za-z_]\w*=.*["'`\\$(]/.test(token)) return ''; // quoted, escaped or substituted value: not parsed, so no word of it can leak
-    if (/^[A-Za-z_]\w*=/.test(token)) continue; // leading NAME=value assignment
+    if (/^[A-Za-z_]\w*=/.test(token)) {
+      // Skip a leading NAME=value only when it is unquoted, the whole value is plain and spaces or tabs follow (bash
+      // splits on nothing else: NBSP, \f or U+3000 keep the next text in the value, a line break starts a new command).
+      // Any other value (quotes, escapes, $( ), ; | & < > ...) or a quoted 'A=1' (the command word, not an assignment)
+      // is not parsed, so no word after it can leak.
+      if (m[3] === undefined || !/^[A-Za-z_]\w*=[\w./:@%+,-]*$/.test(token) || !/^[ \t]*$/.test(m[4] ?? '')) return '';
+      continue;
+    }
     if (token.includes('://')) return '';
     const word = baseName(token).replace(/\.(exe|cmd|bat|ps1)$/i, '');
     return /^[\w.+-]+$/.test(word) ? word : '';

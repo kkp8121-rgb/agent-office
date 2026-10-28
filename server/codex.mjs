@@ -6,13 +6,13 @@ import { lstat, open, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { FileTail } from './tail.mjs';
 import { clip, firstWord, MAX_LEN } from './sanitize.mjs';
+import { isSafeId } from './sessions.mjs';
 
 /** @typedef {import('./parse.mjs').Ev} Ev */
 /** @typedef {import('./sessions.mjs').Session} Session */
 /** @typedef {import('./agents.mjs').AgentMeta} AgentMeta */
 
 const ROLLOUT_NAME = /^rollout-[\w.-]+\.jsonl$/; // also excludes the old .jsonl.zst files
-const SAFE_ID = /^[\w.-]+$/;
 
 const isObj = (v) => typeof v === 'object' && v !== null;
 const timeOf = (v) => (typeof v === 'string' ? Date.parse(v) || 0 : 0);
@@ -35,7 +35,7 @@ export function parseCodexMeta(text, cwdMax) {
   }
   if (!isObj(o) || o.type !== 'session_meta' || !isObj(o.payload)) return null;
   const p = o.payload;
-  if (typeof p.id !== 'string' || !SAFE_ID.test(p.id)) return null;
+  if (!isSafeId(p.id)) return null;
 
   const sub = isObj(p.source) && isObj(p.source.subagent) ? p.source.subagent : null;
   const spawn = sub && isObj(sub.thread_spawn) ? sub.thread_spawn : {};
@@ -45,7 +45,7 @@ export function parseCodexMeta(text, cwdMax) {
     id: p.id,
     cwd: typeof p.cwd === 'string' ? clip(p.cwd, cwdMax) : '',
     kind: sub ? 'subagent' : exec ? 'exec' : 'interactive',
-    parentId: typeof spawn.parent_thread_id === 'string' && SAFE_ID.test(spawn.parent_thread_id) ? spawn.parent_thread_id : null,
+    parentId: isSafeId(spawn.parent_thread_id) ? spawn.parent_thread_id : null,
     agentRole: typeof spawn.agent_role === 'string' && spawn.agent_role ? clip(spawn.agent_role, MAX_LEN) : null,
     taskName: clip(path.replace(/_/g, ' '), MAX_LEN),
     startedAt: timeOf(p.timestamp) || timeOf(o.timestamp),
@@ -54,27 +54,59 @@ export function parseCodexMeta(text, cwdMax) {
 
 // ---- lines -----------------------------------------------------------------------------------
 
-const CMD_OPEN = /\bcmd:\s*(["'`])/;
+const EXEC_CALL = /tools\s*\.\s*exec_command\s*\(/y;
+const CMD_KEY = /\s*\{\s*(?:cmd|"cmd"|'cmd')\s*:\s*(?=["'`])/y;
 const JS_ESCAPES = { n: '\n', t: '\t', r: '\r' };
 
+/** The string literal starting at `src[i]` -> {value, end}, or null if unterminated, `\u`/`\x`-escaped or a template with `${`. */
+function readLiteral(src, i) {
+  const q = src[i];
+  let value = '';
+  for (let j = i + 1; j < src.length; j++) {
+    const c = src[j];
+    if (c === q) return { value, end: j + 1 };
+    if (q === '`' && c === '$' && src[j + 1] === '{') return null;
+    if (c === '\\') {
+      j++;
+      if (j >= src.length || src[j] === 'u' || src[j] === 'x') return null;
+      value += JS_ESCAPES[src[j]] ?? src[j];
+    } else {
+      value += c;
+    }
+  }
+  return null;
+}
+
 /**
- * `input` of an exec call is JS source like `await tools.exec_command({cmd:"git status"})`. Only the value of the
- * FIRST `cmd:` literal is taken (unescaped up to its closing quote); text after it is never scanned, so a
- * `cmd:` inside the command body cannot be picked up. Unterminated or missing: ''.
+ * `input` of an exec call is JS source like `const r = await tools.exec_command({cmd:"git status"})`. The source is
+ * walked as code: comments and string literals are skipped, so a `cmd:` or a call written inside them is never
+ * picked up. The FIRST `tools.exec_command(` call in code decides: its argument must open with a `cmd` key whose value
+ * is a string literal, and that literal is returned. Anything else (a variable, an array, another first key, a
+ * `/` that may start a regex literal before the call, unterminated text): ''.
  */
 function cmdFromInput(input) {
-  const m = typeof input === 'string' ? CMD_OPEN.exec(input) : null;
-  if (!m) return '';
-  let out = '';
-  for (let i = m.index + m[0].length; i < input.length; i++) {
+  if (typeof input !== 'string') return '';
+  for (let i = 0; i < input.length; i++) {
     const c = input[i];
-    if (c === m[1]) return out;
-    if (c === '\\') {
-      i++;
-      if (i >= input.length) return '';
-      out += JS_ESCAPES[input[i]] ?? input[i];
-    } else {
-      out += c;
+    if (c === '"' || c === "'" || c === '`') {
+      const lit = readLiteral(input, i);
+      if (!lit) return '';
+      i = lit.end - 1;
+    } else if (c === '/') {
+      if (input[i + 1] === '/') i = input.indexOf('\n', i) === -1 ? input.length : input.indexOf('\n', i);
+      else if (input[i + 1] === '*') {
+        const close = input.indexOf('*/', i + 2);
+        if (close === -1) return '';
+        i = close + 1;
+      } else return ''; // division or regex literal: cannot tell them apart, so do not guess where code resumes
+    } else if (input.startsWith('<!--', i) || input.startsWith('-->', i)) {
+      return ''; // Annex B HTML-like comment: the engine may skip the rest of the line, so do not guess
+    } else if (c === 't' && !/[\w$.]|[^\x00-\x7f]/.test(input[i - 1] ?? '')) {
+      EXEC_CALL.lastIndex = i;
+      if (!EXEC_CALL.test(input)) continue;
+      CMD_KEY.lastIndex = EXEC_CALL.lastIndex;
+      if (!CMD_KEY.test(input)) return '';
+      return readLiteral(input, CMD_KEY.lastIndex)?.value ?? '';
     }
   }
   return '';
@@ -218,6 +250,9 @@ export class CodexSource {
   /** Total rollout bytes read so far (lets tests prove that an idle poll reads nothing). */
   bytesRead = 0;
 
+  /** Rollout size checks so far (lets tests prove that a quiet rollout is not stat-ed between scan ticks). */
+  statCount = 0;
+
   /** Number of open FileTails (finished, unlisted rollouts hold none). */
   get tailCount() {
     let n = 0;
@@ -239,9 +274,12 @@ export class CodexSource {
   async poll(now) {
     const { codex, agentScanEveryTicks } = this.#cfg;
     if (!codex?.enabled || !this.#cfg.codexHome) return this.#empty();
-    // Directory listings only on scan ticks; every other tick is one stat per watched rollout.
-    if (this.#tickNo++ % agentScanEveryTicks === 0) await this.#scan(now);
+    // Directory listings only on scan ticks. Every other tick is one stat per listed rollout: a quiet one (not listed
+    // at the last poll) is size-checked on scan ticks only.
+    const scan = this.#tickNo++ % agentScanEveryTicks === 0;
+    if (scan) await this.#scan(now);
     for (const rec of this.#recs.values()) {
+      if (!scan && !rec.hot) continue;
       try {
         await this.#read(rec, now);
       } catch {
@@ -276,7 +314,7 @@ export class CodexSource {
       if (!this.#recs.has(path)) {
         this.#recs.set(path, {
           path, size: -1, meta: null, ignored: false, tail: null, resumeAt: 0,
-          turn: 'none', lastTs: 0, activeFrom: null, titleSent: false, pending: [],
+          turn: 'none', lastTs: 0, activeFrom: null, titleSent: false, pending: [], hot: false, gaps: null, busy: null,
         });
       }
     }
@@ -285,6 +323,7 @@ export class CodexSource {
 
   async #read(rec, now) {
     if (rec.ignored) return;
+    this.statCount++;
     const st = await lstat(rec.path);
     if (!st.isFile()) return;
     const { size } = st;
@@ -297,23 +336,46 @@ export class CodexSource {
     const lines = await rec.tail.poll();
     this.bytesRead += rec.tail.offset >= before ? rec.tail.offset - before : rec.tail.offset;
     rec.size = size;
-    // On the first batch (server start) the period began after the last silence longer than the keep time,
-    // exactly where it would have begun had the server been running all along.
+    // On the first batch (server start) the period began after the last silence longer than the keep time during
+    // which the floor would have been unlisted, exactly where it would have begun had the server been running all
+    // along. Whether a sub-agent kept it listed is only known once every rollout is read, so the silences (`gaps`)
+    // and the spans in which this rollout counted as unfinished (`busy`) are kept for #assemble to settle.
     const keepMs = this.#keepMs(rec);
+    const { abandonMs } = this.#cfg.agent;
     const first = rec.lastTs === 0;
     // A window that starts mid-file cannot see where the period began: default to the session start, so the value
     // does not depend on how big the file is (a hidden floor's record must still match after a restart).
     if (first && rec.meta.startedAt > 0) rec.activeFrom = rec.meta.startedAt;
+    const gaps = [];
+    const busy = [];
+    let openFrom = null;
     let prev = 0;
     for (const text of lines) {
       const e = parseEntry(text);
       if (!e) continue;
       const ts = e.ts > 0 ? e.ts : now;
-      if (rec.activeFrom === null || (first && prev > 0 && ts - prev > keepMs)) rec.activeFrom = ts;
+      if (rec.activeFrom === null) rec.activeFrom = ts;
+      if (e.turn) rec.turn = e.turn;
+      if (first) {
+        if (prev > 0 && ts - prev > keepMs) gaps.push([prev, ts]);
+        if (openFrom !== null && ts - prev > abandonMs) {
+          busy.push([openFrom, prev + abandonMs]); // counted as abandoned in between
+          openFrom = null;
+        }
+        if (rec.turn !== 'end') openFrom ??= ts;
+        else if (openFrom !== null) {
+          busy.push([openFrom, ts]);
+          openFrom = null;
+        }
+      }
       prev = ts;
       rec.lastTs = Math.max(rec.lastTs, ts);
-      if (e.turn) rec.turn = e.turn;
       rec.pending.push(...e.evs);
+    }
+    if (first) {
+      if (openFrom !== null) busy.push([openFrom, prev + abandonMs]);
+      rec.gaps = gaps;
+      rec.busy = busy;
     }
   }
 
@@ -370,6 +432,19 @@ export class CodexSource {
     }
     const finished = (rec) => rec.turn === 'end' || rec.lastTs < abandonedBefore;
 
+    // First batch of a top-level rollout: a silence longer than the keep time started a new period only if some
+    // moment of it was not covered by an unfinished sub-agent (only then would the floor have been unlisted).
+    for (const rec of byId.values()) {
+      if (rec.meta.kind === 'subagent' || !rec.gaps) continue;
+      const spans = (kids.get(rec) ?? []).flatMap((k) => k.busy ?? []).sort((a, b) => a[0] - b[0]);
+      const keepMs = this.#keepMs(rec);
+      for (const [from, to] of rec.gaps) {
+        let reach = from + keepMs; // the floor would have left here unless a sub-agent was unfinished
+        for (const [s, e] of spans) if (s <= reach) reach = Math.max(reach, e);
+        if (reach < to) rec.activeFrom = to;
+      }
+    }
+
     const listedRecs = new Set();
     for (const rec of byId.values()) {
       if (rec.meta.kind === 'subagent') continue;
@@ -414,6 +489,8 @@ export class CodexSource {
     // Events are delivered once: whatever was read for unlisted files is dropped, as a Claude tail would drop it.
     for (const rec of this.#recs.values()) {
       rec.pending = [];
+      rec.gaps = rec.busy = null;
+      rec.hot = listedRecs.has(rec) || (!rec.meta && !rec.ignored); // a first line still being written stays watched
       // A finished rollout that is not listed holds no FileTail (64 KB buffer); it resumes from its line offset.
       if (rec.tail?.resumable && rec.meta && !listedRecs.has(rec) && finished(rec)) {
         rec.resumeAt = rec.tail.lineStart;
