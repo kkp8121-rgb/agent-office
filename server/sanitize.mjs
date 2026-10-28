@@ -1,7 +1,11 @@
 // Privacy filter: turns a tool call into a short label. Never exposes full commands,
 // search patterns, paths beyond the basename, or file contents.
 
-export const MAX_LEN = 80;
+import config from '../config.json' with { type: 'json' };
+
+// Text clip for bubbles, log rows and every other short label: log.headMaxChars is the single source.
+// Read once at load from config.json; loadConfig() overrides do not reach it (no caller passes one).
+export const MAX_LEN = config.log.headMaxChars;
 
 export function clip(s, n) {
   const chars = Array.from(String(s));

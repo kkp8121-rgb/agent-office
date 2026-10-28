@@ -1,9 +1,10 @@
 // Turns one transcript JSONL line into privacy-safe events. Transcript lines are untrusted:
 // this never throws and never copies prompts, answers, thinking or tool results.
 import { describeTool, clip, MAX_LEN } from './sanitize.mjs';
+import config from '../config.json' with { type: 'json' };
 
-const NAME_MAX = 200; // title, run id, workflow name
-const PATH_MAX = 1024; // scriptPath is only read from, never shown: a longer one is dropped, not clipped
+const NAME_MAX = config.parse.nameMaxChars; // title, run id, workflow name
+const PATH_MAX = config.parse.pathMaxChars; // scriptPath is only read from, never shown: a longer one is dropped, not clipped
 
 const isObj = (v) => typeof v === 'object' && v !== null;
 const str = (v, n) => (typeof v === 'string' ? clip(v, n) : '');
