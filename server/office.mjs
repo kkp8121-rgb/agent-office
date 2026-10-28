@@ -233,6 +233,25 @@ export class Office {
     f.agents.delete(a.agentId);
     f.usedNames.delete(a.name);
     f.usedSlots.delete(a.slot.i);
+    this.#reseat(f);
+  }
+
+  /**
+   * A free desk goes to the agent that has waited longest (arrival order = insertion order of `f.agents`) on an idle or
+   * overflow slot; its old index is released. Agents that are done or stale are not offered a desk (a stale one is
+   * probably gone, and it competes again as soon as it works again).
+   */
+  #reseat(f) {
+    const r = this.#sceneOf(f.design);
+    for (const a of f.agents.values()) {
+      let i = 0;
+      while (i < r.seats.length && f.usedSlots.has(i)) i++;
+      if (i === r.seats.length) return; // every desk is taken
+      if (a.slot.kind === 'seat' || a.state === 'done' || a.state === 'stale') continue;
+      f.usedSlots.delete(a.slot.i);
+      f.usedSlots.add(i);
+      a.slot = this.#seatSlot(r, i);
+    }
   }
 
   // ---- events ------------------------------------------------------------------------------
@@ -259,6 +278,7 @@ export class Office {
     const a = f?.agents.get(agentId);
     if (!a) return;
     for (const ev of evs) this.#actorEvent(f, a, ev, now, false, opts.logSince);
+    this.#reseat(f); // a stale agent that works again may find a free desk
   }
 
   #setState(actor, state, bubble, now) {
@@ -299,10 +319,11 @@ export class Office {
     this.now = now;
     const f = this.floors.get(sessionId);
     if (!f) return;
+    const fresh = [];
     for (const m of metas) {
       const a = f.agents.get(m.agentId);
       if (!a) {
-        if (!m.finished && !m.abandoned) this.#enterAgent(f, m, now);
+        if (!m.finished && !m.abandoned) fresh.push(m);
       } else if (m.abandoned && !m.finished && a.state !== 'done') {
         this.#logDone(f, a, now, LOG_ABANDONED); // gone silent: released without a report
         this.#releaseAgent(f, a);
@@ -315,6 +336,7 @@ export class Office {
         this.#logDone(f, a, now);
       }
     }
+    for (const m of fresh) this.#enterAgent(f, m, now); // after the releases, so a freed desk goes to a waiter first
   }
 
   #enterAgent(f, m, now) {
@@ -374,15 +396,18 @@ export class Office {
     return this.resolved.get(design);
   }
 
+  #seatSlot(r, i) {
+    const seat = r.seats[i];
+    // ref is the seat number, not the desk id: ids like "desk-1" contain "sk-" and the privacy guard bans that text in /api/state
+    return { i, kind: 'seat', ref: String(seat.i), x: seat.at[0], y: seat.at[1], approach: seat.approach, sit: seat.sitAt, face: seat.face, ring: 0 };
+  }
+
   /** Smallest free index over [...seats, ...idle, ...overflow]; past the last overflow point it laps with `ring` + 1 (the spot is searched on open floor). */
   #allocSceneSlot(f, r) {
     let i = 0;
     while (f.usedSlots.has(i)) i++;
     f.usedSlots.add(i);
-    const seat = r.seats[i];
-    if (seat) { // ref is the seat number, not the desk id: ids like "desk-1" contain "sk-" and the privacy guard bans that text in /api/state
-      return { i, kind: 'seat', ref: String(seat.i), x: seat.at[0], y: seat.at[1], approach: seat.approach, sit: seat.sitAt, face: seat.face, ring: 0 };
-    }
+    if (r.seats[i]) return this.#seatSlot(r, i);
     const k = i - r.seats.length;
     if (k < r.idle.length) {
       const p = r.idle[k];

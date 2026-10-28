@@ -115,12 +115,13 @@ test('office: seats fill first, then idle spots, then overflow index', () => {
   // overflow no longer stacks: every point is its own (details in office-scene.test.mjs)
   assert.deepEqual([slots[total].kind, slots[total].i], ['overflow', total]);
   assert.notDeepEqual([slots[total].x, slots[total].y], [slots[total + 1].x, slots[total + 1].y]);
-  // freed desk 0 is reused by the next newcomer
+  // freed desk 0 goes to the longest-waiting agent; the next newcomer gets that agent's old standing slot
   o.syncAgents('s1', metas.map((m, i) => (i === 0 ? { ...m, finished: true } : m)), 2000);
   o.tick(2000 + cfg.agent.doneLingerMs);
   o.syncAgents('s1', [{ ...metas[0], finished: true }, ...metas.slice(1), M('late')], 30000);
   const late = floorOf(o, 's1').agents.find((a) => a.agentId === 'late');
-  assert.equal(late.slot.i, 0);
+  assert.equal(floorOf(o, 's1').agents.find((a) => a.agentId === `a${r.seats.length}`).slot.i, 0);
+  assert.equal(late.slot.i, r.seats.length);
 });
 
 test('office: floors get designs in rotation and keep them', () => {

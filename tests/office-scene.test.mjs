@@ -50,7 +50,7 @@ test('office-scene: seat slot carries approach, sit and face', () => {
 
 test('office-scene: freed seat is reused', () => {
   const o = setup();
-  const metas = Array.from({ length: 6 }, (_, i) => M(`a${i}`));
+  const metas = Array.from({ length: 4 }, (_, i) => M(`a${i}`)); // nobody waits, so the freed desk stays open for the newcomer
   o.syncAgents('s1', metas, 1000);
   o.syncAgents('s1', metas.map((m, i) => (i === 1 ? { ...m, finished: true } : m)), 2000);
   o.tick(2000 + o.cfg.agent.doneLingerMs);
