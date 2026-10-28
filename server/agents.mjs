@@ -88,7 +88,7 @@ export async function listAgents(sessionDir, cache, readFile = fsReadFile, dirTr
   const wfRoot = join(root, 'workflows');
   for (const run of await names(wfRoot, (n) => n.startsWith('wf_'), cache, dirTrustMs)) {
     const dir = join(wfRoot, run);
-    const frozen = cache.get(`run:${dir}`);
+    const frozen = cache.get(join(dir, 'run'));
     if (frozen) {
       out.push(...frozen);
       continue;
@@ -105,7 +105,7 @@ export async function listAgents(sessionDir, cache, readFile = fsReadFile, dirTr
     const lastActive = Math.max(listing?.mtimeMs ?? 0, ...metas.map((m) => m.mtimeMs));
     const quiet = listing?.trusted && Date.now() - lastActive >= runSettleMs;
     if (quiet && metas.length === files.length && files.length > 0 && files.every((n) => cache.get(join(dir, n))?.settled)) {
-      cache.set(`run:${dir}`, metas);
+      cache.set(join(dir, 'run'), metas);
     }
   }
   return out;

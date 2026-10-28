@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync, readdirSync 
 import fsp from 'node:fs/promises';
 import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { loadConfig } from '../server/config.mjs';
 import { Office } from '../server/office.mjs';
 import { Poller } from '../server/poller.mjs';
@@ -173,4 +173,13 @@ test('F10/F12: a run freezes once its metas, not only its folder, have been quie
   fs.reset();
   await listAgents(sd, cache, undefined, 2000, window);
   assert.equal(fs.under('wf_old0'), 0);
+});
+
+test('a frozen run is cached under the session dir, so Poller.#dropState releases it with the session', async (t) => {
+  const { sd } = history(t, 3, 2);
+  const cache = new Map();
+  for (let i = 0; i < 3; i++) await listAgents(sd, cache, undefined, 2000);
+  const frozen = [...cache.keys()].filter((k) => k.endsWith(sep + 'run'));
+  assert.equal(frozen.length, 3, 'every settled run is frozen');
+  assert.ok([...cache.keys()].every((k) => k.startsWith(sd + sep)),'no key outside the session dir (e.g. a run: prefix)');
 });
