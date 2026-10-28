@@ -137,3 +137,21 @@ test('workflows: phases from script', () => {
   assert.deepEqual(phasesFromScript(s), ['Review', 'Verify']);
   assert.deepEqual(phasesFromScript('const a = 1;'), []);
 });
+
+test('sessions: path-like sessionId is rejected', async () => {
+  const h = home();
+  mkdirSync(join(h.dir, 'sessions'));
+  writeFileSync(
+    join(h.dir, 'sessions', 'evil.json'),
+    JSON.stringify({ pid: process.pid, sessionId: '../x', cwd: '', status: '', name: '', startedAt: 1 }),
+  );
+  assert.deepEqual(await listLiveSessions(h.dir), []);
+  assert.equal(await findSessionPaths(h.dir, '../x'), null);
+  h.done();
+});
+
+test('sessions: pid 0 and negative are not alive', () => {
+  assert.equal(isPidAlive(0), false);
+  assert.equal(isPidAlive(-1), false);
+  assert.equal(isPidAlive(1.5), false);
+});

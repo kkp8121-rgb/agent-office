@@ -5,6 +5,7 @@ import { join } from 'node:path';
 /** @typedef {{provider:'claude'|'codex', pid:number, sessionId:string, cwd:string, status:string, name:string, startedAt:number}} Session */
 
 export function isPidAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;
@@ -12,6 +13,9 @@ export function isPidAlive(pid) {
     return e?.code === 'EPERM';
   }
 }
+
+// Ids become path segments, so only plain names are accepted.
+const isSafeId = (id) => typeof id === 'string' && /^[\w.-]+$/.test(id) && id !== '.' && !id.includes('..');
 
 const str = (v) => (typeof v === 'string' ? v : '');
 
@@ -33,7 +37,7 @@ export async function listLiveSessions(claudeHome) {
       continue;
     }
     if (!j || typeof j !== 'object') continue;
-    if (!Number.isInteger(j.pid) || typeof j.sessionId !== 'string' || !j.sessionId) continue;
+    if (!Number.isInteger(j.pid) || !isSafeId(j.sessionId)) continue;
     if (typeof j.startedAt !== 'number' || !Number.isFinite(j.startedAt)) continue; // no usable start time: skip
     if (!isPidAlive(j.pid)) continue;
     out.push({
@@ -53,6 +57,7 @@ const pathCache = new Map();
 
 /** Finds projects/<any>/<sessionId>.jsonl; hits are remembered, misses are searched again next call. */
 export async function findSessionPaths(claudeHome, sessionId) {
+  if (!isSafeId(sessionId)) return null;
   const key = `${claudeHome}|${sessionId}`;
   if (pathCache.has(key)) return pathCache.get(key);
   let projects;
