@@ -4,6 +4,7 @@ import http from 'node:http';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { extname, isAbsolute, join, relative, resolve } from 'node:path';
+import { isSafeId } from './sessions.mjs';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -158,6 +159,22 @@ export function createServer(cfg, office, { onSavedChange, onShutdown } = {}) {
 
   const isVisible = (sessionId) => office.snapshot().floors.some((f) => f.sessionId === sessionId);
 
+  /** Newest first. `session` must be a safe id (400 otherwise); `limit` falls back to log.pageLimit and is clamped to [1, log.cap]. */
+  function sendLog(res, query) {
+    const params = new URLSearchParams(query);
+    const filter = {};
+    if (params.has('session')) {
+      const sid = params.get('session');
+      if (!isSafeId(sid)) return sendText(res, 400, 'bad request');
+      filter.sessionId = sid;
+    }
+    if (params.has('name')) filter.name = params.get('name');
+    const asked = Number(params.get('limit'));
+    const limit = params.get('limit') === null || params.get('limit') === '' || !Number.isFinite(asked) ? cfg.log.pageLimit : Math.trunc(asked);
+    filter.limit = Math.min(Math.max(limit, 1), cfg.log.cap);
+    return sendJson(res, 200, office.queryLog(filter));
+  }
+
   async function handlePost(path, body, res) {
     if (path === '/api/shutdown') {
       res.writeHead(204, { Connection: 'close' });
@@ -189,7 +206,8 @@ export function createServer(cfg, office, { onSavedChange, onShutdown } = {}) {
   async function handle(req, res) {
     if (!allowedHosts().includes(String(req.headers.host).toLowerCase())) return sendText(res, 403, 'forbidden');
     const q = req.url.indexOf('?');
-    const path = q === -1 ? req.url : req.url.slice(0, q); // not URL-normalized: traversal is checked on the file path
+    const path = q === -1 ? req.url : req.url.slice(0, q);
+    const query = q === -1 ? '' : req.url.slice(q + 1); // not URL-normalized: traversal is checked on the file path
 
     if (req.method === 'POST') {
       const origin = String(req.headers.origin ?? '').toLowerCase();
@@ -203,6 +221,7 @@ export function createServer(cfg, office, { onSavedChange, onShutdown } = {}) {
     switch (path) {
       case '/health': return sendJson(res, 200, { app: 'agent-office', pid: process.pid });
       case '/api/state': return sendJson(res, 200, office.snapshot());
+      case '/api/log': return sendLog(res, query);
       case '/api/ui': return sendJson(res, 200, uiConfig());
       case '/api/events':
         if (!server.listening) return sendText(res, 503, 'closing', { Connection: 'close' }); // shutting down: no new streams

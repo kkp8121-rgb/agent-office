@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>전체 기록 · 에이전트 사무실</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/web/style.css">
+</head>
+<body class="logpage">
+<main id="logmain">
+  <header id="logbar">
+    <h1>전체 기록</h1>
+    <label>세션 <select id="fsession"><option value="">전체</option></select></label>
+    <label>이름 <select id="fname"><option value="">전체</option></select></label>
+    <button id="refresh" type="button" class="mini">새로 고침</button>
+    <a href="/" class="back">← 사무실</a>
+  </header>
+  <div id="logmeta"></div>
+  <div id="log"></div>
+</main>
+<script src="/web/logrow.js"></script>
+<script src="/web/log.js"></script>
+</body>
+</html>

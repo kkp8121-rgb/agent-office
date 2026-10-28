@@ -282,3 +282,47 @@ test('server: /api/events is refused on a connection that outlives server.close(
   sock.destroy();
   await closed;
 });
+
+function logCtx(t, extra = {}) {
+  return start(t, { sessions: [S('s1'), S('s2', { startedAt: 2000 })], ...extra }).then((c) => {
+    c.office.syncAgents('s1', [], 1000);
+    c.office.syncAgents('s2', [], 1000);
+    c.office.applySessionEvents('s1', [{ kind: 'tool', ts: 2000, toolUseId: 't1', name: 'Bash', text: '에스원 작업' }], 2000);
+    c.office.applySessionEvents('s2', [{ kind: 'tool', ts: 3000, toolUseId: 't2', name: 'Bash', text: '에스투 작업' }], 3000);
+    return c;
+  });
+}
+
+test('server: /api/log filters by session and excludes hidden', async (t) => {
+  const c = await logCtx(t);
+  const all = JSON.parse((await req(c, 'GET', '/api/log')).body);
+  assert.deepEqual(all.map((e) => e.text), ['에스투 작업', '에스원 작업']); // newest first
+  const one = JSON.parse((await req(c, 'GET', '/api/log?session=s1')).body);
+  assert.deepEqual(one.map((e) => e.text), ['에스원 작업']);
+  const name = one[0].name;
+  assert.equal(JSON.parse((await req(c, 'GET', `/api/log?name=${encodeURIComponent(name)}`)).body).length >= 1, true);
+  assert.deepEqual(JSON.parse((await req(c, 'GET', '/api/log?name=%EC%97%86%EC%9D%8C')).body), []);
+  assert.equal((await req(c, 'GET', '/api/log', { host: 'evil.test' })).status, 403);
+  await post(c, '/api/hide', { sessionId: 's1' });
+  assert.deepEqual(JSON.parse((await req(c, 'GET', '/api/log')).body).map((e) => e.text), ['에스투 작업']);
+  assert.deepEqual(JSON.parse((await req(c, 'GET', '/api/log?session=s1')).body), []);
+});
+
+test('server: /api/log rejects bad session id', async (t) => {
+  const c = await logCtx(t);
+  for (const bad of ['..', 'a%2Fb', 'a%20b', '%00', '.', '']) {
+    assert.equal((await req(c, 'GET', `/api/log?session=${bad}`)).status, 400, bad);
+  }
+});
+
+test('server: /api/log clamps limit', async (t) => {
+  const cfg = loadConfig({ log: { pageLimit: 1 } });
+  const c = await logCtx(t, { cfg });
+  const n = async (q) => JSON.parse((await req(c, 'GET', `/api/log${q}`)).body).length;
+  assert.equal(await n(''), 1); // default = log.pageLimit
+  assert.equal(await n('?limit=abc'), 1);
+  assert.equal(await n('?limit=0'), 1); // clamped up to 1
+  assert.equal(await n('?limit=-5'), 1);
+  assert.equal(await n('?limit=2'), 2);
+  assert.equal(await n('?limit=999999'), 2); // all there is, capped by log.cap
+});

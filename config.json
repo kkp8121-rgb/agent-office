@@ -3,7 +3,7 @@
   "pollMs": 1500,
   "agentScanEveryTicks": 2,
   "tail": { "startBytes": 262144, "chunkBytes": 65536, "maxLineBytes": 4194304 },
-  "log": { "cap": 2000, "backfillMinutes": 30, "mergeWindowMs": 20000, "sendCap": 200, "headMaxChars": 80 },
+  "log": { "cap": 2000, "backfillMinutes": 30, "mergeWindowMs": 20000, "sendCap": 200, "pageLimit": 500, "headMaxChars": 80 },
   "agent": { "doneLingerMs": 5400, "staleMs": 600000, "bubbleShowMs": 8000, "abandonMs": 1800000 },
   "floor": { "leaveMs": 5000, "nameMaxChars": 30, "missTicks": 2 },
   "workflow": { "scriptHeadBytes": 65536 },

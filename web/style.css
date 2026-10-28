@@ -165,3 +165,12 @@ body.paused *, body.paused *::before, body.paused *::after { animation-play-stat
   position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 99999;
   background: var(--ink); color: var(--paper); padding: 6px 14px; border-radius: 6px;
 }
+
+/* ---- full log page ---- */
+.logpage #logmain { max-width: 860px; margin: 0 auto; padding: 16px; }
+#logbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+#logbar h1 { margin: 0 8px 0 0; font-size: 15px; }
+#logbar select { font: inherit; min-width: 120px; }
+#logbar .back { margin-left: auto; color: var(--muted); font-size: 11px; }
+#logmeta { color: var(--muted); font-size: 11px; margin-bottom: 6px; }
+.logpage #log { min-height: 0; overflow: visible; }

@@ -15,7 +15,7 @@ export function isPidAlive(pid) {
 }
 
 // Ids become path segments, so only plain names are accepted.
-const isSafeId = (id) => typeof id === 'string' && /^[\w.-]+$/.test(id) && id !== '.' && !id.includes('..');
+export const isSafeId = (id) => typeof id === 'string' && /^[\w.-]+$/.test(id) && id !== '.' && !id.includes('..');
 
 const str = (v) => (typeof v === 'string' ? v : '');
 
