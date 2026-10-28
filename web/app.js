@@ -457,7 +457,7 @@ function pickLegs(frec, rec) {
   if (rec.isLead) {
     const desks = [];
     for (const a of frec.agents.values()) {
-      const seat = a.slot?.kind === 'seat' && a.state !== 'done' ? r.seats[a.slot.i] : null;
+      const seat = !a.isLead && a.slot?.kind === 'seat' && a.state !== 'done' ? r.seats[a.slot.i] : null; // the lead's own slot is a seat index too (0), not a colleague
       if (seat?.visit) desks.push({ x: seat.visit[0], y: seat.visit[1], face: seat.at[0] < seat.visit[0] ? 'left' : 'right' });
     }
     if (desks.length) return shuffled(rec.rng, desks).slice(0, amb.leadTourDesks);

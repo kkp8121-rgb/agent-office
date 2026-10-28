@@ -291,12 +291,21 @@ export function createNav(scenes, nav) {
       if (hit !== undefined) {
         cache.delete(key);
         cache.set(key, hit);
-        stat.hits++;
-        if (hit === null) return null;
+        if (hit === null) {
+          stat.hits++;
+          return null;
+        }
         const out = hit.map((p) => p.slice());
         out[0] = from;
         if (isOpen(g, to) && out.length > 1) out[out.length - 1] = to;
-        return out;
+        // the re-pinned first and last legs were not smoothed against the grid: keep the hit only if they still see open cells
+        const n = out.length;
+        if (n < 2 || (lineOfSight(g, out[0], out[1]) && lineOfSight(g, out[n - 2], out[n - 1]))) {
+          stat.hits++;
+          return out;
+        }
+        stat.misses++;
+        return findPath(g, from, to, opts);
       }
       stat.misses++;
       const p = findPath(g, from, to, opts);

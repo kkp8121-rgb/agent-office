@@ -53,7 +53,7 @@
   "spriteHeight": 64,
   "sitHeight": 50,
   "scenesDir": "assets/scenes",
-  "nav": { "cellPx": 8, "inflatePx": 12, "snapRadiusCells": 6, "pathCache": 256, "overflowRing": 28, "trayRowPx": 28, "arrivalGapPx": 24 },
+  "nav": { "cellPx": 8, "inflatePx": 12, "snapRadiusCells": 6, "pathCache": 256, "overflowSearchPx": 200, "overflowMaxOverlap": 0.35, "spriteWidthPx": 44, "trayRowPx": 28, "arrivalGapPx": 24 },
   "depth": { "sliceTolerancePx": 6, "sliceWidthPx": 16, "sliceOverlapPx": 1, "pickMarginPx": 22, "zBase": 1000, "frontZ": 7000, "faceTopPx": 24, "seatShowPx": 28 },
   "designOrder": ["studio2", "lounge", "library", "greenhouse"],
   "layouts": {

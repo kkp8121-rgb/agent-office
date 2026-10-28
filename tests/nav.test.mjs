@@ -96,6 +96,23 @@ test('nav: cache hits on repeat and bakes once', () => {
   assert.deepEqual(nav.path('d', [60, 150], [340, 150]), a);
 });
 
+test('nav: a cache hit never returns an end leg through closed cells', () => {
+  const r = room({ blocks: [box(150, 60, 250, 240)] });
+  const g = bakeGrid(r, NAV);
+  const nav = createNav(new Map([['d', r]]), NAV);
+  nav.path('d', [60, 150], [340, 150]);
+  let rechecked = 0;
+  for (let i = 0; i < 400; i++) {
+    const from = [20 + ((i * 37) % 120), 120 + ((i * 11) % 60)];
+    const to = [300 + ((i * 29) % 90), 120 + ((i * 17) % 60)];
+    const p = nav.path('d', from, to);
+    if (!p || !isOpen(g, from) || !isOpen(g, to)) continue;
+    rechecked++;
+    for (let k = 1; k < p.length; k++) assert.ok(lineOfSight(g, p[k - 1], p[k]), `${from}->${to} leg ${k}`);
+  }
+  assert.ok(rechecked > 300);
+});
+
 test('nav: cache keeps at most pathCache entries', () => {
   const nav = createNav(new Map([['d', room()]]), { ...NAV, pathCache: 2 });
   nav.path('d', [20, 20], [100, 100]);

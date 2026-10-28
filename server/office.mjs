@@ -3,6 +3,7 @@
 // through sanitize.mjs (Ev.text) or local JSON clipped here (descriptions, workflow labels) are kept.
 import { clip } from './sanitize.mjs';
 import { overflowPoint, resolveScene } from '../web/scene.mjs';
+import { bakeGrid, isOpen } from '../web/nav.mjs';
 
 /** @typedef {import('./parse.mjs').Ev} Ev */
 
@@ -37,6 +38,7 @@ export class Office {
     this.savedVersion = 0;
     this.floors = new Map(); // sessionId -> floor
     this.resolved = new Map(); // design -> resolved scene (designs that have a layered scene)
+    this.grids = new Map(); // design -> baked walking grid (overflow spots are picked on open floor)
     this.floorsCreated = 0; // never decremented: breaks ties between equally used designs
     this.floorSeq = 0;
     this.hiddenRecs = new Map(); // sessionId -> {sessionId, pid, startedAt}
@@ -397,7 +399,7 @@ export class Office {
     return this.resolved.get(design);
   }
 
-  /** Smallest free index over [...seats, ...idle, ...overflow]; past the last overflow point it laps with `ring` + 1 (the screen moves and snaps it). */
+  /** Smallest free index over [...seats, ...idle, ...overflow]; past the last overflow point it laps with `ring` + 1 (the spot is searched on open floor). */
   #allocSceneSlot(f, r) {
     let i = 0;
     while (f.usedSlots.has(i)) i++;
@@ -412,7 +414,13 @@ export class Office {
       return { i, kind: 'idle', ref: String(k), x: p.at[0], y: p.at[1], approach: null, sit: null, face: p.face, ring: 0 };
     }
     const j = k - r.idle.length;
-    const { at, ring } = overflowPoint(r, j, this.cfg.nav.overflowRing);
+    const nav = this.cfg.nav;
+    if (!this.grids.has(f.design)) this.grids.set(f.design, bakeGrid(r, nav));
+    const g = this.grids.get(f.design);
+    const { at, ring } = overflowPoint(r, j, {
+      isOpen: (p) => isOpen(g, p), boxPx: [nav.spriteWidthPx, this.cfg.spriteHeight],
+      stepPx: nav.cellPx, searchPx: nav.overflowSearchPx, maxOverlap: nav.overflowMaxOverlap,
+    });
     return { i, kind: 'overflow', ref: String(j % r.overflow.length), x: Math.round(at[0]), y: Math.round(at[1]), approach: null, sit: null, face: r.overflow[j % r.overflow.length].face, ring };
   }
 

@@ -359,13 +359,53 @@ export function trayPoint(r, i, trayRowPx) {
   return [x, y - row * trayRowPx];
 }
 
-/** Overflow point `k`: lap `ring = floor(k / n)` pushes the base point `ring * ringPx` away from the room centre (before snapping). */
-export function overflowPoint(r, k, ringPx) {
+/**
+ * Overflow points `0..count-1`. The first lap is the scene's own points. A later lap moves its base point to the nearest
+ * spot (stepping `stepPx`, within `searchPx`) that is open floor and whose sprite box overlaps every seat, idle spot, the lead and
+ * every earlier overflow point by at most `maxOverlap` of its area; when no spot is that free, the one with the smallest worst overlap wins. Open floor means
+ * the screen's snap leaves the point where it is, so what is checked here is what is drawn.
+ * @param {object} r resolved scene
+ * @param {{isOpen: (p: number[]) => boolean, boxPx: number[], stepPx: number, searchPx: number, maxOverlap: number}} o
+ * @returns {{at: number[], ring: number}[]}
+ */
+export function overflowPoints(r, count, o) {
   const n = r.overflow.length;
-  const ring = Math.floor(k / n);
-  const [bx, by] = r.overflow[k % n].at;
-  const dx = bx - r.size[0] / 2;
-  const dy = by - r.size[1] / 2;
-  const len = Math.hypot(dx, dy) || 1;
-  return { at: [bx + (dx / len) * ring * ringPx, by + (dy / len) * ring * ringPx], ring };
+  const [bw, bh] = o.boxPx;
+  const overlap = (p, q) => Math.max(0, bw - Math.abs(p[0] - q[0])) * Math.max(0, bh - Math.abs(p[1] - q[1])) / (bw * bh);
+  const offsets = [];
+  for (let dy = -o.searchPx; dy <= o.searchPx; dy += o.stepPx) {
+    for (let dx = -o.searchPx; dx <= o.searchPx; dx += o.stepPx) if (Math.hypot(dx, dy) <= o.searchPx) offsets.push([dx, dy]);
+  }
+  offsets.sort((a, b) => Math.hypot(a[0], a[1]) - Math.hypot(b[0], b[1]) || a[1] - b[1] || a[0] - b[0]);
+  const fixed = [r.lead.at, r.lead.sitAt, ...r.seats.flatMap((q) => [q.at, q.sitAt]), ...r.idle.map((q) => q.at)];
+  const out = [];
+  for (let k = 0; k < count; k++) {
+    const base = r.overflow[k % n].at;
+    const ring = Math.floor(k / n);
+    if (ring === 0) {
+      out.push({ at: base, ring });
+      continue;
+    }
+    let best = null;
+    let bestWorst = Infinity;
+    for (const [dx, dy] of offsets) {
+      const p = [base[0] + dx, base[1] + dy];
+      if (p[0] < bw / 2 || p[0] > r.size[0] - bw / 2 || !o.isOpen(p)) continue;
+      let worst = 0;
+      for (const q of fixed) worst = Math.max(worst, overlap(p, q));
+      for (const q of out) worst = Math.max(worst, overlap(p, q.at));
+      if (worst < bestWorst) {
+        best = p;
+        bestWorst = worst;
+        if (worst <= o.maxOverlap) break;
+      }
+    }
+    out.push({ at: best ?? base, ring });
+  }
+  return out;
+}
+
+/** Overflow point `k` (see overflowPoints). */
+export function overflowPoint(r, k, o) {
+  return overflowPoints(r, k + 1, o)[k];
 }

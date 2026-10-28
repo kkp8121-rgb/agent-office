@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkSceneFormat, resolveScene, trayPoint, overflowPoint, distToPolyEdge, distToUnionEdge, pointInPolys } from '../web/scene.mjs';
+import { checkSceneFormat, resolveScene, trayPoint, overflowPoint, overflowPoints, distToPolyEdge, distToUnionEdge, pointInPolys } from '../web/scene.mjs';
+import { bakeGrid, isOpen } from '../web/nav.mjs';
 import { fixtureRaw, FORMAT_OPTS, cfg } from './helpers/fixture.mjs';
 
 test('scene: fixture passes format check', () => {
@@ -67,15 +68,22 @@ test('scene: tray queue lifts rows past n', () => {
   assert.deepEqual(trayPoint(r, 25, 28), [q[1][0], q[1][1] - 56]);
 });
 
-test('scene: overflow ring pushes away from room centre', () => {
+test('scene: overflow laps land on open floor, apart from every earlier point', () => {
   const r = resolveScene(fixtureRaw());
-  const centre = [r.size[0] / 2, r.size[1] / 2];
-  const o = overflowPoint(r, 8, 28);
-  const base = r.overflow[0].at;
-  const d = (p) => Math.hypot(p[0] - centre[0], p[1] - centre[1]);
-  assert.equal(o.ring, 1);
-  assert.ok(Math.abs(d(o.at) - d(base) - 28) < 1e-6);
-  assert.deepEqual(overflowPoint(r, 3, 28), { at: r.overflow[3].at, ring: 0 });
+  const g = bakeGrid(r, cfg.nav);
+  const o = { isOpen: (p) => isOpen(g, p), boxPx: [cfg.nav.spriteWidthPx, cfg.spriteHeight], stepPx: cfg.nav.cellPx, searchPx: cfg.nav.overflowSearchPx, maxOverlap: cfg.nav.overflowMaxOverlap };
+  const pts = overflowPoints(r, 40, o);
+  assert.equal(pts.length, 40);
+  pts.slice(0, 8).forEach((p, k) => assert.deepEqual(p, { at: r.overflow[k].at, ring: 0 }));
+  const [bw, bh] = o.boxPx;
+  const area = (p, q) => Math.max(0, bw - Math.abs(p[0] - q[0])) * Math.max(0, bh - Math.abs(p[1] - q[1])) / (bw * bh);
+  pts.forEach((p, k) => {
+    assert.equal(p.ring, Math.floor(k / 8));
+    if (k < 8) return;
+    assert.ok(isOpen(g, p.at), `point ${k} is closed floor`);
+    for (const q of pts.slice(0, k)) assert.ok(area(p.at, q.at) <= o.maxOverlap + 1e-9, `point ${k} overlaps an earlier one`);
+  });
+  assert.deepEqual(overflowPoint(r, 20, o), pts[20]);
 });
 
 test('scene: union edge distance ignores edges inside another polygon', () => {

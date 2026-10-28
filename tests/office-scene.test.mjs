@@ -1,11 +1,13 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadConfig } from '../server/config.mjs';
 import { Office } from '../server/office.mjs';
-import { FIXTURE_DIR, FIXTURE_SCENES, fixtureRaw } from './helpers/fixture.mjs';
+import { FIXTURE_DIR, FIXTURE_SCENES, ROOT, fixtureRaw } from './helpers/fixture.mjs';
+import { resolveScene } from '../web/scene.mjs';
+import { bakeGrid, isOpen } from '../web/nav.mjs';
 
 const EMPTY = { hidden: [], names: {} };
 const S = (id, o = {}) => ({ provider: 'claude', pid: 100, sessionId: id, cwd: 'C:\\Project', status: 'busy', name: '', startedAt: 1000, ...o });
@@ -29,8 +31,6 @@ test('office-scene: seats, then idle, then overflow', () => {
   assert.deepEqual(slots.slice(-2).map((s) => s.ring), [1, 1]);
   assert.ok(slots.slice(0, -2).every((s) => s.ring === 0));
   assert.equal(new Set(slots.map((s) => `${s.x},${s.y}`)).size, slots.length, 'no two characters share a point');
-  const base = slots[4 + 6];
-  assert.ok(Math.hypot(slots.at(-2).x - 512, slots.at(-2).y - 256) > Math.hypot(base.x - 512, base.y - 256), 'lap 2 stands farther from the room centre');
 });
 
 test('office-scene: seat slot carries approach, sit and face', () => {
@@ -91,4 +91,36 @@ test('office-scene: a scene whose design differs from its folder is refused', (t
   t.after(() => rmSync(tmp, { recursive: true, force: true }));
   cpSync(FIXTURE_DIR, join(tmp, 'other'), { recursive: true });
   assert.throws(() => loadConfig({ scenesDir: tmp, designOrder: ['other'] }), /design/);
+});
+
+// Sprite boxes of the 30 characters on one floor, as the screen draws them (open floor is never moved by the snap).
+function overflowOverlap(cfg, design) {
+  const o = new Office(cfg, EMPTY);
+  o.syncSessions([S('s1')], 1000);
+  o.syncAgents('s1', Array.from({ length: 30 }, (_, i) => M(`a${i}`)), 1000);
+  const slots = agentsOf(o).map((a) => a.slot);
+  const g = bakeGrid(resolveScene(cfg.scenes[design].raw), cfg.nav);
+  const [bw, bh] = [cfg.nav.spriteWidthPx, cfg.spriteHeight];
+  const area = (p, q) => Math.max(0, bw - Math.abs(p.x - q.x)) * Math.max(0, bh - Math.abs(p.y - q.y)) / (bw * bh);
+  let worst = 0;
+  slots.forEach((p, i) => slots.slice(i + 1).forEach((q) => { worst = Math.max(worst, area(p, q)); }));
+  const [w, h] = cfg.scenes[design].raw.size;
+  for (const s of slots) assert.ok(s.x >= 0 && s.x <= w && s.y >= 0 && s.y <= h, `${design}: ${s.x},${s.y}`);
+  for (const s of slots.filter((x) => x.kind === 'overflow' && x.ring > 0)) assert.ok(isOpen(g, [s.x, s.y]), `${design}: lap spot ${s.x},${s.y} is closed floor`);
+  return worst;
+}
+
+test('office-scene: 30 characters on the fixture overlap by at most half', () => {
+  const worst = overflowOverlap(sceneCfg(), 'studio2');
+  assert.ok(worst <= 0.5, `worst overlap ${worst}`);
+});
+
+test('office-scene: 30 characters on every shipped scene overlap by at most half', (t) => {
+  const dir = join(ROOT, 'assets', 'scenes');
+  const designs = existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory() && existsSync(join(dir, d.name, 'scene.json'))).map((d) => d.name) : [];
+  for (const d of designs) {
+    const worst = overflowOverlap(loadConfig({ scenesDir: dir, designOrder: [d] }), d);
+    assert.ok(worst <= 0.5, `${d}: worst overlap ${worst}`);
+  }
+  t.diagnostic(`${designs.length} shipped scene(s) checked`);
 });
