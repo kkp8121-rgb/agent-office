@@ -228,12 +228,12 @@ export class Office {
     if (newest > 0) this.logMark.set(sessionId, newest + 1);
   }
 
-  /** Name/slot bookkeeping for an agent that is leaving the floor. */
-  #releaseAgent(f, a) {
+  /** Name/slot bookkeeping for an agent that is leaving the floor; `reseat: false` lets the caller reseat once afterwards. */
+  #releaseAgent(f, a, reseat = true) {
     f.agents.delete(a.agentId);
     f.usedNames.delete(a.name);
     f.usedSlots.delete(a.slot.i);
-    this.#reseat(f);
+    if (reseat) this.#reseat(f);
   }
 
   /**
@@ -326,7 +326,7 @@ export class Office {
         if (!m.finished && !m.abandoned) fresh.push(m);
       } else if (m.abandoned && !m.finished && a.state !== 'done') {
         this.#logDone(f, a, now, LOG_ABANDONED); // gone silent: released without a report
-        this.#releaseAgent(f, a);
+        this.#releaseAgent(f, a, false); // reseat after the loop, once every finished agent is marked done
       } else if (m.finished && a.state !== 'done') {
         a.state = 'done';
         a.bubble = '';
@@ -336,6 +336,7 @@ export class Office {
         this.#logDone(f, a, now);
       }
     }
+    this.#reseat(f);
     for (const m of fresh) this.#enterAgent(f, m, now); // after the releases, so a freed desk goes to a waiter first
   }
 

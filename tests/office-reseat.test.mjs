@@ -125,3 +125,17 @@ test('reseat: a floor with no waiting agents is untouched when a desk frees', ()
   assert.deepEqual(slotOf(o, 'a1'), before);
   assertSlotsConsistent(o);
 });
+
+for (const abandonedFirst of [true, false]) {
+  test(`reseat: a waiter that finishes in the same sync as a desk is freed never takes it (abandoned ${abandonedFirst ? 'before' : 'after'} the finisher in the list)`, () => {
+    const o = setup(6); // a0-a3 seated, a4 on idle 0, a5 on idle 1
+    const gone = { ...M('a0'), abandoned: true };
+    const done = { ...M('a4'), finished: true };
+    const rest = [M('a1'), M('a2'), M('a3'), M('a5')];
+    o.syncAgents('s1', abandonedFirst ? [gone, done, ...rest] : [done, gone, ...rest], 2000);
+    assert.equal(agentsOf(o).find((a) => a.agentId === 'a4').state, 'done');
+    assert.equal(slotOf(o, 'a4').kind, 'idle', 'the done agent keeps its standing slot');
+    assert.deepEqual([slotOf(o, 'a5').kind, slotOf(o, 'a5').i], ['seat', 0], 'the agent that still waits gets the desk');
+    assertSlotsConsistent(o);
+  });
+}
