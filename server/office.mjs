@@ -379,8 +379,8 @@ export class Office {
     }
     f.doneRuns.delete(runId);
     const max = this.cfg.log.headMaxChars;
-    const name = clip(p.name, max);
-    const current = clip(p.current, max);
+    const name = clip(p.name ?? '', max);
+    const current = clip(p.current ?? '', max);
     const phases = Array.isArray(p.phases) ? p.phases : [];
     const idx = phases.indexOf(p.current);
     f.boardRun = runId;

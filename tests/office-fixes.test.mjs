@@ -182,6 +182,12 @@ test('office: a run with no phase yet shows just its name', () => {
   assert.equal(floorOf(o, 's1').board.line, '새 워크플로');
 });
 
+test('office: a progress report without current never shows the string undefined', () => {
+  const o = setup();
+  o.setWorkflowProgress('s1', 'r1', { name: '새 워크플로', phases: ['a'] });
+  assert.equal(floorOf(o, 's1').board.line, '새 워크플로');
+});
+
 // F22 / F33
 test('office: logTitles gives live titles, remembers departed ones and never lists hidden sessions', () => {
   const o = setup([S('s1', { cwd: 'C:\\Project\\app' }), S('s2', { startedAt: 2000 }), S('s3', { startedAt: 3000 })]);
