@@ -92,12 +92,13 @@ test('office: worker gets 서진, second worker 서진+1, freed number reused', 
   assert.deepEqual(names(), ['서진', '서진+2', '서진+1']);
 });
 
-test('office: unknown agentType uses 나래·지원', () => {
+test('office: unknown agentType takes a pool character labelled with the kind', () => {
   const o = setup();
   o.syncAgents('s1', [M('a1', { agentType: 'mystery' }), M('a2', { agentType: '__lead' })], 1000);
   const [a, b] = floorOf(o, 's1').agents;
-  assert.deepEqual([a.name, a.role, a.sprite], ['나래', '지원', 'default']);
-  assert.equal(b.name, '나래+1');
+  assert.deepEqual([a.role, b.role], ['mystery', '지원'], '"__lead" is not a kind name');
+  assert.notEqual(a.sprite, b.sprite);
+  assert.notEqual(a.sprite, 'lead');
 });
 
 test('office: seats fill first, then idle spots, then overflow index', () => {

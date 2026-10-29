@@ -6,7 +6,7 @@
   "tail": { "startBytes": 262144, "chunkBytes": 65536, "maxLineBytes": 4194304 },
   "log": { "cap": 2000, "backfillMinutes": 30, "mergeWindowMs": 20000, "sendCap": 200, "pageLimit": 500, "headMaxChars": 80 },
   "parse": { "nameMaxChars": 200, "pathMaxChars": 1024 },
-  "agent": { "doneLingerMs": 5400, "staleMs": 600000, "bubbleShowMs": 8000, "abandonMs": 1800000, "dirTrustMs": 2000 },
+  "agent": { "doneLingerMs": 5400, "staleMs": 600000, "bubbleShowMs": 8000, "abandonMs": 1800000, "dirTrustMs": 2000, "roleMaxChars": 16 },
   "floor": { "leaveMs": 5000, "nameMaxChars": 30, "missTicks": 2, "transcriptRetryMs": 15000 },
   "workflow": { "scriptHeadBytes": 65536, "journalLineBytes": 8192, "doneQuietMs": 180000 },
   "codex": { "enabled": true, "headBytes": 262144, "idleKeepMs": 1800000, "execKeepMs": 60000, "cwdMaxChars": 500 },
@@ -21,8 +21,14 @@
             "tripEveryMs": { "working": [240000, 600000], "thinking": [30000, 90000], "idle": [45000, 150000], "stale": [60000, 180000] },
             "leadTourEveryMs": [40000, 120000], "leadTourDesks": 3,
             "stayMs": [4000, 12000], "maxAway": 2, "chatChance": 0.5 } },
+  "leads": [
+    { "key": "lead",   "name": "유나", "role": "팀장" },
+    { "key": "lead-2", "name": "하나", "role": "팀장" },
+    { "key": "lead-3", "name": "수아", "role": "팀장" },
+    { "key": "lead-4", "name": "윤슬", "role": "팀장" },
+    { "key": "lead-5", "name": "다인", "role": "팀장" }
+  ],
   "roles": {
-    "__lead":               { "key": "lead",                 "name": "유나", "role": "팀장" },
     "scout":                { "key": "scout",                "name": "다온", "role": "정찰" },
     "worker-low":           { "key": "worker-low",           "name": "소미", "role": "막내" },
     "worker":               { "key": "worker",               "name": "서진", "role": "개발" },
@@ -40,7 +46,6 @@
     "backend":              { "key": "backend",              "name": "아린", "role": "백엔드" },
     "app":                  { "key": "app",                  "name": "리아", "role": "앱" },
     "__default":            { "key": "default",              "name": "나래", "role": "지원" },
-    "codex:__lead":         { "key": "lead",                 "name": "하나", "role": "팀장" },
     "codex:scout":          { "key": "scout",                "name": "별이", "role": "정찰" },
     "codex:worker_low":     { "key": "worker-low",           "name": "보미", "role": "막내" },
     "codex:worker":         { "key": "worker",               "name": "도담", "role": "개발" },

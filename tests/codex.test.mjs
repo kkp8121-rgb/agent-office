@@ -329,7 +329,7 @@ test('codex: an idle poll reads nothing', async (t) => {
 
 // ---- Office ----------------------------------------------------------------------------------
 
-test('office: codex floor uses 하나·팀장 and 도담 for worker', () => {
+test('office: codex floor uses codex names (도담 for worker) and spreads unknown kinds', () => {
   const cfg = loadConfig();
   const office = new Office(cfg, EMPTY);
   const T = 1793170000000;
@@ -343,19 +343,21 @@ test('office: codex floor uses 하나·팀장 and 도담 for worker', () => {
   ], T);
   const f = office.snapshot().floors[0];
   assert.equal(f.provider, 'codex');
-  assert.deepEqual([f.lead.name, f.lead.role], ['하나', '팀장']);
+  assert.equal(f.lead.role, '팀장');
+  assert.ok(cfg.leads.some((l) => l.name === f.lead.name), 'the boss comes from the leads table, whatever the provider');
   const byId = Object.fromEntries(f.agents.map((a) => [a.agentId, a]));
   assert.deepEqual([byId.a1.name, byId.a1.role], ['도담', '개발']);
   assert.equal(byId.a2.name, '도담+1');
-  assert.equal(byId.a3.name, '누리');
-  assert.equal(byId.a4.name, '누리+1');
-  assert.equal(byId.a5.name, '누리+2', 'a Claude role name is not a Codex role');
+  // unknown kinds take the least used character; the label is the kind ("지원" without one)
+  assert.deepEqual([byId.a3.role, byId.a4.role, byId.a5.role], ['mystery', '지원', 'worker']);
+  assert.equal(new Set([byId.a3.sprite, byId.a4.sprite, byId.a5.sprite, 'worker']).size, 4, 'a Claude role name is not a Codex role: a5 is spread, not the Claude worker');
 
   office.syncSessions([{ provider: 'claude', pid: 1, sessionId: 'cl', cwd: 'C:\\Project\\b', status: 'busy', name: '', startedAt: T + 1 }], T + 1);
   office.syncAgents('cl', [{ agentId: 'c1', agentType: 'codex:worker', description: '', finished: false, transcriptPath: '', mtimeMs: T, workflow: null }], T + 1);
   const cl = office.snapshot().floors.find((x) => x.sessionId === 'cl');
-  assert.equal(cl.lead.name, '유나');
-  assert.equal(cl.agents[0].name, '나래', 'a Codex role name is not a Claude role');
+  assert.equal(cl.lead.role, '팀장');
+  assert.equal(cl.agents[0].role, 'worker', 'a Codex role name is not a Claude role: shown as its kind');
+  assert.notEqual(cl.agents[0].name, '서진');
 });
 
 // ---- Poller ----------------------------------------------------------------------------------
@@ -393,7 +395,7 @@ test('poller: claude and codex sessions merge into one sync', async (t) => {
   const cx = floors.find((f) => f.provider === 'codex');
   assert.equal(cx.title, 'codex exec · billing-app');
   assert.equal(cx.status, 'busy');
-  assert.equal(cx.lead.name, '하나');
+  assert.equal(cx.lead.role, '팀장');
   assert.equal(cx.agents.length, 1);
   assert.equal(cx.agents[0].name, '도담');
   assert.equal(cx.agents[0].bubble, 'git 실행');

@@ -34,6 +34,6 @@ test('config: AGENT_OFFICE_CODEX_HOME sets codexHome, codex block from config.js
     const cfg = loadConfig();
     assert.equal(cfg.codexHome, 'X:/fake-codex');
     assert.equal(cfg.codex.enabled, true);
-    assert.equal(cfg.roles['codex:__lead'].name, '하나');
+    assert.equal(cfg.roles['codex:worker'].name, '도담');
   } finally { if (prev === undefined) delete process.env.AGENT_OFFICE_CODEX_HOME; else process.env.AGENT_OFFICE_CODEX_HOME = prev; }
 });

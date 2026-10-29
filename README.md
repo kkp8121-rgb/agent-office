@@ -30,6 +30,9 @@
 
 `config.json` 의 `roles` 표에서 `name`(이름)과 `role`(역할)을 고치고 사무실을 다시 켭니다.
 
+- 팀장(층마다 한 명)은 `leads` 표의 5명(유나·하나·수아·윤슬·다인)이 돌아가며 맡습니다. 지금 화면에 있는 층에서 가장 적게 쓰인 팀장이 새 층에 배정되고, 숨기거나 떠난 층의 팀장은 곧 풀립니다. 그림은 `assets\sprites\<key>.png`, 앉은 그림은 `<key>-sit.png` 입니다.
+- `roles` 표에 없는 종류의 서브에이전트(예: `general-purpose`)는 그 층에서 가장 적게 쓰인 캐릭터를 받고, 역할 칸에는 종류 이름(없으면 `지원`)이 표시됩니다.
+
 ## 그림 다시 뽑기
 
 Codex 의 imagegen 으로 그림을 만든 뒤 `art\snap.py` 로 격자에 맞춥니다. 프롬프트는 `art\prompts.json`(캐릭터), `art\scenes\<방>.json`(방), `art\sit\prompts.json`(앉은 자세)에 있습니다. 결과는 `assets\` 아래에 둡니다. 옛 한 장짜리 배경 `art\floors\*.png` 는 방을 다시 뽑을 때 쓰는 참고 그림이고 화면에는 쓰지 않습니다.

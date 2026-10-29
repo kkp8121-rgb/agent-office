@@ -171,10 +171,11 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
     const roles = {};
     // Codex roles reuse the Claude sprite keys, so they must not overwrite the Claude names here.
     for (const [k, r] of Object.entries(cfg.roles)) if (!k.startsWith('codex:')) roles[r.key] = { name: r.name, role: r.role };
+    for (const l of cfg.leads) roles[l.key] = { name: l.name, role: l.role };
     const scenes = {};
     for (const [design, s] of Object.entries(cfg.scenes)) scenes[design] = { ...s.raw, url: s.url };
     return {
-      spriteHeight: cfg.spriteHeight, ui: cfg.ui, bubbleShowMs: cfg.agent.bubbleShowMs, nameMaxChars: cfg.floor.nameMaxChars, roles,
+      spriteHeight: cfg.spriteHeight, ui: cfg.ui, bubbleShowMs: cfg.agent.bubbleShowMs, nameMaxChars: cfg.floor.nameMaxChars, roles, leads: cfg.leads.map((l) => l.key),
       scenes, sitSprites, sitHeight: cfg.sitHeight, nav: cfg.nav, depth: cfg.depth,
     };
   }

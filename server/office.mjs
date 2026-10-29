@@ -41,6 +41,7 @@ export class Office {
     this.grids = new Map(); // design -> baked walking grid (overflow spots are picked on open floor)
     this.floorsCreated = 0; // never decremented: breaks ties between equally used designs
     this.floorSeq = 0;
+    this.pool = this.#buildPool();
     this.hiddenRecs = new Map(); // sessionId -> {sessionId, pid, startedAt}
     this.names = new Map(); // sessionId -> renamed title
     this.ring = []; // LogEntry[], oldest first
@@ -171,10 +172,9 @@ export class Office {
   }
 
   #createFloor(s) {
-    const { roles } = this.cfg;
+    const lead = this.#pickLead(); // before #pickDesign: both rotate from the same creation counter
     const design = this.#pickDesign();
     const colorIndex = this.#pickColor();
-    const lead = (s.provider === 'codex' && roles['codex:__lead']) || roles.__lead;
     return {
       sessionId: s.sessionId,
       provider: 'claude',
@@ -197,7 +197,33 @@ export class Office {
       usedNames: new Set([lead.name]),
       usedSlots: new Set(),
       reports: 0,
+      unknownSeq: this.floorSeq * 5, // start of the pool scan for kinds without a fixed character; advances per pick, and floors start apart
     };
+  }
+
+  /** Character pool for unknown agent kinds: every sprite key of the roles table, with its Claude and Codex name. */
+  #buildPool() {
+    const byKey = new Map();
+    for (const [k, r] of Object.entries(this.cfg.roles)) {
+      const c = byKey.get(r.key) ?? byKey.set(r.key, { key: r.key, claude: null, codex: null }).get(r.key);
+      if (k.startsWith('codex:')) c.codex ??= r.name;
+      else c.claude ??= r.name;
+    }
+    return [...byKey.values()].map((c) => ({ key: c.key, claude: c.claude ?? c.codex, codex: c.codex ?? c.claude }));
+  }
+
+  /** Least used boss among the visible floors (not hidden; a leaving floor counts until it is removed); ties go to the first in rotation order from the creation counter. */
+  #pickLead() {
+    const { leads } = this.cfg;
+    const used = new Map(leads.map((l) => [l.key, 0]));
+    for (const f of this.floors.values()) if (!f.hidden && used.has(f.lead.sprite)) used.set(f.lead.sprite, used.get(f.lead.sprite) + 1);
+    const start = this.floorsCreated % leads.length; // #pickDesign advances the counter right after
+    let best = leads[start];
+    for (let k = 1; k < leads.length; k++) {
+      const l = leads[(start + k) % leads.length];
+      if (used.get(l.key) < used.get(best.key)) best = l;
+    }
+    return best;
   }
 
   /** Least used design among the visible floors; ties go to the first in rotation order from the creation counter. */
@@ -341,8 +367,8 @@ export class Office {
   }
 
   #enterAgent(f, m, now) {
-    const { roles, log } = this.cfg;
-    const entry = this.#roleFor(f, m.agentType);
+    const { log } = this.cfg;
+    const entry = this.#roleFor(f, m.agentType) ?? this.#spreadRole(f, m.agentType);
     const wf = m.workflow;
     const head = clip(wf ? `${wf.phase} · ${wf.label}` : m.description ?? '', log.headMaxChars);
     const slot = this.#allocSceneSlot(f, this.#sceneOf(f.design));
@@ -367,7 +393,7 @@ export class Office {
     if (startTs >= this.logSince(f.sessionId, now)) this.#log(f, a, startTs, LOG_START);
   }
 
-  /** Claude floors know Claude role names, Codex floors the `codex:` ones; anything else gets the provider's default. */
+  /** Claude floors know Claude role names, Codex floors the `codex:` ones; anything else is null (see #spreadRole). */
   #roleFor(f, agentType) {
     const { roles } = this.cfg;
     const codex = f.provider === 'codex';
@@ -378,8 +404,28 @@ export class Office {
       !agentType.slice(prefix.length).startsWith('__') &&
       (codex || !agentType.startsWith('codex:')) &&
       Object.hasOwn(roles, agentType);
-    if (known) return roles[agentType];
-    return (codex && roles['codex:__default']) || roles.__default;
+    return known ? roles[agentType] : null;
+  }
+
+  /** An unknown kind takes the pool character least used on the floor (ties: rotation from the floor's own counter); the role label is the kind. */
+  #spreadRole(f, agentType) {
+    const used = new Map();
+    for (const a of f.agents.values()) used.set(a.sprite, (used.get(a.sprite) ?? 0) + 1);
+    const { pool } = this;
+    const start = f.unknownSeq++ % pool.length;
+    let best = pool[start];
+    for (let k = 1; k < pool.length; k++) {
+      const c = pool[(start + k) % pool.length];
+      if ((used.get(c.key) ?? 0) < (used.get(best.key) ?? 0)) best = c;
+    }
+    return { key: best.key, name: f.provider === 'codex' ? best.codex : best.claude, role: this.#kindLabel(agentType) };
+  }
+
+  /** Same rule as sanitize.firstWord: a plain word only (no paths, URLs, spaces); anything else shows as "지원". */
+  #kindLabel(agentType) {
+    const kind = String(agentType ?? '').replace(/^codex:/, '');
+    if (kind.startsWith('__') || !/^[\w.+-]+$/.test(kind)) return '지원';
+    return clip(kind, this.cfg.agent.roleMaxChars);
   }
 
   #allocName(f, base) {
