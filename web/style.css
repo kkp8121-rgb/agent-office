@@ -125,13 +125,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .st-idle .spr, .st-enter .spr { animation: breathe 2.8s ease-in-out infinite; }
 .st-thinking .spr { animation: breathe 3.6s ease-in-out infinite; }
 .st-working .spr { animation: work .55s ease-in-out infinite; }
-.walking .spr { animation: hop .38s ease-in-out infinite; }
+.walking .spr { animation: stride .4s ease-in-out infinite; }
 .st-done.arrived .spr { animation: jump 1.6s ease-out both; }
 .st-done.arrived { animation: fadeout .7s ease-in 1.5s both; }
 
 @keyframes breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(.98, 1.03); } }
 @keyframes work { 0%, 100% { transform: scale(1, 1); } 25% { transform: scale(1.06, .94); } 55% { transform: scale(.97, 1.04); } }
-@keyframes hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes stride { 0%, 50%, 100% { transform: translateY(0); } 25%, 75% { transform: translateY(-1px); } }
 @keyframes jump {
   0% { transform: scale(1, 1); }
   15% { transform: scale(1.12, .84); }
@@ -211,6 +211,42 @@ button { font: inherit; color: inherit; cursor: pointer; }
   color: #8a5a00; background: #ffe27a; border: 2px solid #8a5a00; pointer-events: none; animation: spark 2s ease-out both;
 }
 @keyframes spark { 0% { transform: translateX(-50%) scale(.3) rotate(-12deg); opacity: 0; } 15% { transform: translateX(-50%) scale(1.25) rotate(6deg); opacity: 1; } 30% { transform: translateX(-50%) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ---- walking legs: no new art. While .walking, the body picture is cut at the hip line (--hip) and its own legs are drawn
+   again as two halves (left/right of --sp, app.js makeLegs); every half step (steps(1) over .4s: two steps, matching stride's
+   two bobs) the halves swap: legs apart, then crossed with the front one lifted 1px. Nothing runs while standing. ---- */
+.spr img.leg { display: none; position: absolute; }
+.walking .spr img.leg { display: block; }
+.walking .spr img.stand { clip-path: inset(0 0 calc(100% - var(--hip, 78%)) 0); }
+.spr img.leg.l { clip-path: inset(var(--hip, 78%) calc(100% - var(--sp, 50%)) 0 0); animation: leg-l .4s steps(1) infinite; }
+.spr img.leg.r { clip-path: inset(var(--hip, 78%) 0 0 var(--sp, 50%)); animation: leg-r .4s steps(1) infinite; }
+@keyframes leg-l { 0% { transform: translate(-2px, 0); } 50% { transform: translate(2px, -1px); } }
+@keyframes leg-r { 0% { transform: translate(2px, 0); } 50% { transform: translate(-2px, 0); } }
+
+/* ---- office cat (app.js "office cat"): five pictures in .spr, the root's class picks one; two walking frames swap by steps() ---- */
+.ag.cat .spr img { height: auto; }
+.ag.cat .body { left: -18px; top: -32px; width: 36px; height: 32px; }
+.ag.cat .spr img:not(.stand) { display: none; position: absolute; }
+.ag.cat.walking .spr { animation: none; } /* the cat has its own two frames, no bob */
+.ag.cat.walking .spr img.stand { animation: cat-a .36s steps(1) infinite; }
+.ag.cat.walking .spr img.cw2 { display: block; animation: cat-b .36s steps(1) infinite; }
+@keyframes cat-a { 0% { visibility: visible; } 50% { visibility: hidden; } }
+@keyframes cat-b { 0% { visibility: hidden; } 50% { visibility: visible; } }
+.ag.cat-sit .spr img.stand, .ag.cat-sleep .spr img.stand, .ag.cat.held .spr img.stand { display: none; }
+.ag.cat-sit .spr img.csit, .ag.cat-sleep .spr img.cslp, .ag.cat.held .spr img.chld { display: block; }
+.ag.cat-sleep .zz { display: block; bottom: 16px; left: 8px; }
+.ag.cat.gone { pointer-events: none; }
+.agt.cat .tag { top: -24px; left: 14px; }
+.agt.cat .bub { bottom: 34px; }
+.agt.cat .bub.grab { bottom: 40px; }
+.agt.cat.held .bub.grab { bottom: 72px; }
+.agt.cat.dizzy .bub.grab { bottom: 42px; }
+.hearts { position: absolute; left: 0; top: -30px; width: 0; height: 0; pointer-events: none; }
+.hearts i {
+  position: absolute; left: calc(var(--hx, 0) * 1px - 6px); top: 0; font-style: normal; font-size: 14px; line-height: 1; color: #e8567a;
+  text-shadow: 1px 1px 0 #8a1f3d; opacity: 0; animation: heart 1.6s ease-out both; animation-delay: calc(var(--k) * 160ms);
+}
+@keyframes heart { 0% { transform: translateY(4px) scale(.5); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(-34px) scale(1.15); opacity: 0; } }
 
 /* hidden tab: nothing moves, nothing is received */
 body.paused *, body.paused *::before, body.paused *::after { animation-play-state: paused !important; transition: none !important; }

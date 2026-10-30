@@ -8,6 +8,8 @@ import { fitZoom } from './pip.mjs';
 import { dropPoint, restSpotNear, shouldLift } from './grab.mjs';
 import { daypart, nextPoke, openBox, pickLine, playPartner, throwPath, throwVelocity } from './play.mjs';
 import { between, chooseFidget, chooseSpot, createFloorClock, rngFor, tripRange } from './ambient.mjs';
+import { chooseCatAct, openPoint, otherFloor } from './cat.mjs';
+import { legVars } from './walk.mjs';
 
 // Visual constants (how things look/move, not planning numbers; those come from /api/ui).
 const WALK_PX_PER_SEC = 150;
@@ -79,6 +81,8 @@ function showConn(text) {
 const scenes = new Map(); // design -> {r: resolved scene, raw, url, nodes: object draw nodes}
 let nav = null; // createNav over every scene
 let amb = null; // ui.ui.ambient (scaled down under ?debug=ambient)
+let catC = null; // ui.ui.cat (scaled down under ?debug=ambient)
+let cat = null; // the office cat: {rec, frec, timer, leaveAt, spotId, poke, force}; see "office cat"
 let sitSet = new Set(); // sprite keys that have a seated picture
 const liveTimers = new Map(); // token -> {win, id, fire, at}: pending timers (the ?debug=ambient counter reads this)
 let timerToken = 0;
@@ -120,6 +124,12 @@ function scaleAmbient(a, k) {
   };
 }
 
+/** The cat's time ranges times `k`, like scaleAmbient. */
+function scaleCat(c, k) {
+  const range = (v) => v.map((n) => n * k);
+  return { ...c, firstDelayMs: range(c.firstDelayMs), moveEveryMs: range(c.moveEveryMs), pauseMs: range(c.pauseMs), sitMs: range(c.sitMs), sleepMs: range(c.sleepMs), deskMs: range(c.deskMs) };
+}
+
 function setupScenes() {
   for (const [design, raw] of Object.entries(ui.scenes ?? {})) {
     const r = resolveScene(raw);
@@ -128,6 +138,7 @@ function setupScenes() {
   nav = createNav(new Map([...scenes].map(([design, s]) => [design, s.r])), ui.nav);
   sitSet = new Set(ui.sitSprites ?? []);
   amb = DEBUG_AMBIENT ? scaleAmbient(ui.ui.ambient, 0.1) : ui.ui.ambient;
+  catC = DEBUG_AMBIENT ? scaleCat(ui.ui.cat, 0.1) : ui.ui.cat;
   document.documentElement.style.setProperty('--sit-h', `${ui.sitHeight}px`);
   if (DEBUG_AMBIENT) {
     window.__ambient = {
@@ -135,6 +146,14 @@ function setupScenes() {
       away: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.away).length, 0),
       held: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.press || a.grab).length, 0),
       busy: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.press || a.grab || a.play || a.say || a.steam).length, 0),
+      cat: () => (cat ? { sid: cat.frec.sid, x: cat.rec.x, y: cat.rec.y, walking: !!cat.rec.walk, timer: cat.timer, cls: cat.rec.el.className } : null),
+      catDo: (act) => { // makes the cat start `act` (sleep, spot, desk, stroll, leave) now
+        if (!cat || cat.rec.grab) return;
+        if (cat.timer) clockTimers.clearTimeout(cat.timer);
+        cat.timer = 0;
+        cat.force = act;
+        catNext();
+      },
     };
   }
 }
@@ -158,7 +177,25 @@ function makeSitSprite(rec, key) {
   return img;
 }
 
-function createChar(av, stage, startAt, sc) {
+/** Two extra copies of the picture, clipped to the legs (left and right of the split): they swap sides while the character walks. */
+function makeLegs(spr, key) {
+  const legs = ['l', 'r'].map((side) => {
+    const leg = makeSprite(key);
+    leg.className = `leg ${side}`;
+    spr.append(leg);
+    return leg;
+  });
+  setLegVars(spr, key);
+  return legs;
+}
+
+function setLegVars(spr, key) {
+  const v = legVars(ui.ui.walk, key);
+  spr.style.setProperty('--hip', v.hip);
+  spr.style.setProperty('--sp', v.sp);
+}
+
+function createChar(av, stage, startAt, sc, isCat = false) {
   const root = el('div', 'ag');
   const bubTxt = el('div', 'bub txt empty');
   const bubDot = el('div', 'bub dot empty', '…');
@@ -172,6 +209,17 @@ function createChar(av, stage, startAt, sc) {
   const img = makeSprite(av.sprite);
   img.classList.add('stand');
   spr.append(img);
+  const legs = isCat ? [] : makeLegs(spr, av.sprite);
+  if (isCat) {
+    // the cat is five pictures, a class on its root picks the one that shows (style.css "office cat")
+    root.classList.add('cat');
+    tagRoot.classList.add('cat');
+    for (const [cls, key] of [['cw2', 'cat-walk-2'], ['csit', 'cat-sit'], ['cslp', 'cat-sleep'], ['chld', 'cat-held']]) {
+      const pic = makeSprite(key);
+      pic.className = cls;
+      spr.append(pic);
+    }
+  }
   flip.append(spr);
   body.append(flip);
   root.append(body, zz);
@@ -180,7 +228,7 @@ function createChar(av, stage, startAt, sc) {
   root.style.setProperty('--fid-ms', `${amb.fidgetMs}ms`);
   tagRoot.style.transform = root.style.transform;
   const rec = {
-    el: root, tagRoot, body, bubTxt, bubDot, flip, tag, img, sitImg: null, sprite: av.sprite, x: startAt.x, y: startAt.y, state: '', bubKey: null, arrived: false,
+    el: root, tagRoot, body, bubTxt, bubDot, flip, tag, img, legs, spr, sitImg: null, sprite: av.sprite, x: startAt.x, y: startAt.y, state: '', bubKey: null, arrived: false,
     scene: sc, walk: null, seated: false, seat: null, away: false, trip: null, target: null, targetKey: '', slot: av.slot, isLead: false, frec: null, m: null, rng: null,
   };
   if (sitSet.has(av.sprite)) {
@@ -447,6 +495,7 @@ function takenSpots(frec, except) {
     const id = a !== except && a.away ? a.trip?.cur?.spotId : undefined;
     if (id) taken.set(id, (taken.get(id) ?? 0) + 1);
   }
+  if (cat?.spotId && cat.frec === frec) taken.set(cat.spotId, (taken.get(cat.spotId) ?? 0) + 1); // the cat's own spot
   return taken;
 }
 
@@ -631,7 +680,7 @@ function armSay(rec) {
   g.timer = clockTimers.setTimeout(() => {
     g.timer = 0;
     g.step++;
-    setText(g.say, line('heldLong'));
+    setText(g.say, line(rec.isCat ? 'catHeldLong' : 'heldLong'));
     armSay(rec);
   }, after[g.step] - (after[g.step - 1] ?? 0));
 }
@@ -649,10 +698,11 @@ function liftUp(rec) {
   freeze(rec); // a walking character stops where it is
   clearGestures(rec);
   setPose(rec, false, false);
+  if (rec.isCat) catHold();
   rec.seat = null; // it left its desk: the way back must not start through the desk
   rec.arrived = false;
   const shadow = el('div', 'gshadow');
-  const say = el('div', 'bub grab', line(rec.isLead ? 'liftLead' : 'lift'));
+  const say = el('div', 'bub grab', line(rec.isCat ? 'catLift' : rec.isLead ? 'liftLead' : 'lift'));
   rec.el.prepend(shadow);
   rec.tagRoot.append(say);
   rec.grab = { phase: 'held', id: p.id, step: 0, timer: 0, shadow, say, stars: null, samples: [], anims: null };
@@ -674,6 +724,7 @@ function dropChar(rec, stars, fling = null) {
   if (stars && fling && throwChar(rec, fling)) return;
   const { frec } = rec;
   placeAt(rec, dropPoint(nav.grid(frec.design), [rec.x, rec.y], frec.scene.r.size) ?? [rec.x, rec.y]);
+  if (rec.isCat) return landChar(rec, catLanding()); // a cat lands on its feet: no scene, no stars
   const hit = stars ? partnerAt(rec) : null;
   if (hit && hit.kind !== 'bossLine') {
     landChar(rec, null, false);
@@ -693,13 +744,15 @@ function landChar(rec, dizzy, walk = false) {
   if (!dizzy) return finishDrop(rec, walk);
   g.phase = 'dizzy';
   setText(g.say, dizzy.text);
-  g.stars = el('div', 'stars');
-  for (let k = 0; k < 3; k++) {
-    const star = el('i', '', '★');
-    star.style.setProperty('--k', String(k));
-    g.stars.append(star);
+  if (!rec.isCat) {
+    g.stars = el('div', 'stars');
+    for (let k = 0; k < 3; k++) {
+      const star = el('i', '', '★');
+      star.style.setProperty('--k', String(k));
+      g.stars.append(star);
+    }
+    rec.el.append(g.stars);
   }
-  rec.el.append(g.stars);
   g.timer = clockTimers.setTimeout(() => {
     g.timer = 0;
     finishDrop(rec);
@@ -719,7 +772,7 @@ function throwChar(rec, fling) {
   const path = throwPath([rec.x, rec.y], fling, box, T);
   g.phase = 'flying';
   g.flight = path.pts.at(-1);
-  setText(g.say, line('thrown'));
+  setText(g.say, line(rec.isCat ? 'catLift' : 'thrown'));
   const move = path.pts.map((p, i) => ({ offset: path.offsets[i], transform: `translate(${p[0]}px, ${p[1]}px)` }));
   // the body rises on each leg and comes down at the walls (the wall height is lower than the hand)
   const arc = [{ offset: 0, translate: `0 -${LIFT_PX}px`, easing: 'ease-out' }];
@@ -750,7 +803,7 @@ function landThrown(rec) {
   placeAt(rec, dropPoint(nav.grid(frec.design), g.flight, frec.scene.r.size) ?? g.flight);
   cancelFlight(g); // after the inline position is set, so the character does not blink back to the start
   g.flight = null;
-  landChar(rec, { dizzyMs: ui.ui.throw.dizzyMs, text: line('landed') });
+  landChar(rec, rec.isCat ? catLanding() : { dizzyMs: ui.ui.throw.dizzyMs, text: line('landed') });
 }
 
 /** The drop is over: near a free rest spot it rests there for an ambient-style stay, otherwise it walks to where the server wants it. */
@@ -761,6 +814,7 @@ function finishDrop(rec, walk = true) {
   g.say.remove();
   rec.tagRoot.classList.remove('dizzy');
   rec.grab = null;
+  if (rec.isCat) return catNext(); // the cat wanders off
   if (!walk) return;
   const { frec } = rec;
   const spot = amb.enabled && rec.state !== 'done' ? restSpotNear(frec.scene.r.spots, takenSpots(frec, rec), [rec.x, rec.y], ui.ui.grab.restRadiusPx) : null;
@@ -783,6 +837,7 @@ function slipOut(rec) {
 /** The small window opened or closed: moving the floors cancels running animations, so flights end where they were going. */
 function landFlights() {
   for (const f of floorRecs.values()) for (const a of f.agents.values()) if (a.grab?.phase === 'flying') landThrown(a);
+  if (cat?.rec.grab?.phase === 'flying') landThrown(cat.rec);
 }
 
 /** Forgets a press, hold, scene or speech at once (floor gone, tab hidden): no animation, no leftover timer, listener state or node. */
@@ -853,6 +908,7 @@ function clearSteam(rec) {
 
 /** A plain click: the reaction grows with quick repeated clicks (ui.poke), at the top level steam comes off the head. */
 function pokeChar(rec) {
+  if (rec.isCat) return petCat(rec);
   if (rec.state === 'done' || rec.grab || rec.play || rec.el.classList.contains('gone')) return;
   const P = ui.ui.poke;
   rec.poke = nextPoke(rec.poke ?? null, performance.now(), P);
@@ -966,6 +1022,174 @@ function endPlay(sc, except, home = true) {
   else if (!host.seated && sc.kind === 'highFive') setFacing(host, host.target.face);
 }
 
+// ---------- office cat: one cat for the whole office (screen play only: nothing is sent or saved) ----------
+
+/** The cat's one timer (at most one is pending; a walk is a CSS transition and needs none). */
+function catAt(ms, fn) {
+  if (cat.timer) clockTimers.clearTimeout(cat.timer);
+  cat.timer = clockTimers.setTimeout(() => {
+    cat.timer = 0;
+    fn();
+  }, ms);
+}
+
+function catEnter(rec) {
+  for (const e of [rec.el, rec.tagRoot]) {
+    e.classList.remove('enter-in');
+    void e.offsetWidth;
+    e.classList.add('enter-in');
+  }
+}
+
+/** The cat shows up at the door of `frec`, and starts its day a few seconds later. */
+function catSpawn(frec) {
+  const { door } = frec.scene.r;
+  const rec = createChar({ sprite: 'cat-walk-1', slot: null }, frec.stage, { x: door.at[0], y: door.at[1] }, frec.scene, true);
+  rec.frec = frec;
+  rec.isCat = true;
+  rec.state = 'cat';
+  setText(rec.tag, catC.name);
+  setFacing(rec, door.face);
+  cat = { rec, frec, timer: 0, leaveAt: Date.now() + between(Math.random, catC.moveEveryMs), spotId: '', poke: null, force: '' };
+  catEnter(rec);
+  catAt(between(Math.random, catC.firstDelayMs), catNext);
+}
+
+/** The cat is gone (its floor went away, or the last floor did); the next render brings it back on another floor. */
+function catRemove() {
+  const { rec } = cat;
+  if (cat.timer) clockTimers.clearTimeout(cat.timer);
+  cancelGrab(rec);
+  rec.el.remove();
+  rec.tagRoot.remove();
+  cat = null;
+}
+
+/** Keeps the cat in step with the floors: none without floors, one on some floor, a pending timer unless it is busy. */
+function catSync() {
+  if (!catC || document.body.classList.contains('paused')) return;
+  if (cat && !floorRecs.has(cat.frec.sid)) catRemove();
+  if (!floorRecs.size) return;
+  if (!cat) return catSpawn([...floorRecs.values()][Math.floor(Math.random() * floorRecs.size)]);
+  const { rec } = cat;
+  if (!cat.timer && !rec.walk && !rec.grab && !rec.press) catAt(between(Math.random, catC.firstDelayMs), catNext);
+}
+
+/** The hidden tab: the cat stops where it is, nothing of it keeps running. */
+function catSettle() {
+  if (!cat) return;
+  const { rec } = cat;
+  if (cat.timer) clockTimers.clearTimeout(cat.timer);
+  cat.timer = 0;
+  cancelGrab(rec);
+  rec.tagRoot.querySelectorAll('.hearts').forEach((h) => h.remove());
+  if (rec.walk) {
+    rec.walk = null;
+    rec.el.classList.remove('walking');
+    placeAt(rec, [rec.x, rec.y], false);
+  }
+  if (rec.el.classList.contains('gone')) catRelocate();
+}
+
+function setCatPose(pose) {
+  for (const e of [cat.rec.el, cat.rec.tagRoot]) {
+    e.classList.toggle('cat-sit', pose === 'sit');
+    e.classList.toggle('cat-sleep', pose === 'sleep');
+  }
+}
+
+/** Picked up: it stops what it was doing. */
+function catHold() {
+  if (cat.timer) clockTimers.clearTimeout(cat.timer);
+  cat.timer = 0;
+  cat.spotId = '';
+  setCatPose('stand');
+}
+
+const catLanding = () => ({ dizzyMs: catC.landMs, text: line('catLanded') });
+
+/** The cat's next act: walk to a spot, a colleague's desk or a random point and stay a while, or leave for another floor. */
+function catNext() {
+  const { rec, frec } = cat;
+  if (rec.grab) return;
+  const { r } = frec.scene;
+  setCatPose('stand');
+  cat.spotId = '';
+  const desks = [];
+  for (const a of frec.agents.values()) {
+    const seat = !a.isLead && a.slot?.kind === 'seat' && a.arrived && !a.walk && (a.state === 'working' || a.state === 'thinking') ? r.seats[a.slot.i] : null;
+    if (seat?.visit) desks.push({ x: seat.visit[0], y: seat.visit[1], face: seat.at[0] < seat.visit[0] ? 'left' : 'right', agent: a });
+  }
+  const grid = nav.grid(frec.design);
+  const pick = chooseCatAct(Math.random, {
+    cat: catC, spots: r.spots, taken: takenSpots(frec, null), desks, point: () => openPoint(Math.random, grid),
+    leaveDue: floorRecs.size > 1 && Date.now() >= cat.leaveAt, force: cat.force,
+  });
+  cat.force = '';
+  if (!pick) return catAt(between(Math.random, catC.pauseMs), catNext);
+  if (pick.act === 'leave') {
+    const { door } = r;
+    goTo(rec, frec, { x: door.at[0], y: door.at[1], face: door.face, seated: false, seat: null }, () => {
+      rec.el.classList.add('gone'); // fades out at the door
+      rec.tagRoot.hidden = true;
+      catAt(400, catRelocate);
+    });
+    return;
+  }
+  cat.spotId = pick.spotId ?? '';
+  goTo(rec, frec, { x: pick.x, y: pick.y, face: pick.face, seated: false, seat: null }, () => {
+    setCatPose(pick.pose);
+    if (pick.desk && Math.random() < catC.reactChance) chatter(pick.desk.agent, line('catNear'), catC.reactMs);
+    catAt(pick.ms, catNext);
+  });
+}
+
+/** The cat comes out of the door of another floor (the same floor when there is no other). */
+function catRelocate() {
+  const { rec } = cat;
+  const id = otherFloor(Math.random, [...floorRecs.keys()], cat.frec.sid) ?? cat.frec.sid;
+  const frec = floorRecs.get(id);
+  const { door } = frec.scene.r;
+  frec.stage.append(rec.el, rec.tagRoot);
+  rec.frec = frec;
+  rec.scene = frec.scene;
+  cat.frec = frec;
+  cat.leaveAt = Date.now() + between(Math.random, catC.moveEveryMs);
+  placeAt(rec, door.at);
+  setFacing(rec, door.face);
+  rec.el.classList.remove('gone');
+  rec.tagRoot.hidden = false;
+  catEnter(rec);
+  if (!document.body.classList.contains('paused')) catAt(between(Math.random, catC.firstDelayMs), catNext);
+}
+
+/** A plain click on the cat: hearts and a purr, and a bigger one for each quick click after it (ui.cat.pet). */
+function petCat(rec) {
+  if (rec.grab) return;
+  const P = catC.pet;
+  if (rec.walk) freeze(rec);
+  cat.poke = nextPoke(cat.poke, performance.now(), P);
+  const lv = cat.poke.level;
+  if (rec.el.classList.contains('cat-sleep')) setCatPose('sit'); // a sleeper wakes up
+  sayFor(rec, line(`catPet${lv}`), P.sayMs);
+  const hearts = el('div', 'hearts');
+  for (let k = 0; k < P.hearts[lv - 1]; k++) {
+    const h = el('i', '', '♥');
+    h.style.setProperty('--k', String(k));
+    h.style.setProperty('--hx', String(((k * 7) % 5 - 2) * 7)); // a little spread, the same every time
+    hearts.append(h);
+  }
+  hearts.addEventListener('animationend', (e) => {
+    e.target.remove();
+    if (!hearts.firstChild) hearts.remove();
+  });
+  rec.tagRoot.append(hearts);
+  clearGestures(rec);
+  void rec.body.offsetWidth;
+  rec.body.classList.add(lv >= P.maxLevel ? 'fid-hop' : 'squash');
+  catAt(P.sayMs + P.pauseMs, catNext); // after a pet it goes on with its day
+}
+
 // ---------- character view ----------
 
 function setBubble(rec, bubble, since) {
@@ -1030,6 +1254,8 @@ function renderAgent(av, floorEl) {
   if (rec.sprite !== av.sprite) {
     rec.sprite = av.sprite;
     rec.img.src = spriteUrl(av.sprite);
+    for (const leg of rec.legs) leg.src = rec.img.src;
+    setLegVars(rec.spr, av.sprite);
     if (sitSet.has(av.sprite)) {
       if (rec.sitImg) rec.sitImg.src = sitUrl(av.sprite);
       else {
@@ -1383,6 +1609,7 @@ function removeSession(sessionId, withLog = true) {
   if (f) {
     stopAmbient(f);
     for (const a of f.agents.values()) cancelGrab(a);
+    if (cat?.frec === f) catRemove();
     f.el.remove();
     floorRecs.delete(sessionId);
   }
@@ -1439,6 +1666,7 @@ function render(state) {
   syncOrder(sessionsEl, rowEls);
   emptyEl.hidden = list.length > 0;
   fitFloors();
+  catSync();
 }
 
 async function refreshState() {
@@ -1552,6 +1780,7 @@ function pause() {
     stopAmbient(f);
     for (const a of f.agents.values()) settleNow(a);
   }
+  catSettle();
 }
 
 async function resume() {
@@ -1561,6 +1790,7 @@ async function resume() {
   await refreshState();
   if (document.hidden) return; // hidden again while the state was loading: stay paused
   for (const f of floorRecs.values()) startAmbient(f, true);
+  catSync();
   connect();
 }
 
