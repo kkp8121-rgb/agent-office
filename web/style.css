@@ -190,6 +190,28 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .body.thump { animation: thump .6s ease-in; }
 
+/* ---- play: poke, report, high-five, small talk (app.js "play"). A canned line hides the character's own bubble while it shows. ---- */
+.agt.talk .bub:not(.say) { display: none; }
+.bub.say { transform: translateX(calc(-50% + var(--sx, 0px))); animation: bubpop .18s ease-out; }
+.bub.say::after { margin-left: calc(-4px - var(--sx, 0px)); }
+@keyframes bubpop { from { transform: translateX(calc(-50% + var(--sx, 0px))) scale(.6); opacity: 0; } }
+.steam { position: absolute; left: 0; top: -56px; width: 0; height: 0; pointer-events: none; }
+.agt.sitting .steam { top: -42px; }
+.steam i {
+  position: absolute; left: -7px; top: 0; width: 14px; height: 14px; border-radius: 50%;
+  background: #fff; border: 2px solid #5f5849; opacity: 0;
+  animation: puff 1s ease-out infinite; animation-delay: calc(var(--k) * -333ms);
+}
+.steam i:nth-child(1) { margin-left: -30px; }
+.steam i:nth-child(2) { margin-left: 30px; }
+.steam i:nth-child(3) { margin-left: 22px; margin-top: 10px; }
+@keyframes puff { 0% { transform: translateY(2px) scale(.5); opacity: 0; } 25% { opacity: 1; } 100% { transform: translateY(-14px) scale(1.5); opacity: 0; } }
+.spark {
+  position: absolute; top: -40px; transform: translateX(-50%); padding: 0 5px; font-weight: 800; font-size: 13px; line-height: 1.3;
+  color: #8a5a00; background: #ffe27a; border: 2px solid #8a5a00; pointer-events: none; animation: spark 2s ease-out both;
+}
+@keyframes spark { 0% { transform: translateX(-50%) scale(.3) rotate(-12deg); opacity: 0; } 15% { transform: translateX(-50%) scale(1.25) rotate(6deg); opacity: 1; } 30% { transform: translateX(-50%) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
+
 /* hidden tab: nothing moves, nothing is received */
 body.paused *, body.paused *::before, body.paused *::after { animation-play-state: paused !important; transition: none !important; }
 

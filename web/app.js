@@ -6,6 +6,7 @@ import { createNav } from './nav.mjs';
 import { charZ, objectNodes, splitWalk } from './depth.mjs';
 import { fitZoom } from './pip.mjs';
 import { dropPoint, restSpotNear, shouldLift } from './grab.mjs';
+import { daypart, nextPoke, openBox, pickLine, playPartner, throwPath, throwVelocity } from './play.mjs';
 import { between, chooseFidget, chooseSpot, createFloorClock, rngFor, tripRange } from './ambient.mjs';
 
 // Visual constants (how things look/move, not planning numbers; those come from /api/ui).
@@ -15,7 +16,7 @@ const RECONNECT_MS = 3000;
 const DONE_STALE_MS = 4000; // a done agent older than this is not walked to the tray again after a reload
 const HELD_Z = 7900; // a held character draws above every object and character of its floor (the name tags sit at 8000)
 const HELD_FOLLOW_MS = 80; // a held character trails the pointer by this much, which also softens the lift
-const GRAB_SAY = { lift: '앗!', lead: '나 사장인데?!', hold: ['내려 주세요~', '일하는 중인데요…'], grumble: '툴툴…' };
+const LIFT_PX = 28; // the held character's height above its shadow (--lift in style.css)
 
 const DEBUG = new URLSearchParams(location.search).get('debug');
 const DEBUG_NAV = DEBUG === 'nav'; // ?debug=nav draws the walking grid and every scene point over each scene floor
@@ -79,20 +80,18 @@ const scenes = new Map(); // design -> {r: resolved scene, raw, url, nodes: obje
 let nav = null; // createNav over every scene
 let amb = null; // ui.ui.ambient (scaled down under ?debug=ambient)
 let sitSet = new Set(); // sprite keys that have a seated picture
-const liveTimers = new Map(); // token -> {win, id}: pending floor-clock timers (the ?debug=ambient counter reads this)
+const liveTimers = new Map(); // token -> {win, id, fire, at}: pending timers (the ?debug=ambient counter reads this)
 let timerToken = 0;
 // While the small window is open its timers are used: a hidden opener tab gets its timers throttled (once a second, later once a minute).
 const clockTimers = {
   setTimeout: (fn, ms) => {
     const win = pipWin ?? window;
     const token = ++timerToken;
-    liveTimers.set(token, {
-      win,
-      id: win.setTimeout(() => {
-        liveTimers.delete(token);
-        fn();
-      }, ms),
-    });
+    const fire = () => {
+      liveTimers.delete(token);
+      fn();
+    };
+    liveTimers.set(token, { win, id: win.setTimeout(fire, ms), fire, at: Date.now() + ms });
     return token;
   },
   clearTimeout: (token) => {
@@ -135,6 +134,7 @@ function setupScenes() {
       timers: () => liveTimers.size,
       away: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.away).length, 0),
       held: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.press || a.grab).length, 0),
+      busy: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.press || a.grab || a.play || a.say || a.steam).length, 0),
     };
   }
 }
@@ -298,6 +298,10 @@ function arriveAt(rec, target, animate = true) {
   setFacing(rec, target.face);
   setPose(rec, target.seated, animate);
   if (rec.state === 'done') rec.el.classList.add('arrived');
+  if (rec.greet) {
+    rec.greet = false; // a newcomer says hello once, at its desk
+    chatter(rec, line(`greeting${daypart(new Date().getHours())}`), ui.ui.play.greetMs, true);
+  }
 }
 
 /** Where a character belongs on a scene floor, from its server slot. `seat` is set when it sits at a desk. */
@@ -380,6 +384,7 @@ function retarget(rec, frec, target) {
 
 /** Puts the character at its target at once and cuts any walk or trip (hidden tab, first draw). */
 function settleNow(rec, animate = false) {
+  if (rec.play) endPlay(rec.play, rec, false); // nobody walks: everyone is placed at the server's spot
   cancelGrab(rec); // a hidden tab drops whatever is held
   if (!rec.target) return;
   abortTrip(rec);
@@ -422,7 +427,7 @@ function playFidget(rec, name) {
 
 function doFidget(frec, rec) {
   rec.m.nextFidgetAt = Date.now() + between(rec.rng, amb.fidgetEveryMs);
-  if (rec.walk || rec.away || rec.grab || rec.state === 'done' || rec.el.classList.contains('walking')) return;
+  if (rec.walk || rec.away || rec.grab || rec.play || rec.state === 'done' || rec.el.classList.contains('walking')) return;
   playFidget(rec, chooseFidget(rec.rng, rec.seated, amb));
 }
 
@@ -468,10 +473,16 @@ function pickLegs(frec, rec) {
 /** Two on one spot turn to face each other. */
 function chat(frec, rec, leg) {
   if (!leg.spotId) return;
+  const P = ui.ui.play;
   const mate = [...frec.agents.values()].find((a) => a !== rec && a.away && !a.walk && a.trip?.cur?.spotId === leg.spotId);
-  if (!mate) return;
+  if (!mate) {
+    if (Math.random() < P.mutterChance) chatter(rec, line('idleMutter'), P.talkMs);
+    return;
+  }
   setFacing(rec, rec.x < mate.x ? 'right' : 'left');
   setFacing(mate, mate.x < rec.x ? 'right' : 'left');
+  chatter(rec, talkLine(), P.talkMs);
+  chatter(mate, talkLine(), P.talkMs);
 }
 
 function startLeg(frec, rec) {
@@ -484,7 +495,7 @@ function startLeg(frec, rec) {
 
 function doTrip(frec, rec) {
   const range = tripRange(amb, whoOf(frec, rec));
-  const legs = range && !rec.walk && !rec.away && !rec.grab && rec.arrived && rec.state !== 'done' ? pickLegs(frec, rec) : null;
+  const legs = range && !rec.walk && !rec.away && !rec.grab && !rec.play && rec.arrived && rec.state !== 'done' ? pickLegs(frec, rec) : null;
   if (!legs?.length) return scheduleTrip(frec, rec);
   rec.away = true;
   rec.trip = { legs, i: 0, cur: null };
@@ -569,12 +580,23 @@ function bindGrab(rec) {
       p.cy = e.clientY;
       if (shouldLift(e.clientX - p.x, e.clientY - p.y, performance.now() - p.t, ui.ui.grab)) liftUp(rec);
     } else if (rec.grab?.phase === 'held' && rec.grab.id === e.pointerId) {
-      holdAt(rec, floorPoint(rec, e.clientX, e.clientY));
+      const at = floorPoint(rec, e.clientX, e.clientY);
+      sample(rec, at);
+      holdAt(rec, at);
     }
   });
   const end = (e) => {
-    if (rec.press?.id === e.pointerId) clearPress(rec); // a plain click: nothing happens
-    else if (rec.grab?.phase === 'held' && rec.grab.id === e.pointerId) dropChar(rec, true);
+    if (rec.press?.id === e.pointerId) {
+      clearPress(rec); // a plain click is a poke
+      if (e.type === 'pointerup') pokeChar(rec);
+    } else if (rec.grab?.phase === 'held' && rec.grab.id === e.pointerId) {
+      let fling = null;
+      if (e.type === 'pointerup') {
+        sample(rec, floorPoint(rec, e.clientX, e.clientY));
+        fling = throwVelocity(rec.grab.samples, performance.now(), ui.ui.throw);
+      }
+      dropChar(rec, true, fling);
+    }
   };
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) body.addEventListener(type, end);
 }
@@ -608,7 +630,8 @@ function armSay(rec) {
   if (g.step >= after.length) return;
   g.timer = clockTimers.setTimeout(() => {
     g.timer = 0;
-    setText(g.say, GRAB_SAY.hold[g.step++]);
+    g.step++;
+    setText(g.say, line('heldLong'));
     armSay(rec);
   }, after[g.step] - (after[g.step - 1] ?? 0));
 }
@@ -619,6 +642,9 @@ function liftUp(rec) {
   if (rec.state === 'done') return clearPress(rec);
   rec.press = null;
   if (p.timer) clockTimers.clearTimeout(p.timer);
+  if (rec.play) endPlay(rec.play, rec);
+  clearSay(rec);
+  clearSteam(rec);
   abortTrip(rec);
   freeze(rec); // a walking character stops where it is
   clearGestures(rec);
@@ -626,32 +652,47 @@ function liftUp(rec) {
   rec.seat = null; // it left its desk: the way back must not start through the desk
   rec.arrived = false;
   const shadow = el('div', 'gshadow');
-  const say = el('div', 'bub grab', rec.isLead ? GRAB_SAY.lead : GRAB_SAY.lift);
+  const say = el('div', 'bub grab', line(rec.isLead ? 'liftLead' : 'lift'));
   rec.el.prepend(shadow);
   rec.tagRoot.append(say);
-  rec.grab = { phase: 'held', id: p.id, step: 0, timer: 0, shadow, say, stars: null };
+  rec.grab = { phase: 'held', id: p.id, step: 0, timer: 0, shadow, say, stars: null, samples: [], anims: null };
   rec.el.classList.add('held');
   rec.tagRoot.classList.add('held');
-  holdAt(rec, floorPoint(rec, p.cx, p.cy));
+  const at = floorPoint(rec, p.cx, p.cy);
+  sample(rec, at);
+  holdAt(rec, at);
   armSay(rec);
 }
 
-/** Lets go: lands on the nearest walkable point with a squash-and-bounce; with `stars` a short dizzy spell follows before the walk back. */
-function dropChar(rec, stars) {
+/** Lets go. A fast release throws; otherwise it lands on the nearest walkable point with a squash-and-bounce, and with `stars` a
+ * short dizzy spell follows before the walk back (a worker dropped near the boss or another worker joins a little scene instead). */
+function dropChar(rec, stars, fling = null) {
   const g = rec.grab;
   if (g.timer) clockTimers.clearTimeout(g.timer);
   g.timer = 0;
   releaseCapture(rec, g.id);
+  if (stars && fling && throwChar(rec, fling)) return;
   const { frec } = rec;
   placeAt(rec, dropPoint(nav.grid(frec.design), [rec.x, rec.y], frec.scene.r.size) ?? [rec.x, rec.y]);
+  const hit = stars ? partnerAt(rec) : null;
+  if (hit && hit.kind !== 'bossLine') {
+    landChar(rec, null, false);
+    return startScene(rec, hit);
+  }
+  landChar(rec, stars ? { dizzyMs: ui.ui.grab.dizzyMs, text: line(hit ? 'bossDrop' : rec.isLead ? 'grumbleLead' : 'grumble') } : null, !stars);
+}
+
+/** The landing: held look off, squash-and-bounce, then the dizzy spell (`dizzy`: its length and line) or, without one, the walk back. */
+function landChar(rec, dizzy, walk = false) {
+  const g = rec.grab;
   rec.el.classList.remove('held');
   rec.tagRoot.classList.replace('held', 'dizzy');
   g.shadow.remove();
   void rec.body.offsetWidth;
   rec.body.classList.add('thump');
-  if (!stars) return finishDrop(rec);
+  if (!dizzy) return finishDrop(rec, walk);
   g.phase = 'dizzy';
-  setText(g.say, GRAB_SAY.grumble);
+  setText(g.say, dizzy.text);
   g.stars = el('div', 'stars');
   for (let k = 0; k < 3; k++) {
     const star = el('i', '', '★');
@@ -662,17 +703,65 @@ function dropChar(rec, stars) {
   g.timer = clockTimers.setTimeout(() => {
     g.timer = 0;
     finishDrop(rec);
-  }, ui.ui.grab.dizzyMs);
+  }, dizzy.dizzyMs);
+}
+
+/**
+ * A fast release: the character flies along the pointer's direction and bounces off the walls of its floor's walkable area.
+ * The path is computed once and played by the browser (element.animate), nothing runs per frame. False when the floor has no walkable cell.
+ */
+function throwChar(rec, fling) {
+  const { frec } = rec;
+  const box = openBox(nav.grid(frec.design));
+  if (!box) return false;
+  const T = ui.ui.throw;
+  const g = rec.grab;
+  const path = throwPath([rec.x, rec.y], fling, box, T);
+  g.phase = 'flying';
+  g.flight = path.pts.at(-1);
+  setText(g.say, line('thrown'));
+  const move = path.pts.map((p, i) => ({ offset: path.offsets[i], transform: `translate(${p[0]}px, ${p[1]}px)` }));
+  // the body rises on each leg and comes down at the walls (the wall height is lower than the hand)
+  const arc = [{ offset: 0, translate: `0 -${LIFT_PX}px`, easing: 'ease-out' }];
+  for (let i = 1; i < path.pts.length; i++) {
+    const last = i === path.pts.length - 1;
+    arc.push({ offset: (path.offsets[i - 1] + path.offsets[i]) / 2, translate: `0 -${LIFT_PX + T.arcPx}px`, easing: 'ease-in' });
+    arc.push({ offset: path.offsets[i], translate: `0 -${last ? LIFT_PX : T.wallLiftPx}px`, easing: 'ease-out' });
+  }
+  const opts = { duration: path.ms, fill: 'forwards' };
+  g.anims = [rec.el.animate(move, { ...opts, easing: 'linear' }), rec.tagRoot.animate(move, { ...opts, easing: 'linear' }), rec.body.animate(arc, opts)];
+  g.anims[0].onfinish = () => landThrown(rec);
+  return true;
+}
+
+function cancelFlight(g) {
+  if (!g.anims) return;
+  for (const a of g.anims) {
+    a.onfinish = null;
+    a.cancel();
+  }
+  g.anims = null;
+}
+
+/** The flight is over (or cut short): it lands where it ended, on the nearest walkable point, with a longer dizzy spell. */
+function landThrown(rec) {
+  const g = rec.grab;
+  const { frec } = rec;
+  placeAt(rec, dropPoint(nav.grid(frec.design), g.flight, frec.scene.r.size) ?? g.flight);
+  cancelFlight(g); // after the inline position is set, so the character does not blink back to the start
+  g.flight = null;
+  landChar(rec, { dizzyMs: ui.ui.throw.dizzyMs, text: line('landed') });
 }
 
 /** The drop is over: near a free rest spot it rests there for an ambient-style stay, otherwise it walks to where the server wants it. */
-function finishDrop(rec) {
+function finishDrop(rec, walk = true) {
   const g = rec.grab;
   if (g.timer) clockTimers.clearTimeout(g.timer);
   g.stars?.remove();
   g.say.remove();
   rec.tagRoot.classList.remove('dizzy');
   rec.grab = null;
+  if (!walk) return;
   const { frec } = rec;
   const spot = amb.enabled && rec.state !== 'done' ? restSpotNear(frec.scene.r.spots, takenSpots(frec, rec), [rec.x, rec.y], ui.ui.grab.restRadiusPx) : null;
   if (!spot) return void goTo(rec, frec, rec.target);
@@ -682,18 +771,30 @@ function finishDrop(rec) {
   frec.clock.kick();
 }
 
-/** Its agent finished while it was held (or dizzy): it slips out of the hand and leaves normally. */
+/** Its agent finished while it was held (or flying, or dizzy): it slips out of the hand and leaves normally. */
 function slipOut(rec) {
   if (rec.grab.phase === 'held') dropChar(rec, false);
-  else finishDrop(rec);
+  else {
+    if (rec.grab.phase === 'flying') landThrown(rec);
+    finishDrop(rec);
+  }
 }
 
-/** Forgets a press or hold at once (floor gone, tab hidden): no animation, no leftover timer, listener state or node. */
+/** The small window opened or closed: moving the floors cancels running animations, so flights end where they were going. */
+function landFlights() {
+  for (const f of floorRecs.values()) for (const a of f.agents.values()) if (a.grab?.phase === 'flying') landThrown(a);
+}
+
+/** Forgets a press, hold, scene or speech at once (floor gone, tab hidden): no animation, no leftover timer, listener state or node. */
 function cancelGrab(rec) {
   clearPress(rec);
+  if (rec.play) endPlay(rec.play, rec);
+  clearSay(rec);
+  clearSteam(rec);
   const g = rec.grab;
   if (!g) return;
   if (g.timer) clockTimers.clearTimeout(g.timer);
+  cancelFlight(g);
   releaseCapture(rec, g.id);
   g.shadow.remove();
   g.say.remove();
@@ -701,6 +802,168 @@ function cancelGrab(rec) {
   rec.el.classList.remove('held');
   rec.tagRoot.classList.remove('held', 'dizzy');
   rec.grab = null;
+}
+
+// ---------- play: poke, report to the boss, high-five, small talk (screen play only: nothing is sent or saved) ----------
+
+const lastLine = new Map(); // situation -> the line said last, so the same line never comes twice in a row
+
+/** A canned line of a situation (config ui.lines), never the one before it; `{task}` is filled with `fill`. */
+function line(situation, fill) {
+  const text = pickLine(Math.random, ui.ui.lines[situation], lastLine.get(situation));
+  lastLine.set(situation, text);
+  return fill === undefined ? text : text.replace('{task}', fill);
+}
+
+const talkLine = () => line(daypart(new Date().getHours()) === 'Night' && Math.random() < ui.ui.play.nightTalkChance ? 'smallTalkNight' : 'smallTalk');
+
+/** A short canned line over a character's head. While it shows it hides the character's own bubble, so keep `ms` short. One per character. */
+function sayFor(rec, text, ms, shiftPx = 0) {
+  clearSay(rec);
+  const b = el('div', 'bub say', text);
+  if (shiftPx) b.style.setProperty('--sx', `${shiftPx}px`); // two speakers side by side lean apart so their bubbles do not overlap
+  rec.tagRoot.append(b);
+  rec.tagRoot.classList.add('talk');
+  rec.say = { el: b, timer: clockTimers.setTimeout(() => clearSay(rec), ms) };
+}
+
+function clearSay(rec) {
+  const s = rec.say;
+  if (!s) return;
+  rec.say = null;
+  clockTimers.clearTimeout(s.timer);
+  s.el.remove();
+  rec.tagRoot.classList.remove('talk');
+}
+
+/** Small talk and greetings: skipped while the character's real bubble is fresh (its task text wins), unless `force`. */
+function chatter(rec, text, ms, force = false) {
+  if (rec.grab || rec.play || rec.say || rec.state === 'done' || rec.el.classList.contains('gone')) return;
+  if (!force && rec.hasBubble && lastNow - rec.since < ui.bubbleShowMs) return;
+  sayFor(rec, text, ms);
+}
+
+function clearSteam(rec) {
+  const s = rec.steam;
+  if (!s) return;
+  rec.steam = null;
+  clockTimers.clearTimeout(s.timer);
+  s.el.remove();
+}
+
+/** A plain click: the reaction grows with quick repeated clicks (ui.poke), at the top level steam comes off the head. */
+function pokeChar(rec) {
+  if (rec.state === 'done' || rec.grab || rec.play || rec.el.classList.contains('gone')) return;
+  const P = ui.ui.poke;
+  rec.poke = nextPoke(rec.poke ?? null, performance.now(), P);
+  const lv = rec.poke.level;
+  sayFor(rec, line(`${rec.isLead ? 'pokeLead' : 'poke'}${lv}`), P.sayMs);
+  clearGestures(rec);
+  rec.body.style.removeProperty('--fid-delay');
+  void rec.body.offsetWidth;
+  rec.body.classList.add(lv >= P.maxLevel ? 'fid-hop' : 'squash');
+  if (lv < P.maxLevel) return;
+  clearSteam(rec);
+  const steam = el('div', 'steam');
+  for (let k = 0; k < 3; k++) {
+    const puff = el('i');
+    puff.style.setProperty('--k', String(k));
+    steam.append(puff);
+  }
+  rec.tagRoot.append(steam);
+  rec.steam = { el: steam, timer: clockTimers.setTimeout(() => clearSteam(rec), P.steamMs) };
+}
+
+/** Records the pointer for the throw: the last few floor points with their time (only while held). */
+function sample(rec, [x, y]) {
+  const s = rec.grab.samples;
+  s.push({ t: performance.now(), x, y });
+  if (s.length > ui.ui.throw.maxSamples) s.shift();
+}
+
+/** Characters that can join a little scene: standing or sitting still, not held, not in another scene, not finished or asleep. */
+const playable = (a) => a.arrived && !a.walk && !a.grab && !a.press && !a.play && a.state !== 'done' && a.state !== 'stale' && !a.el.classList.contains('gone');
+
+/** Who the character just dropped at its feet is near (see playPartner), or null. */
+function partnerAt(rec) {
+  const P = ui.ui.play;
+  const others = [...rec.frec.agents.values()].filter((a) => a !== rec && playable(a)).map((a) => ({ id: a, isLead: a.isLead, x: a.x, y: a.y }));
+  return playPartner({ id: rec, isLead: rec.isLead }, [rec.x, rec.y], others, { report: P.reportRadiusPx, highFive: P.highFiveRadiusPx });
+}
+
+/** Where a visitor stands to face `host`: at its desk's visiting spot when it sits, else beside it on the visitor's side. */
+function standPoint(frec, host, from) {
+  const { r } = frec.scene;
+  if (host.seat) return host.isLead ? host.seat.approach : (r.seats[host.slot.i]?.visit ?? host.seat.approach);
+  const side = from.x < host.x ? -1 : 1;
+  return dropPoint(nav.grid(frec.design), [host.x + side * ui.nav.arrivalGapPx, host.y], r.size) ?? [host.x, host.y];
+}
+
+/** The worker walks up to the other character; `sc` is the scene both belong to while it lasts (rec.play). */
+function startScene(guest, hit) {
+  const { frec } = guest;
+  const host = hit.other.id;
+  const sc = { kind: hit.kind, guest, host, timer: 0, spark: null, hostAway: host.away };
+  guest.play = host.play = sc;
+  abortTrip(host); // a host out on a trip stays where it stands and walks home afterwards
+  clearSay(host);
+  clearSteam(host);
+  const at = standPoint(frec, host, guest);
+  goTo(guest, frec, { x: at[0], y: at[1], face: host.x < at[0] ? 'left' : 'right', seated: false, seat: null }, () => sceneAct(sc));
+}
+
+const hopOnce = (rec) => {
+  clearGestures(rec);
+  rec.body.style.removeProperty('--fid-delay');
+  void rec.body.offsetWidth;
+  rec.body.classList.add('fid-hop');
+};
+
+/** The visitor has arrived: the report (what it really does now, then the boss answers) or the high-five. */
+function sceneAct(sc) {
+  const { guest, host } = sc;
+  if (guest.play !== sc) return;
+  const P = ui.ui.play;
+  const away = host.x < guest.x ? 1 : -1; // the guest's bubble leans away from the host and the host's the other way
+  if (sc.kind === 'report') {
+    const task = guest.bubbleText;
+    sayFor(guest, task ? line('report', task) : line('reportRest'), P.reportSayMs, away * P.bubbleLeanPx);
+    sc.timer = clockTimers.setTimeout(() => {
+      sayFor(host, line('bossReply'), P.replyMs, -away * P.bubbleLeanPx);
+      sc.timer = clockTimers.setTimeout(() => endPlay(sc, null), P.replyMs + P.endPauseMs);
+    }, P.replyDelayMs);
+    return;
+  }
+  if (!host.seated) setFacing(host, guest.x < host.x ? 'left' : 'right');
+  hopOnce(guest);
+  hopOnce(host);
+  sc.spark = el('div', 'spark', '짝!');
+  sc.spark.style.left = `${(host.x - guest.x) / 2}px`;
+  guest.tagRoot.append(sc.spark);
+  sayFor(guest, line('highFive'), P.highFiveMs, away * P.bubbleLeanPx);
+  sayFor(host, line('highFive'), P.highFiveMs, -away * P.bubbleLeanPx);
+  sc.timer = clockTimers.setTimeout(() => endPlay(sc, null), P.highFiveMs + P.endPauseMs);
+}
+
+/**
+ * Ends a scene: bubbles and sparks go, the visitor (and a host that left its trip stop) walk back to where the server wants them.
+ * `except` is the one the caller deals with itself (it was picked up, finished, or moved by the server); `home` false walks nobody.
+ */
+function endPlay(sc, except, home = true) {
+  const { guest, host } = sc;
+  if (guest.play !== sc) return;
+  if (sc.timer) clockTimers.clearTimeout(sc.timer);
+  sc.spark?.remove();
+  for (const r of [guest, host]) {
+    r.play = null;
+    clearSay(r);
+    r.body.classList.remove('fid-hop');
+  }
+  if (!home) return;
+  if (guest !== except) goTo(guest, guest.frec, guest.target);
+  if (host === except) return;
+  if (sc.hostAway) goTo(host, host.frec, host.target);
+  else if (!host.seated && sc.kind === 'highFive') setFacing(host, host.target.face);
 }
 
 // ---------- character view ----------
@@ -714,10 +977,12 @@ function setBubble(rec, bubble, since) {
   rec.hasBubble = !empty;
   rec.bubTxt.classList.toggle('empty', empty);
   rec.bubDot.classList.toggle('empty', empty);
+  rec.bubbleText = '';
   if (empty) return;
   const chars = Array.from(bubble);
   const max = ui.ui.bubbleMaxChars;
   const text = chars.length > max ? `${chars.slice(0, max - 1).join('')}…` : bubble;
+  rec.bubbleText = text; // the report to the boss says the same words
   setText(rec.bubTxt, text);
   const remain = Math.max(0, ui.bubbleShowMs - (lastNow - since));
   for (const b of [rec.bubTxt, rec.bubDot]) {
@@ -750,6 +1015,7 @@ function renderAgent(av, floorEl) {
     if (frec.populated && !isLead) {
       rec.el.classList.add('enter-in');
       rec.tagRoot.classList.add('enter-in');
+      rec.greet = !done;
     }
     initAmbient(rec, frec, av);
     setFacing(rec, walksIn ? door.face : target.face);
@@ -802,6 +1068,7 @@ function renderAgent(av, floorEl) {
   setBubble(rec, av.bubble, av.since);
 
   rec.target = target;
+  if (rec.play && (done || rec.targetKey !== key)) endPlay(rec.play, rec); // the server moved it: its scene is over
   if (rec.grab) {
     rec.targetKey = key; // held or dizzy: remember the place, apply it after the drop
     if (done) slipOut(rec);
@@ -1323,6 +1590,7 @@ async function openPip() {
   }
   d.documentElement.style.setProperty('--sit-h', `${ui.sitHeight}px`);
   d.body.classList.add('pip-mini');
+  landFlights(); // moving the floors cancels running animations
   pipWin = w;
   d.body.append(floorsEl);
   holdEl.hidden = false;
@@ -1335,7 +1603,14 @@ async function openPip() {
 /** Brings the floors back to this page (the small window closed, or the person asked). Safe to call twice. */
 function pipClosed() {
   if (!pipWin) return;
+  const gone = pipWin;
   pipWin = null;
+  landFlights();
+  for (const t of liveTimers.values()) {
+    if (t.win !== gone) continue; // the closed window's timers died with it: they run on this page now
+    t.win = window;
+    t.id = window.setTimeout(t.fire, Math.max(0, t.at - Date.now()));
+  }
   holdEl.before(floorsEl);
   holdEl.hidden = true;
   floorsEl.style.zoom = '';
