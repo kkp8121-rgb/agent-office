@@ -4,6 +4,7 @@
 import { resolveScene, trayPoint } from './scene.mjs';
 import { createNav } from './nav.mjs';
 import { charZ, objectNodes, splitWalk } from './depth.mjs';
+import { fitZoom } from './pip.mjs';
 import { between, chooseFidget, chooseSpot, createFloorClock, rngFor, tripRange } from './ambient.mjs';
 
 // Visual constants (how things look/move, not planning numbers; those come from /api/ui).
@@ -25,6 +26,8 @@ const sessionsEl = $('sessions');
 const logEl = $('log');
 const emptyEl = $('empty');
 const connEl = $('conn');
+const holdEl = $('pip-hold');
+const pipBtn = $('pip');
 
 const STATUS_TEXT = { busy: '작업 중', waiting: '입력 대기', leaving: '퇴근 중' };
 const PROVIDER_TEXT = { claude: 'Claude', codex: 'Codex' };
@@ -33,6 +36,7 @@ let ui = null; // /api/ui
 let es = null; // EventSource (kept after close() so readyState stays inspectable)
 let retryTimer = 0;
 let lastNow = Date.now(); // server clock of the latest state
+let pipWin = null; // the Document Picture-in-Picture window while the floors live there
 
 const floorRecs = new Map(); // sessionId -> {el, stage, refs..., agents: Map(key -> rec)}
 const rowRecs = new Map(); // sessionId -> {el, ...}
@@ -44,12 +48,20 @@ const recOf = new WeakMap(); // character element -> rec
 
 /** Scales the floors down (CSS zoom) so the widest one fits beside the panel, or above it in a narrow window. */
 function fitFloors() {
-  const cs = getComputedStyle(appEl);
-  const sideBySide = cs.flexDirection === 'row';
-  const avail = appEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
-    - (sideBySide ? panelEl.offsetWidth + parseFloat(cs.columnGap) : 0);
+  const doc = floorsEl.ownerDocument; // the small window's document while the floors are there
+  let avail;
+  if (doc.body.classList.contains('pip-mini')) {
+    // mini layout: floors only, the whole window width minus the body padding
+    const cs = doc.defaultView.getComputedStyle(doc.body);
+    avail = doc.documentElement.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  } else {
+    const cs = getComputedStyle(appEl);
+    const sideBySide = cs.flexDirection === 'row';
+    avail = appEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      - (sideBySide ? panelEl.offsetWidth + parseFloat(cs.columnGap) : 0);
+  }
   const widest = Math.max(0, ...[...floorRecs.values()].map((r) => r.scene.r.size[0]));
-  floorsEl.style.zoom = widest > avail ? String(Math.max(avail, 0) / widest) : '';
+  floorsEl.style.zoom = fitZoom(avail, widest);
 }
 
 function showConn(text) {
@@ -63,19 +75,27 @@ const scenes = new Map(); // design -> {r: resolved scene, raw, url, nodes: obje
 let nav = null; // createNav over every scene
 let amb = null; // ui.ui.ambient (scaled down under ?debug=ambient)
 let sitSet = new Set(); // sprite keys that have a seated picture
-const liveTimers = new Set(); // pending floor-clock timers (the ?debug=ambient counter reads this)
+const liveTimers = new Map(); // token -> {win, id}: pending floor-clock timers (the ?debug=ambient counter reads this)
+let timerToken = 0;
+// While the small window is open its timers are used: a hidden opener tab gets its timers throttled (once a second, later once a minute).
 const clockTimers = {
   setTimeout: (fn, ms) => {
-    const id = window.setTimeout(() => {
-      liveTimers.delete(id);
-      fn();
-    }, ms);
-    liveTimers.add(id);
-    return id;
+    const win = pipWin ?? window;
+    const token = ++timerToken;
+    liveTimers.set(token, {
+      win,
+      id: win.setTimeout(() => {
+        liveTimers.delete(token);
+        fn();
+      }, ms),
+    });
+    return token;
   },
-  clearTimeout: (id) => {
-    liveTimers.delete(id);
-    window.clearTimeout(id);
+  clearTimeout: (token) => {
+    const t = liveTimers.get(token);
+    if (!t) return;
+    liveTimers.delete(token);
+    t.win.clearTimeout(t.id);
   },
 };
 
@@ -194,7 +214,7 @@ function placeAt(rec, p, commit = true) {
 /** Stops a walk where the character is right now (the one place the live position is read). */
 function freeze(rec) {
   if (!rec.walk) return;
-  const m = new DOMMatrixReadOnly(getComputedStyle(rec.el).transform);
+  const m = new DOMMatrixReadOnly(rec.el.ownerDocument.defaultView.getComputedStyle(rec.el).transform);
   rec.walk = null;
   rec.el.classList.remove('walking');
   placeAt(rec, [m.m41, m.m42]);
@@ -1100,7 +1120,68 @@ async function resume() {
   connect();
 }
 
+// ---------- picture-in-picture ----------
+
+/** Moves the live floor stack into a small always-on-top window; the page keeps updating it as before. */
+async function openPip() {
+  let w;
+  try {
+    w = await window.documentPictureInPicture.requestWindow({ width: ui.ui.pip.width, height: ui.ui.pip.height });
+  } catch {
+    showConn('작은 창을 열지 못했습니다');
+    setTimeout(() => { connEl.hidden = true; }, RECONNECT_MS);
+    return;
+  }
+  const d = w.document;
+  d.title = '에이전트 사무실';
+  // a new window has no styles and no base address: copy ours, with absolute addresses
+  const base = d.createElement('base');
+  base.href = location.href;
+  d.head.append(base);
+  for (const node of document.querySelectorAll('link[rel="stylesheet"], style')) {
+    const copy = d.createElement(node.localName);
+    if (node.localName === 'link') Object.assign(copy, { rel: 'stylesheet', href: node.href });
+    else copy.textContent = node.textContent;
+    d.head.append(copy);
+  }
+  d.documentElement.style.setProperty('--sit-h', `${ui.sitHeight}px`);
+  d.body.classList.add('pip-mini');
+  pipWin = w;
+  d.body.append(floorsEl);
+  holdEl.hidden = false;
+  w.addEventListener('resize', fitFloors);
+  w.addEventListener('pagehide', pipClosed);
+  for (const f of floorRecs.values()) f.clock.kick(); // move the one clock timer to the small window
+  fitFloors();
+}
+
+/** Brings the floors back to this page (the small window closed, or the person asked). Safe to call twice. */
+function pipClosed() {
+  if (!pipWin) return;
+  pipWin = null;
+  holdEl.before(floorsEl);
+  holdEl.hidden = true;
+  floorsEl.style.zoom = '';
+  if (document.hidden) pause(); // pausing was skipped while the small window showed the office
+  else for (const f of floorRecs.values()) f.clock.kick(); // its timer died with the small window
+  fitFloors();
+}
+
+function togglePip() {
+  if (!pipWin) return void openPip();
+  const w = pipWin;
+  pipClosed();
+  w.close();
+}
+
+if ('documentPictureInPicture' in window) {
+  pipBtn.hidden = false;
+  pipBtn.addEventListener('click', togglePip);
+  $('pip-back').addEventListener('click', togglePip);
+}
+
 document.addEventListener('visibilitychange', () => {
+  if (pipWin) return; // the small window keeps the office live while this tab is hidden
   if (document.hidden) pause();
   else resume();
 });

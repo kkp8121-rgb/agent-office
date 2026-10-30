@@ -194,11 +194,22 @@ body.paused *, body.paused *::before, body.paused *::after { animation-play-stat
 .ev .h b { font-size: 12px; border-left: 3px solid var(--c); padding-left: 5px; }
 .ev .h span { color: var(--muted); font-size: 11px; flex: none; }
 .ev p { margin: 1px 0 0; color: #5b4d3a; overflow-wrap: anywhere; }
-#quit { align-self: flex-end; margin-top: 10px; border: 1.5px solid var(--muted); background: #e9e2d2; color: #6b5d45; padding: 2px 12px; font-size: 11px; }
+#panel .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+#quit, #pip { border: 1.5px solid var(--muted); background: #e9e2d2; color: #6b5d45; padding: 2px 12px; font-size: 11px; }
 #conn {
   position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 99999;
   background: var(--ink); color: var(--paper); padding: 6px 14px; border-radius: 6px;
 }
+
+/* picture-in-picture: the floors move into a small always-on-top window (app.js openPip); only floors, scaled to the width.
+   The same class on a normal page's body shows the mini layout for checking. */
+#pip-hold { flex: none; width: 320px; padding: 16px; text-align: center; color: var(--muted); border: 2px dashed var(--line); border-radius: 8px; }
+#pip-hold p { margin: 0 0 8px; }
+#pip-back { border: 1.5px solid var(--ink); background: #fff; padding: 2px 10px; font-size: 11px; box-shadow: 2px 2px 0 rgba(59, 47, 34, .3); }
+.pip-mini { margin: 0; padding: 6px; }
+html:has(.pip-mini) { scrollbar-gutter: stable; }
+.pip-mini #app { display: block; padding: 0; }
+.pip-mini #panel, .pip-mini #pip-hold { display: none; }
 
 /* narrow window: the panel goes under the floors, which scale to the width (see fitFloors in app.js) */
 @media (max-width: 1099px) {

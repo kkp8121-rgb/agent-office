@@ -10,13 +10,20 @@
 <body>
 <main id="app">
   <div id="floors"></div>
+  <div id="pip-hold" hidden>
+    <p>작은 창에서 보는 중</p>
+    <button id="pip-back" type="button">여기로 되돌리기</button>
+  </div>
   <aside id="panel">
     <h2>세션</h2>
     <div id="sessions"></div>
     <div id="empty" hidden>실행 중인 세션이 없습니다. Claude Code나 Codex를 실행하면 층이 생깁니다.</div>
     <h2 class="log-head"><span>기록</span><a href="/log" target="_blank" rel="noopener">전체 기록 ↗</a></h2>
     <div id="log" role="log" aria-label="기록"></div>
-    <button id="quit" type="button">끄기</button>
+    <div class="foot">
+      <button id="pip" type="button" hidden title="항상 위 작은 창으로 띄우기">작은 창</button>
+      <button id="quit" type="button">끄기</button>
+    </div>
   </aside>
 </main>
 <div id="conn" role="status" hidden></div>
