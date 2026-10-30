@@ -193,6 +193,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ---- play: poke, report, high-five, small talk (app.js "play"). A canned line hides the character's own bubble while it shows. ---- */
 .agt.talk .bub:not(.say) { display: none; }
+.agt.meet .tag { display: none; } /* workflow meeting: six name tags at the board would pile up (class set and cleared in app.js with `talk`) */
 .bub.say { transform: translateX(calc(-50% + var(--sx, 0px))); animation: bubpop .18s ease-out; }
 .bub.say::after { margin-left: calc(-4px - var(--sx, 0px)); }
 @keyframes bubpop { from { transform: translateX(calc(-50% + var(--sx, 0px))) scale(.6); opacity: 0; } }
@@ -363,7 +364,7 @@ li.completed .tx { text-decoration: line-through; }
 .mood { position: absolute; left: 10px; top: -64px; width: 0; height: 0; pointer-events: none; }
 .agt.sitting .mood { top: -50px; }
 .mood i { position: absolute; background-repeat: no-repeat; background-size: 100% 100%; image-rendering: pixelated; }
-.mood.sweat i { left: 0; top: 0; width: 14px; height: 18px; animation: mood-drip .8s ease-in infinite; }
+.mood.sweat i { left: -2px; top: -2px; width: 18px; height: 22px; animation: mood-drip .8s ease-in infinite; }
 .mood.cloud { left: -14px; top: -84px; }
 .agt.sitting .mood.cloud { top: -70px; }
 .mood.cloud i { left: 0; top: 0; width: 28px; height: 22px; animation: mood-swap 1s steps(1) infinite; }

@@ -1199,7 +1199,7 @@ function onPhase(sig) {
     clearSay(rec);
     clearSteam(rec);
     rec.play = next;
-    rec.tagRoot.classList.add('talk'); // their own task bubbles step aside so the boss's line is readable
+    rec.tagRoot.classList.add('talk', 'meet'); // their own task bubbles step aside so the boss's line is readable; the name tags step aside too, or six of them pile up at the board
     next.members.add(rec);
     walkMs = Math.max(walkMs, goTo(rec, frec, { x: spot.at[0], y: spot.at[1], face: spot.face, seated: false, seat: null }));
   }
@@ -1222,7 +1222,7 @@ function endMeeting(mt) {
   for (const rec of crew) {
     rec.play = null;
     clearSay(rec);
-    rec.tagRoot.classList.remove('talk');
+    rec.tagRoot.classList.remove('talk', 'meet');
     goTo(rec, mt.frec, rec.target);
   }
 }
@@ -1237,7 +1237,7 @@ function leaveMeeting(mt, rec) {
   mt.members.delete(rec);
   rec.play = null;
   clearSay(rec);
-  rec.tagRoot.classList.remove('talk');
+  rec.tagRoot.classList.remove('talk', 'meet');
   if (mt.members.size === 0) finishMeeting(mt);
 }
 

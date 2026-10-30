@@ -2,7 +2,7 @@
 
   python art/seasonal/build_fx.py
 Writes sweat-drop, rain-cloud-1/2 and sparkle-1/2. Characters: '.' clear, 'o' outline,
-others are palette keys below.
+others are palette keys below. The sweat drop has a 1px 'w' ring outside its 'o' outline so it reads on any background.
 """
 import os
 
@@ -18,15 +18,17 @@ PAL = {
 
 SPRITES = {
     "sweat-drop": [
-        "...o...",
-        "...o...",
-        "..obo..",
-        "..obo..",
-        ".obbho.",
-        ".obbbo.",
-        ".obbbo.",
-        "..obo..",
-        "...o...",
+        "....w....",
+        "...wow...",
+        "..wobow..",
+        ".wobbhow.",
+        ".wobbbow.",
+        "wobbhbbow",
+        "wobbbbbow",
+        "wobbbbbow",
+        ".wobbbow.",
+        "..wooow..",
+        "...www...",
     ],
     "rain-cloud-1": [
         "....oooo......",
