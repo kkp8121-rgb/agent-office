@@ -6,6 +6,7 @@
   --line: #ddd2bb;
   --panel: #fbf8f1;
   --walk-ms: 1200ms;
+  --lift: 28px;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -154,6 +155,40 @@ button { font: inherit; color: inherit; cursor: pointer; }
 @keyframes zz { 0%, 100% { transform: translate(0, 0); opacity: .5; } 50% { transform: translate(3px, -5px); opacity: 1; } }
 @keyframes bubhide { from { visibility: visible; } to { visibility: hidden; } }
 @keyframes bubshow { from { visibility: hidden; } to { visibility: visible; } }
+
+/* ---- grabbing: a character can be picked up, swung and dropped (app.js "grabbing"). Lift height is --lift. ---- */
+.body { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.body img { -webkit-user-drag: none; }
+.st-done .body { cursor: default; }
+.ag.held .body {
+  cursor: grabbing; transform-origin: 50% 0; translate: 0 calc(var(--lift) * -1);
+  animation: swing .8s ease-in-out infinite alternate;
+}
+.ag.held .body::before, .ag.held .zz { display: none; }
+.agt.held .tag { translate: 0 calc(var(--lift) * -1); }
+.agt.held .bub:not(.grab), .agt.dizzy .bub:not(.grab) { display: none; }
+.agt .bub.grab { display: block; bottom: 72px; }
+.agt.held .bub.grab { bottom: 100px; }
+.agt.dizzy .bub.grab { bottom: 98px; }
+.gshadow { position: absolute; left: -16px; top: -3px; width: 32px; height: 8px; border-radius: 50%; background: rgba(40, 28, 16, .32); }
+.stars { position: absolute; left: 0; top: -68px; width: 0; height: 0; pointer-events: none; transform: scaleY(.55); }
+.stars i {
+  position: absolute; left: -8px; top: -9px; font-style: normal; font-size: 17px; line-height: 1; color: #f7c331;
+  text-shadow: 1px 1px 0 #8a5a00; animation: orbit .9s linear infinite; animation-delay: calc(var(--k) * -300ms);
+}
+@keyframes swing { from { transform: rotate(-10deg); } to { transform: rotate(10deg); } }
+@keyframes thump {
+  0% { translate: 0 calc(var(--lift) * -1); scale: 1 1; }
+  30% { translate: 0 0; scale: 1.22 .76; }
+  55% { translate: 0 -10px; scale: .94 1.08; }
+  78% { translate: 0 0; scale: 1.07 .93; }
+  100% { translate: 0 0; scale: 1 1; }
+}
+@keyframes orbit {
+  from { transform: rotate(0deg) translateX(19px) rotate(0deg); }
+  to { transform: rotate(360deg) translateX(19px) rotate(-360deg); }
+}
+.body.thump { animation: thump .6s ease-in; }
 
 /* hidden tab: nothing moves, nothing is received */
 body.paused *, body.paused *::before, body.paused *::after { animation-play-state: paused !important; transition: none !important; }

@@ -5,6 +5,7 @@ import { resolveScene, trayPoint } from './scene.mjs';
 import { createNav } from './nav.mjs';
 import { charZ, objectNodes, splitWalk } from './depth.mjs';
 import { fitZoom } from './pip.mjs';
+import { dropPoint, restSpotNear, shouldLift } from './grab.mjs';
 import { between, chooseFidget, chooseSpot, createFloorClock, rngFor, tripRange } from './ambient.mjs';
 
 // Visual constants (how things look/move, not planning numbers; those come from /api/ui).
@@ -12,6 +13,9 @@ const WALK_PX_PER_SEC = 150;
 const WALK_MIN_MS = 350;
 const RECONNECT_MS = 3000;
 const DONE_STALE_MS = 4000; // a done agent older than this is not walked to the tray again after a reload
+const HELD_Z = 7900; // a held character draws above every object and character of its floor (the name tags sit at 8000)
+const HELD_FOLLOW_MS = 80; // a held character trails the pointer by this much, which also softens the lift
+const GRAB_SAY = { lift: '앗!', lead: '나 사장인데?!', hold: ['내려 주세요~', '일하는 중인데요…'], grumble: '툴툴…' };
 
 const DEBUG = new URLSearchParams(location.search).get('debug');
 const DEBUG_NAV = DEBUG === 'nav'; // ?debug=nav draws the walking grid and every scene point over each scene floor
@@ -130,6 +134,7 @@ function setupScenes() {
     window.__ambient = {
       timers: () => liveTimers.size,
       away: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.away).length, 0),
+      held: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.press || a.grab).length, 0),
     };
   }
 }
@@ -183,13 +188,14 @@ function createChar(av, stage, startAt, sc) {
     spr.append(rec.sitImg);
   }
   recOf.set(root, rec);
+  bindGrab(rec);
   // A walk is a chain of pieces; only a piece's own end moves it on.
   root.addEventListener('transitionend', (e) => {
     if (e.target !== root || e.propertyName !== 'transform') return;
     if (rec.walk) walkEnded(rec, e);
   });
   const gestureEnd = (e) => {
-    if ((e.target === body || e.target === flip) && (e.animationName === 'squash' || e.animationName.startsWith('fid-'))) e.target.classList.remove(e.animationName);
+    if ((e.target === body || e.target === flip) && (e.animationName === 'squash' || e.animationName === 'thump' || e.animationName.startsWith('fid-'))) e.target.classList.remove(e.animationName);
   };
   body.addEventListener('animationend', gestureEnd);
   flip.addEventListener('animationend', gestureEnd);
@@ -282,7 +288,7 @@ function setPose(rec, seated, animate) {
 }
 
 function clearGestures(rec) {
-  rec.body.classList.remove('squash', 'fid-lean', 'fid-stretch', 'fid-hop');
+  rec.body.classList.remove('squash', 'thump', 'fid-lean', 'fid-stretch', 'fid-hop');
   rec.flip.classList.remove('fid-look');
 }
 
@@ -374,6 +380,7 @@ function retarget(rec, frec, target) {
 
 /** Puts the character at its target at once and cuts any walk or trip (hidden tab, first draw). */
 function settleNow(rec, animate = false) {
+  cancelGrab(rec); // a hidden tab drops whatever is held
   if (!rec.target) return;
   abortTrip(rec);
   rec.walk = null;
@@ -415,7 +422,7 @@ function playFidget(rec, name) {
 
 function doFidget(frec, rec) {
   rec.m.nextFidgetAt = Date.now() + between(rec.rng, amb.fidgetEveryMs);
-  if (rec.walk || rec.away || rec.state === 'done' || rec.el.classList.contains('walking')) return;
+  if (rec.walk || rec.away || rec.grab || rec.state === 'done' || rec.el.classList.contains('walking')) return;
   playFidget(rec, chooseFidget(rec.rng, rec.seated, amb));
 }
 
@@ -477,7 +484,7 @@ function startLeg(frec, rec) {
 
 function doTrip(frec, rec) {
   const range = tripRange(amb, whoOf(frec, rec));
-  const legs = range && !rec.walk && !rec.away && rec.arrived && rec.state !== 'done' ? pickLegs(frec, rec) : null;
+  const legs = range && !rec.walk && !rec.away && !rec.grab && rec.arrived && rec.state !== 'done' ? pickLegs(frec, rec) : null;
   if (!legs?.length) return scheduleTrip(frec, rec);
   rec.away = true;
   rec.trip = { legs, i: 0, cur: null };
@@ -529,6 +536,171 @@ function startAmbient(frec, fresh = false) {
 function stopAmbient(frec) {
   frec.clockOn = false;
   frec.clock.stop();
+}
+
+// ---------- grabbing: pick a character up and drop it (screen play only: nothing is sent or saved) ----------
+
+/** Floor-space point under a pointer event. The scale comes from the stage's own box, so the fit zoom and the small window need no special case. */
+function floorPoint(rec, cx, cy) {
+  const box = rec.frec.stage.getBoundingClientRect();
+  const k = box.width / rec.frec.scene.r.size[0];
+  return [(cx - box.left) / k, (cy - box.top) / k];
+}
+
+/** Pointer handling lives on the character's own element (pointer capture), so it works in whichever window the floor is in. */
+function bindGrab(rec) {
+  const { body } = rec;
+  body.addEventListener('dragstart', (e) => e.preventDefault());
+  body.addEventListener('pointerdown', (e) => {
+    if (!e.isPrimary || e.button !== 0 || rec.press || rec.grab || rec.state === 'done' || rec.el.classList.contains('gone')) return;
+    e.preventDefault();
+    body.setPointerCapture(e.pointerId);
+    // a press is a click until it moves or is held long enough (shouldLift); the hold timer exists only during the press
+    rec.press = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: e.clientX, cy: e.clientY, t: performance.now(), timer: 0 };
+    rec.press.timer = clockTimers.setTimeout(() => {
+      rec.press.timer = 0;
+      liftUp(rec);
+    }, ui.ui.grab.holdMs);
+  });
+  body.addEventListener('pointermove', (e) => {
+    const p = rec.press;
+    if (p && p.id === e.pointerId) {
+      p.cx = e.clientX;
+      p.cy = e.clientY;
+      if (shouldLift(e.clientX - p.x, e.clientY - p.y, performance.now() - p.t, ui.ui.grab)) liftUp(rec);
+    } else if (rec.grab?.phase === 'held' && rec.grab.id === e.pointerId) {
+      holdAt(rec, floorPoint(rec, e.clientX, e.clientY));
+    }
+  });
+  const end = (e) => {
+    if (rec.press?.id === e.pointerId) clearPress(rec); // a plain click: nothing happens
+    else if (rec.grab?.phase === 'held' && rec.grab.id === e.pointerId) dropChar(rec, true);
+  };
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) body.addEventListener(type, end);
+}
+
+function releaseCapture(rec, id) {
+  if (rec.body.hasPointerCapture(id)) rec.body.releasePointerCapture(id);
+}
+
+function clearPress(rec) {
+  const p = rec.press;
+  if (!p) return;
+  rec.press = null;
+  if (p.timer) clockTimers.clearTimeout(p.timer);
+  releaseCapture(rec, p.id);
+}
+
+/** Moves a held character: the feet (and the shadow) follow the pointer, kept inside the floor. */
+function holdAt(rec, [x, y]) {
+  const [w, h] = rec.frec.scene.r.size;
+  rec.x = Math.min(Math.max(x, 0), w);
+  rec.y = Math.min(Math.max(y, 0), h);
+  rec.el.style.transitionDuration = rec.tagRoot.style.transitionDuration = `${HELD_FOLLOW_MS}ms`;
+  rec.el.style.zIndex = String(HELD_Z);
+  rec.el.style.transform = rec.tagRoot.style.transform = `translate(${rec.x}px, ${rec.y}px)`;
+}
+
+/** The bubble text changes with the time held: one timer per held character, one step at a time. */
+function armSay(rec) {
+  const g = rec.grab;
+  const after = ui.ui.grab.bubbleAfterMs;
+  if (g.step >= after.length) return;
+  g.timer = clockTimers.setTimeout(() => {
+    g.timer = 0;
+    setText(g.say, GRAB_SAY.hold[g.step++]);
+    armSay(rec);
+  }, after[g.step] - (after[g.step - 1] ?? 0));
+}
+
+function liftUp(rec) {
+  const p = rec.press;
+  if (!p) return;
+  if (rec.state === 'done') return clearPress(rec);
+  rec.press = null;
+  if (p.timer) clockTimers.clearTimeout(p.timer);
+  abortTrip(rec);
+  freeze(rec); // a walking character stops where it is
+  clearGestures(rec);
+  setPose(rec, false, false);
+  rec.seat = null; // it left its desk: the way back must not start through the desk
+  rec.arrived = false;
+  const shadow = el('div', 'gshadow');
+  const say = el('div', 'bub grab', rec.isLead ? GRAB_SAY.lead : GRAB_SAY.lift);
+  rec.el.prepend(shadow);
+  rec.tagRoot.append(say);
+  rec.grab = { phase: 'held', id: p.id, step: 0, timer: 0, shadow, say, stars: null };
+  rec.el.classList.add('held');
+  rec.tagRoot.classList.add('held');
+  holdAt(rec, floorPoint(rec, p.cx, p.cy));
+  armSay(rec);
+}
+
+/** Lets go: lands on the nearest walkable point with a squash-and-bounce; with `stars` a short dizzy spell follows before the walk back. */
+function dropChar(rec, stars) {
+  const g = rec.grab;
+  if (g.timer) clockTimers.clearTimeout(g.timer);
+  g.timer = 0;
+  releaseCapture(rec, g.id);
+  const { frec } = rec;
+  placeAt(rec, dropPoint(nav.grid(frec.design), [rec.x, rec.y], frec.scene.r.size) ?? [rec.x, rec.y]);
+  rec.el.classList.remove('held');
+  rec.tagRoot.classList.replace('held', 'dizzy');
+  g.shadow.remove();
+  void rec.body.offsetWidth;
+  rec.body.classList.add('thump');
+  if (!stars) return finishDrop(rec);
+  g.phase = 'dizzy';
+  setText(g.say, GRAB_SAY.grumble);
+  g.stars = el('div', 'stars');
+  for (let k = 0; k < 3; k++) {
+    const star = el('i', '', '★');
+    star.style.setProperty('--k', String(k));
+    g.stars.append(star);
+  }
+  rec.el.append(g.stars);
+  g.timer = clockTimers.setTimeout(() => {
+    g.timer = 0;
+    finishDrop(rec);
+  }, ui.ui.grab.dizzyMs);
+}
+
+/** The drop is over: near a free rest spot it rests there for an ambient-style stay, otherwise it walks to where the server wants it. */
+function finishDrop(rec) {
+  const g = rec.grab;
+  if (g.timer) clockTimers.clearTimeout(g.timer);
+  g.stars?.remove();
+  g.say.remove();
+  rec.tagRoot.classList.remove('dizzy');
+  rec.grab = null;
+  const { frec } = rec;
+  const spot = amb.enabled && rec.state !== 'done' ? restSpotNear(frec.scene.r.spots, takenSpots(frec, rec), [rec.x, rec.y], ui.ui.grab.restRadiusPx) : null;
+  if (!spot) return void goTo(rec, frec, rec.target);
+  rec.away = true;
+  rec.trip = { legs: [{ x: spot.at[0], y: spot.at[1], face: spot.face, spotId: spot.id, slot: 'at' }], i: 0, cur: null };
+  startLeg(frec, rec); // sets the stay; the floor clock ends the trip and walks it home
+  frec.clock.kick();
+}
+
+/** Its agent finished while it was held (or dizzy): it slips out of the hand and leaves normally. */
+function slipOut(rec) {
+  if (rec.grab.phase === 'held') dropChar(rec, false);
+  else finishDrop(rec);
+}
+
+/** Forgets a press or hold at once (floor gone, tab hidden): no animation, no leftover timer, listener state or node. */
+function cancelGrab(rec) {
+  clearPress(rec);
+  const g = rec.grab;
+  if (!g) return;
+  if (g.timer) clockTimers.clearTimeout(g.timer);
+  releaseCapture(rec, g.id);
+  g.shadow.remove();
+  g.say.remove();
+  g.stars?.remove();
+  rec.el.classList.remove('held');
+  rec.tagRoot.classList.remove('held', 'dizzy');
+  rec.grab = null;
 }
 
 // ---------- character view ----------
@@ -630,7 +802,10 @@ function renderAgent(av, floorEl) {
   setBubble(rec, av.bubble, av.since);
 
   rec.target = target;
-  if (rec.targetKey !== key) {
+  if (rec.grab) {
+    rec.targetKey = key; // held or dizzy: remember the place, apply it after the drop
+    if (done) slipOut(rec);
+  } else if (rec.targetKey !== key) {
     rec.targetKey = key;
     retarget(rec, frec, target);
   } else if (rec.away && av.state === 'working') {
@@ -837,6 +1012,7 @@ function renderFloor(fv, elm) {
   }
   for (const [key, a] of [...rec.agents]) {
     if (!keys.has(key)) {
+      cancelGrab(a);
       a.el.remove();
       a.tagRoot.remove();
       rec.agents.delete(key);
@@ -939,6 +1115,7 @@ function removeSession(sessionId, withLog = true) {
   const f = floorRecs.get(sessionId);
   if (f) {
     stopAmbient(f);
+    for (const a of f.agents.values()) cancelGrab(a);
     f.el.remove();
     floorRecs.delete(sessionId);
   }
