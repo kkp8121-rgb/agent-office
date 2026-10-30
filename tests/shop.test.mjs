@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { mkdtempSync, readdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadConfig } from '../server/config.mjs';
@@ -461,6 +461,30 @@ test('http: rejections carry a Korean message and a status, and save nothing', a
   await bad('/api/shop/buy', 'not json', 400, 'bad-request');
   assert.equal((await post(c, '/api/shop/nope', {})).status, 404);
   assert.equal(c.saves(), 0);
+});
+
+test('http: when saving fails the answer is 500 and the coins, box and room are as before', async (t) => {
+  const c = await start(t);
+  c.shop.coins = 500;
+  const [a] = okSpots(c.cfg, 'studio2', 'plant-small', 1);
+  assert.equal((await post(c, '/api/shop/buy', { item: 'plant-small' })).status, 200);
+  const before = JSON.stringify(c.shop.view());
+  mkdirSync(join(c.cfg.dataDir, 'shop.json.tmp')); // the temp file cannot be written
+  const fail = async (path, obj) => {
+    const r = await post(c, path, obj);
+    assert.equal(r.status, 500);
+    assert.equal(JSON.parse(r.body).code, 'save-failed');
+    assert.equal(JSON.stringify(c.shop.view()), before, path);
+  };
+  await fail('/api/shop/buy', { item: 'sofa' });
+  await fail('/api/shop/place', { item: 'plant-small', design: 'studio2', x: a[0], y: a[1] });
+  rmSync(join(c.cfg.dataDir, 'shop.json.tmp'), { recursive: true });
+  const { uid } = JSON.parse((await post(c, '/api/shop/place', { item: 'plant-small', design: 'studio2', x: a[0], y: a[1] })).body);
+  const placed = JSON.stringify(c.shop.view());
+  mkdirSync(join(c.cfg.dataDir, 'shop.json.tmp'));
+  const r = await post(c, '/api/shop/store', { uid });
+  assert.equal(r.status, 500);
+  assert.equal(JSON.stringify(c.shop.view()), placed, 'store undone');
 });
 
 test('http: shop POSTs are protected like hide and rename (Origin, Host, body size)', async (t) => {

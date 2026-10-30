@@ -6,6 +6,7 @@ import { buyBlock, changedDesigns, ownedList } from './decor.mjs';
 
 const $ = (id) => document.getElementById(id);
 const DRAG_CLICK_PX = 4; // a press that moved less than this is a click (select), not a drag
+const FLOAT_MIN_VISIBLE = 48; // a stage showing less than this (px, each way) counts as out of view for the +10 float
 const imgUrl = (id) => `/assets/decor/${id}.png`;
 
 /**
@@ -75,25 +76,34 @@ export function createShop(ctx) {
     coinsEl.classList.add('bump');
   }
 
-  /** "+10" rises from the character who finished (or from its floor, or the middle of the window) and flies to the counter. */
+  /**
+   * "+10" rises from the character who finished and flies to the counter. The counter itself only follows `shop` frames: an
+   * earn can arrive after a newer shop frame and its `coins` would move the number backwards.
+   * The start is kept inside the visible part of that floor's stage; a floor out of view starts it beside the counter.
+   */
   function earn(e) {
-    numEl.textContent = String(e.coins);
     const doc = ctx.floorsEl.ownerDocument;
     const win = doc.defaultView;
     const D = ctx.ui().ui.decor;
     if (floats.size >= D.maxFloats || (doc === document && document.body.classList.contains('paused'))) return bump();
     const frec = e.sessionId ? ctx.floorRecs.get(e.sessionId) : null;
-    let sx = win.innerWidth / 2;
-    let sy = win.innerHeight / 2;
+    const to = coinsEl.getBoundingClientRect();
+    let sx = to.left + to.width / 2;
+    let sy = to.bottom + 40;
     if (frec) {
       const rec = e.key ? frec.agents.get(e.key) : null;
       const box = frec.stage.getBoundingClientRect();
       const k = box.width / frec.scene.r.size[0];
       const at = rec ? [rec.x, rec.y - 70] : [frec.scene.r.door.at[0], frec.scene.r.door.at[1] - 70];
-      sx = box.left + at[0] * k;
-      sy = box.top + at[1] * k;
+      const left = Math.max(box.left, 0);
+      const right = Math.min(box.right, win.innerWidth);
+      const top = Math.max(box.top, 0);
+      const bottom = Math.min(box.bottom, win.innerHeight);
+      if (right - left >= FLOAT_MIN_VISIBLE && bottom - top >= FLOAT_MIN_VISIBLE) {
+        sx = Math.min(Math.max(box.left + at[0] * k, left + 12), right - 12);
+        sy = Math.min(Math.max(box.top + at[1] * k, top + 34), bottom - 4); // it rises 34px first
+      }
     }
-    const to = coinsEl.getBoundingClientRect();
     const f = doc.createElement('div');
     f.className = 'coinfloat';
     f.textContent = `+${e.amount}`;
@@ -225,6 +235,13 @@ export function createShop(ctx) {
       if (decorating) return setDecorating(false);
       shopEl.hidden = !shopEl.hidden;
       renderMode();
+      if (!shopEl.hidden) (listEl.querySelector('button:not(:disabled)') ?? $('shop-close')).focus({ preventScroll: true });
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || shopEl.hidden || decorating) return; // in 꾸미기 mode Esc leaves the mode (setDecorating)
+      shopEl.hidden = true;
+      renderMode();
+      openBtn.focus({ preventScroll: true });
     });
     decorBtn.addEventListener('click', () => setDecorating(!decorating));
     $('shop-close').addEventListener('click', () => {

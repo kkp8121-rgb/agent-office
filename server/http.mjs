@@ -238,11 +238,12 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
       await onShopChange?.();
     } catch (e) {
       console.error('상점 저장 실패:', e?.message ?? e);
+      r.undo?.(); // the answer must match reality: nothing was bought or moved
       pushShop();
       return sendJson(res, 500, { ok: false, code: 'save-failed', message: '저장하지 못했어요. 잠시 뒤 다시 시도해 주세요' });
     }
     pushShop();
-    const { status, ok, ...rest } = r;
+    const { status, ok, undo, ...rest } = r;
     return sendJson(res, 200, { ok: true, ...rest, shop: shop.view() });
   }
 

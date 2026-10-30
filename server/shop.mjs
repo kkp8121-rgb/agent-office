@@ -168,7 +168,12 @@ export class Shop {
     this.coins -= c.price;
     this.inventory[c.id] = (this.inventory[c.id] ?? 0) + 1;
     this.version++;
-    return ok();
+    return ok({ undo: () => { this.coins += c.price; this.#take(c.id); this.version++; } });
+  }
+
+  /** One item out of the storage box. */
+  #take(id) {
+    if (--this.inventory[id] === 0) delete this.inventory[id];
   }
 
   #scene(design) {
@@ -197,9 +202,17 @@ export class Shop {
     if (!res.ok) return no(res.code === 'bad-position' ? 400 : 409, res.code, res.message);
     const uid = `d${this.nextUid++}`;
     list.push({ uid, item, x: px, y: py });
-    if (--this.inventory[item] === 0) delete this.inventory[item];
+    this.#take(item);
     this.version++;
-    return ok({ uid });
+    return ok({
+      uid,
+      undo: () => {
+        const i = list.findIndex((p) => p.uid === uid);
+        if (i >= 0) list.splice(i, 1);
+        this.inventory[item] = (this.inventory[item] ?? 0) + 1;
+        this.version++;
+      },
+    });
   }
 
   #find(uid) {
@@ -220,12 +233,12 @@ export class Shop {
     const cur = hit.list[hit.i];
     const res = this.#check(hit.design, hit.list.filter((p) => p !== cur), { item: cur.item, x: px, y: py });
     if (!res.ok) return no(res.code === 'bad-position' ? 400 : 409, res.code, res.message);
-    if (cur.x !== px || cur.y !== py) {
-      cur.x = px;
-      cur.y = py;
-      this.version++;
-    }
-    return ok({ uid });
+    const [ox, oy] = [cur.x, cur.y];
+    if (ox === px && oy === py) return ok({ uid });
+    cur.x = px;
+    cur.y = py;
+    this.version++;
+    return ok({ uid, undo: () => { [cur.x, cur.y] = [ox, oy]; this.version++; } });
   }
 
   store(uid) {
@@ -234,6 +247,13 @@ export class Shop {
     const [cur] = hit.list.splice(hit.i, 1);
     this.inventory[cur.item] = (this.inventory[cur.item] ?? 0) + 1;
     this.version++;
-    return ok({ uid });
+    return ok({
+      uid,
+      undo: () => {
+        hit.list.splice(Math.min(hit.i, hit.list.length), 0, cur);
+        this.#take(cur.item);
+        this.version++;
+      },
+    });
   }
 }
