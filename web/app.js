@@ -5,6 +5,7 @@ import { resolveScene, trayPoint } from './scene.mjs';
 import { createNav } from './nav.mjs';
 import { charZ, objectNodes, splitWalk } from './depth.mjs';
 import { fitZoom } from './pip.mjs';
+import { orderFloors, nextFloor, fallbackFloor, fitBox } from './view.mjs';
 import { dropPoint, restSpotNear, shouldLift } from './grab.mjs';
 import { daypart, nextPoke, openBox, pickLine, playPartner, throwPath, throwVelocity } from './play.mjs';
 import { between, chooseFidget, chooseSpot, createFloorClock, rngFor, tripRange } from './ambient.mjs';
@@ -18,6 +19,8 @@ const RECONNECT_MS = 3000;
 const DONE_STALE_MS = 4000; // a done agent older than this is not walked to the tray again after a reload
 const HELD_Z = 7900; // a held character draws above every object and character of its floor (the name tags sit at 8000)
 const HELD_FOLLOW_MS = 80; // a held character trails the pointer by this much, which also softens the lift
+const SINGLE_MAX_ZOOM = 3; // a single floor (or the stack with the panel hidden) is scaled up to fit, at most this much
+const PANEL_KEY = 'agent-office.panelOff'; // localStorage: the session panel was hidden by the person
 const LIFT_PX = 28; // the held character's height above its shadow (--lift in style.css)
 
 const DEBUG = new URLSearchParams(location.search).get('debug');
@@ -29,6 +32,7 @@ const $ = (id) => document.getElementById(id);
 const appEl = $('app');
 const floorsEl = $('floors');
 const panelEl = $('panel');
+const topbarEl = $('topbar');
 const sessionsEl = $('sessions');
 const logEl = $('log');
 const emptyEl = $('empty');
@@ -53,22 +57,31 @@ const recOf = new WeakMap(); // character element -> rec
 
 // ---------- small helpers ----------
 
-/** Scales the floors down (CSS zoom) so the widest one fits beside the panel, or above it in a narrow window. */
+/** Scales the floors (CSS zoom) to the room: the widest one down to fit beside the panel (or above it in a narrow window); the single floor shown, or the stack once the panel is hidden, up or down. */
 function fitFloors() {
   const doc = floorsEl.ownerDocument; // the small window's document while the floors are there
-  let avail;
-  if (doc.body.classList.contains('pip-mini')) {
-    // mini layout: floors only, the whole window width minus the body padding
+  const mini = doc.body.classList.contains('pip-mini');
+  let availW;
+  let availH;
+  if (mini) {
+    // mini layout: floors only, the whole window minus the body padding
     const cs = doc.defaultView.getComputedStyle(doc.body);
-    avail = doc.documentElement.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    availW = doc.documentElement.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    availH = doc.documentElement.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   } else {
     const cs = getComputedStyle(appEl);
     const sideBySide = cs.flexDirection === 'row';
-    avail = appEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
-      - (sideBySide ? panelEl.offsetWidth + parseFloat(cs.columnGap) : 0);
+    availW = appEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      - (sideBySide && panelEl.offsetWidth ? panelEl.offsetWidth + parseFloat(cs.columnGap) : 0);
+    availH = window.innerHeight - topbarEl.offsetHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  }
+  const shown = shownId === null ? null : floorRecs.get(shownId);
+  if (shown) {
+    floorsEl.style.zoom = String(fitBox(availW, availH, ...shown.scene.r.size, SINGLE_MAX_ZOOM));
+    return;
   }
   const widest = Math.max(0, ...[...floorRecs.values()].map((r) => r.scene.r.size[0]));
-  floorsEl.style.zoom = fitZoom(avail, widest);
+  floorsEl.style.zoom = !mini && widest > 0 && !panelEl.offsetWidth ? String(fitBox(availW, Infinity, widest, 0, SINGLE_MAX_ZOOM)) : fitZoom(availW, widest);
 }
 
 function showConn(text) {
@@ -307,7 +320,7 @@ function walkPath(rec, frec, points, onArrive) {
   frec.dbg?.path(rec, points);
   rec.x = last[0];
   rec.y = last[1];
-  if (pieces.length === 0) {
+  if (pieces.length === 0 || frec.off) { // a floor that is not shown has no transitions to wait for
     placeAt(rec, last);
     onArrive?.();
     return 0;
@@ -587,7 +600,7 @@ function makeClock(frec) {
 }
 
 function startAmbient(frec, fresh = false) {
-  if (document.body.classList.contains('paused')) return;
+  if (frec.off || document.body.classList.contains('paused')) return;
   if (fresh) for (const r of frec.agents.values()) if (r.m) freshTimes(frec, r);
   frec.clockOn = true;
   frec.clock.start();
@@ -1074,7 +1087,13 @@ function catSync() {
   if (!catC || document.body.classList.contains('paused')) return;
   if (cat && !floorRecs.has(cat.frec.sid)) catRemove();
   if (!floorRecs.size) return;
-  if (!cat) return catSpawn([...floorRecs.values()][Math.floor(Math.random() * floorRecs.size)]);
+  const shown = [...floorRecs.values()].filter((f) => !f.off);
+  if (!cat) return catSpawn(shown[Math.floor(Math.random() * shown.length)]);
+  if (cat.frec.off) { // its floor is not shown: it stops where it is and comes out of another floor's door
+    catSettle();
+    if (cat.frec.off) catRelocate();
+    return;
+  }
   const { rec } = cat;
   if (!cat.timer && !rec.walk && !rec.grab && !rec.press) catAt(between(Math.random, catC.firstDelayMs), catNext);
 }
@@ -1151,7 +1170,7 @@ function catNext() {
 /** The cat comes out of the door of another floor (the same floor when there is no other). */
 function catRelocate() {
   const { rec } = cat;
-  const id = otherFloor(Math.random, [...floorRecs.keys()], cat.frec.sid) ?? cat.frec.sid;
+  const id = otherFloor(Math.random, [...floorRecs.values()].filter((f) => !f.off).map((f) => f.sid), cat.frec.sid) ?? cat.frec.sid;
   const frec = floorRecs.get(id);
   const { door } = frec.scene.r;
   frec.stage.append(rec.el, rec.tagRoot);
@@ -1408,6 +1427,7 @@ function createFloor(fv) {
   const { r } = sc;
   const root = el('section', 'floor');
   root.dataset.sid = fv.sessionId;
+  root.hidden = shownId !== null && fv.sessionId !== shownId; // see "floor switcher"
   root.style.setProperty('--c', colorOf(fv.sessionId));
   root.style.width = `${r.size[0]}px`;
   root.style.height = `${r.size[1]}px`;
@@ -1452,7 +1472,7 @@ function createFloor(fv) {
   root.append(stage);
   const rec = {
     el: root, stage, bt, bl, fno, ft, ff, fs, prov, reports, agents: new Map(), populated: false,
-    sid: fv.sessionId, design: fv.design, scene: sc, status: fv.status, dbg: null, clock: null, clockOn: false, warned: false,
+    sid: fv.sessionId, off: root.hidden, design: fv.design, scene: sc, status: fv.status, dbg: null, clock: null, clockOn: false, warned: false,
   };
   rec.clock = makeClock(rec);
   if (DEBUG_NAV) {
@@ -1653,6 +1673,7 @@ function render(state) {
   }
   const list = state.floors.filter((f) => !forcedHidden.has(f.sessionId));
   const ids = new Set(list.map((f) => f.sessionId));
+  const viewMoved = reconcileView(list);
   for (const id of [...floorRecs.keys()]) if (!ids.has(id)) removeSession(id, false);
 
   lastFloors = new Map(list.map((f) => [f.sessionId, f]));
@@ -1669,7 +1690,9 @@ function render(state) {
   syncOrder(floorsEl, floorEls);
   syncOrder(sessionsEl, rowEls);
   emptyEl.hidden = list.length > 0;
-  fitFloors();
+  syncTabs();
+  if (viewMoved) applyView();
+  else fitFloors();
   catSync();
 }
 
@@ -1777,6 +1800,7 @@ function connect() {
 
 function pause() {
   clearTimeout(retryTimer);
+  clearRotate();
   if (es) es.close();
   document.body.classList.add('paused');
   // nothing moves while hidden: every walking or away character goes to its server place now
@@ -1795,8 +1819,184 @@ async function resume() {
   if (document.hidden) return; // hidden again while the state was loading: stay paused
   for (const f of floorRecs.values()) startAmbient(f, true);
   catSync();
+  armRotate();
   connect();
 }
+
+// ---------- floor switcher: top bar, single-floor view, rotation, fullscreen, session panel ----------
+
+const tabListEl = $('tab-list');
+const allBtn = $('view-all');
+const rotateBtn = $('rotate');
+const fsBtn = $('fullscreen');
+const panelBtn = $('panel-toggle');
+const tabRecs = new Map(); // sessionId -> floor button
+let viewIds = []; // session ids in floor order, as of the last state
+let shownId = null; // the one floor on show, or null for the whole stack
+let rotating = false;
+let rotateTimer = 0; // clockTimers token: one chain, only while rotating (it follows the small window like the clocks)
+let panelOff = false; // the person's own choice; fullscreen hides the panel on top of it
+
+const setAttr = (e, name, value) => {
+  if (e.getAttribute(name) !== value) e.setAttribute(name, value);
+};
+
+function toast(text) {
+  showConn(text);
+  setTimeout(() => { connEl.hidden = true; }, RECONNECT_MS);
+}
+
+/** Follows the floors in the shown view: a shown floor that ended or was hidden gives way to the next one (none left = the whole stack). True when the shown floor changed. */
+function reconcileView(list) {
+  const ids = orderFloors(list);
+  let moved = false;
+  if (shownId !== null) {
+    const keep = fallbackFloor(viewIds, shownId, ids);
+    moved = keep !== shownId;
+    shownId = keep;
+    if (keep === null) setRotate(false);
+  }
+  viewIds = ids;
+  return moved;
+}
+
+/** One button per floor (kept, not rebuilt), in floor-number order, with the session colour and name. */
+function syncTabs() {
+  const btns = [];
+  const keep = new Set();
+  for (const fv of viewIds.map((id) => lastFloors.get(id))) {
+    keep.add(fv.sessionId);
+    let b = tabRecs.get(fv.sessionId);
+    if (!b) {
+      b = el('button', 'tab');
+      b.type = 'button';
+      b.addEventListener('click', () => pickFloor(fv.sessionId));
+      tabRecs.set(fv.sessionId, b);
+    }
+    const label = `${fv.floorNo}층 · ${fv.title}`;
+    setText(b, String(fv.floorNo));
+    setAttr(b, 'aria-label', label);
+    setAttr(b, 'title', label);
+    setAttr(b, 'aria-pressed', String(fv.sessionId === shownId));
+    if (b.style.getPropertyValue('--c') !== colorOf(fv.sessionId)) b.style.setProperty('--c', colorOf(fv.sessionId));
+    btns.push(b);
+  }
+  for (const [id, b] of [...tabRecs]) {
+    if (keep.has(id)) continue;
+    b.remove();
+    tabRecs.delete(id);
+  }
+  syncOrder(tabListEl, btns);
+}
+
+/** Shows only the shown floor (the others are laid out nowhere and stand still), or the whole stack. */
+function applyView() {
+  document.body.classList.toggle('single', shownId !== null);
+  for (const [id, f] of floorRecs) setOff(f, shownId !== null && id !== shownId);
+  for (const [id, b] of tabRecs) setAttr(b, 'aria-pressed', String(id === shownId));
+  setAttr(allBtn, 'aria-pressed', String(shownId === null));
+  fitFloors();
+  catSync();
+}
+
+/** A floor that is not shown keeps its state but stops its clock and walks (a walk needs a transition end, which an undisplayed floor never gets). */
+function setOff(f, off) {
+  if (f.off === off) return;
+  f.off = off;
+  f.el.hidden = off;
+  if (off) {
+    stopAmbient(f);
+    for (const a of f.agents.values()) settleNow(a);
+  } else {
+    startAmbient(f, true);
+  }
+}
+
+function pickFloor(id) {
+  setRotate(false);
+  shownId = shownId === id ? null : id;
+  applyView();
+}
+
+function showAll() {
+  setRotate(false);
+  shownId = null;
+  applyView();
+}
+
+function clearRotate() {
+  if (rotateTimer) clockTimers.clearTimeout(rotateTimer);
+  rotateTimer = 0;
+}
+
+/** (Re)starts the one rotation timer where the clocks are now (this page, or the small window). */
+function armRotate() {
+  clearRotate();
+  if (rotating && !document.body.classList.contains('paused')) rotateTimer = clockTimers.setTimeout(rotateStep, ui.ui.rotate.seconds * 1000);
+}
+
+function rotateStep() {
+  rotateTimer = 0;
+  shownId = nextFloor(viewIds, shownId);
+  if (shownId === null) return setRotate(false);
+  applyView();
+  armRotate();
+}
+
+/** Rotation on: the single-floor view from the current floor (or the first), then the next floor every ui.rotate.seconds. */
+function setRotate(on) {
+  clearRotate();
+  rotating = on && (shownId !== null || viewIds.length > 0);
+  setAttr(rotateBtn, 'aria-pressed', String(rotating));
+  if (!rotating) return;
+  shownId ??= viewIds[0];
+  applyView();
+  armRotate();
+}
+
+function applyPanel() {
+  document.body.classList.toggle('panel-off', panelOff);
+  setText(panelBtn, panelOff ? '세션 창 보이기' : '세션 창 숨기기');
+  setAttr(panelBtn, 'aria-expanded', String(!panelOff));
+  fitFloors();
+}
+
+allBtn.addEventListener('click', showAll);
+rotateBtn.addEventListener('click', () => setRotate(!rotating));
+panelBtn.addEventListener('click', () => {
+  panelOff = !panelOff;
+  try {
+    localStorage.setItem(PANEL_KEY, panelOff ? '1' : '0');
+  } catch {
+    // private window or blocked storage: the choice only lasts for this page
+  }
+  applyPanel();
+});
+if (document.fullscreenEnabled) {
+  fsBtn.addEventListener('click', async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch {
+      toast('전체 화면을 열지 못했습니다');
+    }
+  });
+  document.addEventListener('fullscreenchange', () => {
+    const on = document.fullscreenElement !== null;
+    document.body.classList.toggle('fs', on); // the panel hides while fullscreen and comes back as the person left it
+    setText(fsBtn, on ? '전체 화면 끝내기' : '전체 화면');
+    panelBtn.disabled = on;
+    fitFloors();
+  });
+} else {
+  fsBtn.hidden = true;
+}
+try {
+  panelOff = localStorage.getItem(PANEL_KEY) === '1';
+} catch {
+  // storage blocked: the panel shows
+}
+applyPanel();
 
 // ---------- picture-in-picture ----------
 
@@ -1831,6 +2031,7 @@ async function openPip() {
   w.addEventListener('resize', fitFloors);
   w.addEventListener('pagehide', pipClosed);
   for (const f of floorRecs.values()) f.clock.kick(); // move the one clock timer to the small window
+  armRotate(); // and the rotation timer
   fitFloors();
 }
 

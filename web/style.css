@@ -7,6 +7,7 @@
   --panel: #fbf8f1;
   --walk-ms: 1200ms;
   --lift: 28px;
+  --bar-h: 38px;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -253,7 +254,7 @@ body.paused *, body.paused *::before, body.paused *::after { animation-play-stat
 
 /* ---- side panel ---- */
 #panel {
-  flex: none; width: 360px; position: sticky; top: 16px; max-height: calc(100vh - 32px);
+  flex: none; width: 360px; position: sticky; top: calc(var(--bar-h) + 16px); max-height: calc(100vh - var(--bar-h) - 32px);
   display: flex; flex-direction: column; min-height: 0;
 }
 #panel h2 { margin: 0 0 6px; font-size: 13px; }
@@ -287,8 +288,21 @@ body.paused *, body.paused *::before, body.paused *::after { animation-play-stat
 .ev .h b { font-size: 12px; border-left: 3px solid var(--c); padding-left: 5px; }
 .ev .h span { color: var(--muted); font-size: 11px; flex: none; }
 .ev p { margin: 1px 0 0; color: #5b4d3a; overflow-wrap: anywhere; }
-#panel .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
-#quit, #pip { border: 1.5px solid var(--muted); background: #e9e2d2; color: #6b5d45; padding: 2px 12px; font-size: 11px; }
+
+/* ---- top bar: floor buttons on the left, view controls on the right ---- */
+#topbar {
+  position: sticky; top: 0; z-index: 100000; min-height: var(--bar-h); padding: 4px 16px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap;
+  background: var(--panel); border-bottom: 1px solid var(--line);
+}
+#floor-tabs, #tab-list, .tb-right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+#tab-list { display: contents; }
+#topbar button { border: 1.5px solid var(--muted); background: #e9e2d2; color: #6b5d45; padding: 2px 12px; font-size: 11px; }
+#topbar button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+#topbar button:disabled { opacity: .5; cursor: default; }
+#topbar .tab { min-width: 28px; padding: 2px 8px; font-weight: 700; border-bottom: 4px solid var(--c, var(--muted)); }
+#topbar .tab[aria-pressed="true"] { border-bottom-color: var(--c, var(--muted)); }
+body.panel-off #panel, body.fs #panel { display: none; }
 #conn {
   position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 99999;
   background: var(--ink); color: var(--paper); padding: 6px 14px; border-radius: 6px;
@@ -302,7 +316,7 @@ body.paused *, body.paused *::before, body.paused *::after { animation-play-stat
 .pip-mini { margin: 0; padding: 6px; }
 html:has(.pip-mini) { scrollbar-gutter: stable; }
 .pip-mini #app { display: block; padding: 0; }
-.pip-mini #panel, .pip-mini #pip-hold { display: none; }
+.pip-mini #panel, .pip-mini #pip-hold, .pip-mini #topbar { display: none; }
 
 /* narrow window: the panel goes under the floors, which scale to the width (see fitFloors in app.js) */
 @media (max-width: 1099px) {

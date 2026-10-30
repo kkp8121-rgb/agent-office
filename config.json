@@ -12,7 +12,7 @@
   "codex": { "enabled": true, "headBytes": 262144, "idleKeepMs": 1800000, "execKeepMs": 60000, "cwdMaxChars": 500 },
   "launch": { "healthTimeoutMs": 800 },
   "server": { "ssePingMs": 25000, "maxBodyBytes": 1024 },
-  "ui": { "pip": { "width": 420, "height": 640 }, "grab": { "holdMs": 300, "movePx": 6, "bubbleAfterMs": [2500, 6000], "dizzyMs": 1500, "restRadiusPx": 80 }, "bubbleMaxChars": 16, "bubbleFullMax": 3, "logDomCap": 300,
+  "ui": { "pip": { "width": 420, "height": 640 }, "rotate": { "seconds": 15 }, "grab": { "holdMs": 300, "movePx": 6, "bubbleAfterMs": [2500, 6000], "dizzyMs": 1500, "restRadiusPx": 80 }, "bubbleMaxChars": 16, "bubbleFullMax": 3, "logDomCap": 300,
           "poke": { "resetMs": 1500, "sayMs": 1900, "steamMs": 2400, "maxLevel": 4 },
           "throw": { "minSpeedPxS": 800, "windowMs": 110, "staleMs": 60, "maxSamples": 8, "distPerSpeed": 0.3, "minDistPx": 70, "maxDistPx": 400,
                      "maxBounces": 3, "bounceKeep": 0.8, "flyPxPerSec": 480, "minFlyMs": 500, "arcPx": 46, "wallLiftPx": 14, "dizzyMs": 2800 },
