@@ -11,6 +11,8 @@ import { daypart, nextPoke, openBox, pickLine, playPartner, throwPath, throwVelo
 import { between, chooseFidget, chooseSpot, createFloorClock, rngFor, tripRange } from './ambient.mjs';
 import { chooseCatAct, openPoint, otherFloor } from './cat.mjs';
 import { legVars } from './walk.mjs';
+import { boardCapacity, boardFrame, itemWindow, todoKey } from './board.mjs';
+import { assignSpots, clipPhase, moodKind, patDue } from './meeting.mjs';
 
 // Visual constants (how things look/move, not planning numbers; those come from /api/ui).
 const WALK_PX_PER_SEC = 150;
@@ -22,6 +24,14 @@ const HELD_FOLLOW_MS = 80; // a held character trails the pointer by this much, 
 const SINGLE_MAX_ZOOM = 3; // a single floor (or the stack with the panel hidden) is scaled up to fit, at most this much
 const PANEL_KEY = 'agent-office.panelOff'; // localStorage: the session panel was hidden by the person
 const LIFT_PX = 28; // the held character's height above its shadow (--lift in style.css)
+const BOARD_LINE_PX = 9; // line height of the text on the wall board (.wboard in style.css)
+const BOARD_PAD_PX = 2; // padding of the wall board (the same)
+const BOARD_MIN_ITEMS = 3; // the wall board always shows at least this many items
+const BIG_WIDTH_PX = 250; // width of the enlarged to-do list (.wbig)
+const BIG_GAP_PX = 6; // its distance from the floor edge and from the board
+const TODO_MARK = { in_progress: '▶', completed: '✓', pending: '☐' };
+const NO_TODOS = { items: [], done: 0, total: 0 };
+const FX_URL = '/assets/fx/'; // the failure faces (sweat-drop, rain-cloud-1/2)
 
 const DEBUG = new URLSearchParams(location.search).get('debug');
 const DEBUG_NAV = DEBUG === 'nav'; // ?debug=nav draws the walking grid and every scene point over each scene floor
@@ -158,8 +168,10 @@ function setupScenes() {
       timers: () => liveTimers.size,
       away: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.away).length, 0),
       held: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.press || a.grab).length, 0),
-      busy: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.press || a.grab || a.play || a.say || a.steam).length, 0),
+      busy: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.press || a.grab || a.play || a.say || a.steam || a.mood).length, 0),
       cat: () => (cat ? { sid: cat.frec.sid, x: cat.rec.x, y: cat.rec.y, walking: !!cat.rec.walk, timer: cat.timer, cls: cat.rec.el.className } : null),
+      signal: (type, data) => (type === 'phase' ? onPhase : onFail)(data), // the SSE handlers, without the stream
+      meetings: () => [...floorRecs.values()].filter((f) => f.meeting).length,
       catDo: (act) => { // makes the cat start `act` (sleep, spot, desk, stroll, leave) now
         if (!cat || cat.rec.grab) return;
         if (cat.timer) clockTimers.clearTimeout(cat.timer);
@@ -859,6 +871,7 @@ function cancelGrab(rec) {
   if (rec.play) endPlay(rec.play, rec);
   clearSay(rec);
   clearSteam(rec);
+  clearMood(rec);
   const g = rec.grab;
   if (!g) return;
   if (g.timer) clockTimers.clearTimeout(g.timer);
@@ -880,7 +893,7 @@ const lastLine = new Map(); // situation -> the line said last, so the same line
 function line(situation, fill) {
   const text = pickLine(Math.random, ui.ui.lines[situation], lastLine.get(situation));
   lastLine.set(situation, text);
-  return fill === undefined ? text : text.replace('{task}', fill);
+  return fill === undefined ? text : text.replace('{task}', fill).replace('{phase}', fill);
 }
 
 const talkLine = () => line(daypart(new Date().getHours()) === 'Night' && Math.random() < ui.ui.play.nightTalkChance ? 'smallTalkNight' : 'smallTalk');
@@ -996,11 +1009,14 @@ function sceneAct(sc) {
   if (guest.play !== sc) return;
   const P = ui.ui.play;
   const away = host.x < guest.x ? 1 : -1; // the guest's bubble leans away from the host and the host's the other way
-  if (sc.kind === 'report') {
+  if (sc.kind === 'report' || sc.kind === 'pat') {
+    const pat = sc.kind === 'pat'; // the boss comforts the one who failed, who answers
     const task = isStatusText(guest.bubbleText) ? '' : guest.bubbleText; // a status word ("생각 중…") is not a task
-    sayFor(guest, task ? line('report', task) : line('reportRest'), P.reportSayMs, away * P.bubbleLeanPx);
+    if (pat && !host.seated) setFacing(host, guest.x < host.x ? 'left' : 'right');
+    sayFor(guest, pat ? line('patBoss') : task ? line('report', task) : line('reportRest'), P.reportSayMs, away * P.bubbleLeanPx);
     sc.timer = clockTimers.setTimeout(() => {
-      sayFor(host, line('bossReply'), P.replyMs, -away * P.bubbleLeanPx);
+      if (pat) clearMood(host);
+      sayFor(host, line(pat ? 'patReply' : 'bossReply'), P.replyMs, -away * P.bubbleLeanPx);
       sc.timer = clockTimers.setTimeout(() => endPlay(sc, null), P.replyMs + P.endPauseMs);
     }, P.replyDelayMs);
     return;
@@ -1022,6 +1038,7 @@ function sceneAct(sc) {
  * `except` is the one the caller deals with itself (it was picked up, finished, or moved by the server); `home` false walks nobody.
  */
 function endPlay(sc, except, home = true) {
+  if (sc.kind === 'meeting') return leaveMeeting(sc, except);
   const { guest, host } = sc;
   if (guest.play !== sc) return;
   if (sc.timer) clockTimers.clearTimeout(sc.timer);
@@ -1036,6 +1053,214 @@ function endPlay(sc, except, home = true) {
   if (host === except) return;
   if (sc.hostAway) goTo(host, host.frec, host.target);
   else if (!host.seated && sc.kind === 'highFive') setFacing(host, host.target.face);
+}
+
+// ---------- whiteboard to-dos, workflow meetings, failure faces (screen play only: nothing is sent or saved) ----------
+
+/** The wall board of a floor: a box laid on scene.whiteboard.quad with one shear, showing the session's real to-do list. */
+function makeBoard(frec) {
+  const quad = frec.scene.raw.whiteboard?.quad;
+  if (!quad) return;
+  const f = boardFrame(quad);
+  const box = el('div', 'wboard empty');
+  Object.assign(box.style, { left: `${f.x}px`, top: `${f.y}px`, width: `${f.w}px`, height: `${f.h}px`, transform: `matrix(1, ${f.slope}, 0, 1, 0, 0)` });
+  box.tabIndex = 0;
+  box.setAttribute('role', 'button');
+  const title = el('b');
+  const list = el('ul');
+  box.append(title, list);
+  box.addEventListener('click', () => toggleBig(frec));
+  box.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    toggleBig(frec);
+  });
+  frec.stage.append(box);
+  frec.wb = { el: box, title, list, cap: boardCapacity(f.h, BOARD_LINE_PX, BOARD_PAD_PX, BOARD_MIN_ITEMS), key: '', frame: f };
+}
+
+/** One line of a to-do list: a mark and the (server-clipped) text; the status is a class. */
+function todoLine(item) {
+  const li = el('li', item.status);
+  li.append(el('span', 'mk', TODO_MARK[item.status] ?? TODO_MARK.pending), el('span', 'tx', item.text));
+  return li;
+}
+
+/** Redraws the wall board when this floor's list really changed. A floor that is not shown draws it when it comes back (setOff). */
+function renderBoard(frec) {
+  const wb = frec.wb;
+  if (!wb || frec.off) return;
+  const key = todoKey(frec.todos);
+  if (key === wb.key) return;
+  wb.key = key;
+  const t = frec.todos;
+  wb.el.classList.toggle('empty', t.total === 0);
+  setText(wb.title, t.total === 0 ? '' : `할 일 ${t.done}/${t.total}`);
+  wb.list.replaceChildren(...itemWindow(t.items, wb.cap).map(todoLine));
+  if (bigBoard?.frec === frec) fillBig();
+}
+
+let bigBoard = null; // the one enlarged list: {frec, el, title, list, close}
+
+function fillBig() {
+  const { frec, title, list } = bigBoard;
+  const t = frec.todos;
+  setText(title, `할 일 ${t.done}/${t.total}`);
+  const rows = t.items.map(todoLine);
+  if (t.total > t.items.length) rows.push(el('li', 'more', `…외 ${t.total - t.items.length}개`));
+  list.replaceChildren(...rows);
+}
+
+function closeBig() {
+  if (!bigBoard) return;
+  bigBoard.close();
+  bigBoard = null;
+}
+
+/** The board was clicked: the whole list in a readable size next to it. Closes on Esc, a click elsewhere, or the board again. */
+function toggleBig(frec) {
+  const again = bigBoard?.frec === frec;
+  closeBig();
+  if (again || !frec.wb || frec.todos.total === 0) return;
+  const doc = frec.stage.ownerDocument;
+  const pop = el('div', 'wbig');
+  pop.setAttribute('role', 'dialog');
+  const title = el('b');
+  const list = el('ul');
+  pop.append(title, list);
+  frec.stage.append(pop);
+  const onKey = (e) => e.key === 'Escape' && closeBig();
+  const onDown = (e) => {
+    if (!pop.contains(e.target) && !frec.wb.el.contains(e.target)) closeBig();
+  };
+  doc.addEventListener('keydown', onKey);
+  doc.addEventListener('pointerdown', onDown, true);
+  bigBoard = {
+    frec, el: pop, title, list,
+    close: () => {
+      doc.removeEventListener('keydown', onKey);
+      doc.removeEventListener('pointerdown', onDown, true);
+      pop.remove();
+    },
+  };
+  fillBig();
+  const [W, H] = frec.scene.r.size;
+  const f = frec.wb.frame;
+  pop.style.width = `${BIG_WIDTH_PX}px`;
+  pop.style.left = `${Math.min(Math.max(f.x + f.w / 2 - BIG_WIDTH_PX / 2, BIG_GAP_PX), W - BIG_WIDTH_PX - BIG_GAP_PX)}px`;
+  pop.style.top = `${Math.max(BIG_GAP_PX, Math.min(f.y + f.h + f.slope * f.w + BIG_GAP_PX, H - pop.offsetHeight - BIG_GAP_PX))}px`;
+}
+
+/** Characters that can be called to a meeting: present (seated or idle), not held, not in a scene, not finished or gone. */
+const meetable = (a) => !a.grab && !a.press && !a.play && a.state !== 'done' && a.target && !a.el.classList.contains('gone');
+
+const paused = () => document.body.classList.contains('paused');
+
+/**
+ * A workflow went on to its next phase (SSE "phase"): the floor's characters walk to the meeting spots in front of the board, the boss
+ * announces the phase, and after ui.meeting.seconds they walk back. Only a floor on show meets; there is no queue for the others.
+ */
+function onPhase(sig) {
+  const frec = floorRecs.get(sig.sessionId);
+  const spots = frec?.scene.raw.meeting;
+  if (!spots || frec.off || paused() || frec.status === 'leaving') return;
+  const M = ui.ui.meeting;
+  const mt = frec.meeting;
+  const phase = clipPhase(sig.phase, M.phaseMaxChars);
+  if (mt) { // a new phase during a meeting: the boss says the new one and the time starts again
+    mt.phase = phase;
+    if (mt.hold) holdMeeting(mt);
+    return;
+  }
+  const crew = [...frec.agents.values()].filter(meetable);
+  const boss = crew.find((a) => a.isLead) ?? null;
+  const place = assignSpots(crew.filter((a) => !a.isLead).map((a) => ({ id: a, x: a.x, y: a.y })), spots.spots);
+  if (place.size === 0) return;
+  if (boss) place.set(boss, spots.boss);
+  const next = { kind: 'meeting', frec, members: new Set(), boss, phase, hold: false, timer: 0 };
+  frec.meeting = next;
+  let walkMs = 0;
+  for (const [rec, spot] of place) {
+    abortTrip(rec);
+    clearSay(rec);
+    clearSteam(rec);
+    rec.play = next;
+    rec.tagRoot.classList.add('talk'); // their own task bubbles step aside so the boss's line is readable
+    next.members.add(rec);
+    walkMs = Math.max(walkMs, goTo(rec, frec, { x: spot.at[0], y: spot.at[1], face: spot.face, seated: false, seat: null }));
+  }
+  next.timer = clockTimers.setTimeout(() => holdMeeting(next), walkMs + M.gatherPauseMs);
+}
+
+/** Everyone stands in place: the boss says the phase, and the meeting ends ui.meeting.seconds from now. */
+function holdMeeting(mt) {
+  const ms = ui.ui.meeting.seconds * 1000;
+  mt.hold = true;
+  clockTimers.clearTimeout(mt.timer);
+  if (mt.boss && mt.members.has(mt.boss)) sayFor(mt.boss, line('meetingBoss', mt.phase), ms);
+  mt.timer = clockTimers.setTimeout(() => endMeeting(mt), ms);
+}
+
+function endMeeting(mt) {
+  const crew = [...mt.members];
+  mt.members.clear();
+  finishMeeting(mt);
+  for (const rec of crew) {
+    rec.play = null;
+    clearSay(rec);
+    rec.tagRoot.classList.remove('talk');
+    goTo(rec, mt.frec, rec.target);
+  }
+}
+
+function finishMeeting(mt) {
+  clockTimers.clearTimeout(mt.timer);
+  if (mt.frec.meeting === mt) mt.frec.meeting = null;
+}
+
+/** One character leaves the meeting for its own reasons (picked up, finished, moved by the server, floor hidden); the caller deals with it from there. */
+function leaveMeeting(mt, rec) {
+  mt.members.delete(rec);
+  rec.play = null;
+  clearSay(rec);
+  rec.tagRoot.classList.remove('talk');
+  if (mt.members.size === 0) finishMeeting(mt);
+}
+
+function clearMood(rec) {
+  const m = rec.mood;
+  if (!m) return;
+  rec.mood = null;
+  clockTimers.clearTimeout(m.timer);
+  m.el.remove();
+}
+
+/** A sweat drop or rain cloud above the head for ui.fail.seconds; another failure in the meantime starts the time again. */
+function showMood(rec, streak) {
+  clearMood(rec);
+  const kind = moodKind(streak);
+  const m = el('div', `mood ${kind}`);
+  const frames = kind === 'cloud' ? ['rain-cloud-1', 'rain-cloud-2'] : ['sweat-drop'];
+  for (const name of frames) {
+    const pic = el('i');
+    pic.style.backgroundImage = `url(${FX_URL}${name}.png)`;
+    m.append(pic);
+  }
+  rec.tagRoot.append(m);
+  rec.mood = { el: m, timer: clockTimers.setTimeout(() => clearMood(rec), ui.ui.fail.seconds * 1000) };
+}
+
+/** A command or test failed (SSE "fail"): the mood shows; from ui.fail.patStreak in a row the boss comes to comfort (not for the boss itself). */
+function onFail(sig) {
+  const frec = floorRecs.get(sig.sessionId);
+  const rec = frec?.agents.get(sig.agent);
+  if (!rec || frec.off || paused() || rec.state === 'done' || rec.el.classList.contains('gone')) return;
+  showMood(rec, sig.streak);
+  const boss = frec.agents.get('lead');
+  if (rec.isLead || !boss || !patDue(sig.streak, frec.patAt ?? -Infinity, Date.now(), ui.ui.fail) || !playable(boss) || !playable(rec)) return;
+  frec.patAt = Date.now();
+  abortTrip(boss);
+  startScene(boss, { kind: 'pat', other: { id: rec } });
 }
 
 // ---------- office cat: one cat for the whole office (screen play only: nothing is sent or saved) ----------
@@ -1307,6 +1532,7 @@ function renderAgent(av, floorEl) {
     rec.el.classList.add(`st-${av.state}`);
     rec.tagRoot.classList.add(`st-${av.state}`);
     rec.tagRoot.classList.toggle('done', done); // finished agents stand together on the tray: their tags would pile up
+    if (done) clearMood(rec);
   }
   if (done && !frec.populated && lastNow - av.since > DONE_STALE_MS) rec.el.classList.add('gone'); // already reported before this page loaded
   if (rec.m.nextTripAt === Infinity && !rec.away && rec.m.returnAt === 0) {
@@ -1475,6 +1701,8 @@ function createFloor(fv) {
     sid: fv.sessionId, off: root.hidden, design: fv.design, scene: sc, status: fv.status, dbg: null, clock: null, clockOn: false, warned: false,
   };
   rec.clock = makeClock(rec);
+  rec.todos = NO_TODOS;
+  makeBoard(rec);
   if (DEBUG_NAV) {
     rec.dbg = buildNavDebug(rec, sc);
     stage.append(rec.dbg.svg);
@@ -1506,6 +1734,8 @@ function renderFloor(fv, elm) {
   rec.bl.hidden = fv.board.line === '';
   elm.classList.toggle('leaving', fv.status === 'leaving');
   rec.reports.hidden = fv.reports <= 0;
+  rec.todos = fv.todos ?? NO_TODOS;
+  renderBoard(rec);
   if (fv.reports > 0) setText(rec.reports, `보고 ${fv.reports}`);
 
   const { lead } = rec.scene.r;
@@ -1632,6 +1862,7 @@ function removeSession(sessionId, withLog = true) {
   const f = floorRecs.get(sessionId);
   if (f) {
     stopAmbient(f);
+    if (bigBoard?.frec === f) closeBig();
     for (const a of f.agents.values()) cancelGrab(a);
     if (cat?.frec === f) catRemove();
     f.el.remove();
@@ -1791,6 +2022,8 @@ function connect() {
   es.addEventListener('open', () => { connEl.hidden = true; });
   es.addEventListener('state', (ev) => render(JSON.parse(ev.data)));
   es.addEventListener('log', (ev) => appendLog(JSON.parse(ev.data)));
+  es.addEventListener('phase', (ev) => onPhase(JSON.parse(ev.data)));
+  es.addEventListener('fail', (ev) => onFail(JSON.parse(ev.data)));
   es.addEventListener('error', () => {
     showConn('연결이 끊겼습니다. 다시 연결하는 중…');
     // The browser retries by itself unless the server refused the stream (then the state is CLOSED).
@@ -1803,6 +2036,7 @@ function pause() {
   clearRotate();
   if (es) es.close();
   document.body.classList.add('paused');
+  closeBig();
   // nothing moves while hidden: every walking or away character goes to its server place now
   for (const f of floorRecs.values()) {
     stopAmbient(f);
@@ -1905,9 +2139,11 @@ function setOff(f, off) {
   f.off = off;
   f.el.hidden = off;
   if (off) {
+    if (bigBoard?.frec === f) closeBig();
     stopAmbient(f);
     for (const a of f.agents.values()) settleNow(a);
   } else {
+    renderBoard(f);
     startAmbient(f, true);
   }
 }
@@ -2025,6 +2261,7 @@ async function openPip() {
   d.documentElement.style.setProperty('--sit-h', `${ui.sitHeight}px`);
   d.body.classList.add('pip-mini');
   landFlights(); // moving the floors cancels running animations
+  closeBig(); // its listeners belong to this page's document
   pipWin = w;
   d.body.append(floorsEl);
   holdEl.hidden = false;
@@ -2041,6 +2278,7 @@ function pipClosed() {
   const gone = pipWin;
   pipWin = null;
   landFlights();
+  closeBig();
   for (const t of liveTimers.values()) {
     if (t.win !== gone) continue; // the closed window's timers died with it: they run on this page now
     t.win = window;

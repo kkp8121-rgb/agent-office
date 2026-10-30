@@ -333,3 +333,39 @@ html:has(.pip-mini) { scrollbar-gutter: stable; }
 #logbar .back { margin-left: auto; color: var(--muted); font-size: 11px; }
 #logmeta { color: var(--muted); font-size: 11px; margin-bottom: 6px; }
 .logpage #log { min-height: 0; overflow: visible; }
+
+/* ---- whiteboard to-dos on the wall (the box is laid on the board's quad with one shear, app.js makeBoard) ---- */
+.wboard {
+  position: absolute; z-index: 900; transform-origin: 0 0; box-sizing: border-box; padding: 2px 3px; overflow: hidden; cursor: pointer;
+  background: #f7f6ef; color: #1f1d19; font-size: 8px; line-height: 9px; font-weight: 700;
+}
+.wboard b { display: block; height: 9px; overflow: hidden; white-space: nowrap; color: #a8402b; font-weight: 800; }
+.wboard ul, .wbig ul { margin: 0; padding: 0; list-style: none; }
+.wboard li { display: flex; gap: 2px; height: 9px; overflow: hidden; white-space: nowrap; }
+.wboard .tx, .wbig .tx { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.wboard .mk, .wbig .mk { flex: none; }
+li.in_progress { background: #ffe38a; font-weight: 700; }
+li.completed { color: #6f695e; font-weight: 400; }
+li.completed .tx { text-decoration: line-through; }
+.wboard:focus-visible { outline: 1px solid #2f80d0; }
+/* the enlarged list: readable at 1x, above everything on the floor */
+.wbig {
+  position: absolute; z-index: 9600; box-sizing: border-box; padding: 8px 10px; background: var(--paper); border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0 rgba(59, 47, 34, .4); font-size: 13px; line-height: 1.5;
+}
+.wbig b { display: block; margin-bottom: 4px; color: #a8402b; font-size: 14px; }
+.wbig li { display: flex; gap: 6px; padding: 0 4px; }
+.wbig li.more { color: var(--muted); }
+.wbig .tx { white-space: normal; overflow: visible; }
+
+/* ---- failure faces: a sweat drop or a rain cloud (two pictures that swap every half second) beside the head ---- */
+.mood { position: absolute; left: 10px; top: -64px; width: 0; height: 0; pointer-events: none; }
+.agt.sitting .mood { top: -50px; }
+.mood i { position: absolute; background-repeat: no-repeat; background-size: 100% 100%; image-rendering: pixelated; }
+.mood.sweat i { left: 0; top: 0; width: 14px; height: 18px; animation: mood-drip .8s ease-in infinite; }
+.mood.cloud { left: -14px; top: -84px; }
+.agt.sitting .mood.cloud { top: -70px; }
+.mood.cloud i { left: 0; top: 0; width: 28px; height: 22px; animation: mood-swap 1s steps(1) infinite; }
+.mood.cloud i + i { animation-delay: -.5s; }
+@keyframes mood-drip { 0% { transform: translateY(-2px); } 100% { transform: translateY(3px); opacity: .6; } }
+@keyframes mood-swap { 0% { opacity: 1; } 50% { opacity: 0; } }

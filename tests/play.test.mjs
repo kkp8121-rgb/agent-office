@@ -40,7 +40,7 @@ test('lines: every situation has at least 8 distinct lines that fit a bubble; da
   for (const [name, pool] of Object.entries(L)) {
     assert.ok(pool.length >= 8, `${name} has ${pool.length}`);
     assert.equal(new Set(pool).size, pool.length, `${name} repeats a line`);
-    const max = name === 'report' ? 26 : 16;
+    const max = name === 'report' || name === 'meetingBoss' ? 26 : 16;
     for (const line of pool) assert.ok([...line].length <= max, `${name}: ${line}`);
   }
   for (const line of L.report) assert.ok(line.includes('{task}'), line);
