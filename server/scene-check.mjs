@@ -7,6 +7,26 @@ import { charZ, objectNodes } from '../web/depth.mjs';
 const CHAIR = /chair/i;
 const CHAIR_NEAR_PX = 70;
 
+/** How far an object's picture top lies below its highest point at screen x: it follows the back line of a slanted footprint (0 for a straight one). */
+const topDrop = (o, x) => (o?.footprint.length >= 3 ? backAt(o.footprint, x) - polyMinY(o.footprint) : 0);
+
+/** Smallest y of the polygon at screen x (x clamped into the polygon's x range): the desk's back line where a seat sits. A slanted desk has no single back line. */
+function backAt(poly, x) {
+  const xs = poly.map((p) => p[0]);
+  const cx = Math.min(Math.max(x, Math.min(...xs)), Math.max(...xs));
+  let best = Infinity;
+  for (let k = 0; k < poly.length; k++) {
+    const [ax, ay] = poly[k];
+    const [bx, by] = poly[(k + 1) % poly.length];
+    if (ax === bx) {
+      if (ax === cx) best = Math.min(best, ay, by);
+    } else if (cx >= Math.min(ax, bx) && cx <= Math.max(ax, bx)) {
+      best = Math.min(best, ay + ((by - ay) * (cx - ax)) / (bx - ax));
+    }
+  }
+  return best;
+}
+
 /**
  * @param {object} raw scene.json content
  * @param {{atlasSize: [number, number]|null, cfg: object, minSeats?: number}} opts
@@ -96,7 +116,7 @@ export function checkScene(raw, { atlasSize, cfg, minSeats }) {
 
   // 5. depth: stand behind the desk's back line, chair behind the character, no overlapping blockers
   for (const s of sitters) {
-    const back = polyMinY(s.desk.footprint);
+    const back = backAt(s.desk.footprint, s.at[0]);
     if (!(s.at[1] < back)) errors.push(`5단계 깊이: ${s.label} at.y(${Math.round(s.at[1])}) 가 책상 뒤쪽 선(${Math.round(back)})보다 작아야 합니다`);
     if (!s.chair) warnings.push(`5단계 깊이: ${s.label} 근처에서 의자(종류 이름에 chair 포함)를 찾지 못했습니다`);
     else if (polyMaxY(s.chair.footprint) > s.at[1] - 2) errors.push(`5단계 깊이: ${s.label} 의자 ${s.chair.id} 앞쪽(${Math.round(polyMaxY(s.chair.footprint))})이 at.y−2(${Math.round(s.at[1] - 2)}) 이하여야 합니다`);
@@ -115,7 +135,7 @@ export function checkScene(raw, { atlasSize, cfg, minSeats }) {
   ];
   for (const f of faces) {
     const [x0, x1, y0, y1] = [f.p[0] - depth.pickMarginPx, f.p[0] + depth.pickMarginPx, f.p[1] - f.h, f.p[1] - f.h + depth.faceTopPx];
-    const cover = nodes.filter((n) => n.z > charZ(f.p[1], depth) && n.z < depth.frontZ - 1 && n.x < x1 && n.x + n.w > x0 && n.y < y1 && n.y + n.h > y0);
+    const cover = nodes.filter((n) => n.z > charZ(f.p[1], depth) && n.z < depth.frontZ - 1 && n.x < x1 && n.x + n.w > x0 && n.y + topDrop(byId.get(n.objId), f.p[0]) < y1 && n.y + n.h > y0);
     const ids = [...new Set(cover.map((n) => n.objId))];
     if (ids.length) warnings.push(`6단계 가림: ${f.label} 의 얼굴을 ${ids.join(', ')} 이(가) 가릴 수 있습니다`);
   }
@@ -137,12 +157,12 @@ export function checkScene(raw, { atlasSize, cfg, minSeats }) {
 
   // 9. seated pose shows: head and shoulders above the desk picture, behind the desk, in front of the chair
   for (const s of sitters) {
-    const deskTop = s.desk.at[1] - s.desk.anchor[1];
+    const deskTop = s.desk.at[1] - s.desk.anchor[1] + topDrop(s.desk, s.sitAt[0]);
     const sitTop = s.sitAt[1] - cfg.sitHeight;
     if (sitTop > deskTop - depth.seatShowPx) {
       errors.push(`9단계 앉은 자세: ${s.label} 앉은 그림 윗변(${Math.round(sitTop)})이 책상 윗변(${Math.round(deskTop)})보다 ${depth.seatShowPx}px 이상 위여야 합니다`);
     }
-    const back = polyMinY(s.desk.footprint);
+    const back = backAt(s.desk.footprint, s.sitAt[0]);
     if (!(s.sitAt[1] < back)) errors.push(`9단계 앉은 자세: ${s.label} sitAt.y(${Math.round(s.sitAt[1])}) 가 책상 뒤쪽 선(${Math.round(back)})보다 작아야 합니다`);
     if (s.chair && polyMaxY(s.chair.footprint) > s.sitAt[1] - 2) errors.push(`9단계 앉은 자세: ${s.label} 의자 ${s.chair.id} 앞쪽이 sitAt.y−2 이하여야 합니다`);
   }
