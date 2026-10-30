@@ -1,0 +1,358 @@
+{
+ "version": 1,
+ "note": "size/anchor in scene px; anchor = floor contact (bottom-centre); footprint like scene.json kinds",
+ "items": [
+  {
+   "id": "plant-small",
+   "name": "화분",
+   "price": 30,
+   "size": [
+    29,
+    36
+   ],
+   "anchor": [
+    14,
+    35
+   ],
+   "footprint": [
+    [
+     -8,
+     -5
+    ],
+    [
+     8,
+     -5
+    ],
+    [
+     8,
+     0
+    ],
+    [
+     -8,
+     0
+    ]
+   ],
+   "blocks": true
+  },
+  {
+   "id": "poster-stand",
+   "name": "포스터 입간판",
+   "price": 40,
+   "size": [
+    43,
+    56
+   ],
+   "anchor": [
+    21,
+    55
+   ],
+   "footprint": [
+    [
+     -11,
+     -5
+    ],
+    [
+     11,
+     -5
+    ],
+    [
+     11,
+     0
+    ],
+    [
+     -11,
+     0
+    ]
+   ],
+   "blocks": true
+  },
+  {
+   "id": "rug",
+   "name": "러그",
+   "price": 70,
+   "size": [
+    96,
+    32
+   ],
+   "anchor": [
+    48,
+    31
+   ],
+   "footprint": [
+    [
+     -40,
+     -16
+    ],
+    [
+     40,
+     -16
+    ],
+    [
+     40,
+     0
+    ],
+    [
+     -40,
+     0
+    ]
+   ],
+   "blocks": false
+  },
+  {
+   "id": "plant-big",
+   "name": "큰 화분",
+   "price": 60,
+   "size": [
+    56,
+    70
+   ],
+   "anchor": [
+    28,
+    69
+   ],
+   "footprint": [
+    [
+     -12,
+     -6
+    ],
+    [
+     12,
+     -6
+    ],
+    [
+     12,
+     0
+    ],
+    [
+     -12,
+     0
+    ]
+   ],
+   "blocks": true
+  },
+  {
+   "id": "floor-lamp",
+   "name": "스탠드 조명",
+   "price": 80,
+   "size": [
+    24,
+    68
+   ],
+   "anchor": [
+    12,
+    67
+   ],
+   "footprint": [
+    [
+     -6,
+     -4
+    ],
+    [
+     6,
+     -4
+    ],
+    [
+     6,
+     0
+    ],
+    [
+     -6,
+     0
+    ]
+   ],
+   "blocks": true
+  },
+  {
+   "id": "bookshelf",
+   "name": "책장",
+   "price": 100,
+   "size": [
+    39,
+    74
+   ],
+   "anchor": [
+    19,
+    73
+   ],
+   "footprint": [
+    [
+     -17,
+     -6
+    ],
+    [
+     17,
+     -6
+    ],
+    [
+     17,
+     0
+    ],
+    [
+     -17,
+     0
+    ]
+   ],
+   "blocks": true
+  },
+  {
+   "id": "cat-house",
+   "name": "고양이 집",
+   "price": 120,
+   "size": [
+    34,
+    38
+   ],
+   "anchor": [
+    17,
+    37
+   ],
+   "footprint": [
+    [
+     -14,
+     -6
+    ],
+    [
+     14,
+     -6
+    ],
+    [
+     14,
+     0
+    ],
+    [
+     -14,
+     0
+    ]
+   ],
+   "blocks": true
+  },
+  {
+   "id": "fish-tank",
+   "name": "어항",
+   "price": 150,
+   "size": [
+    46,
+    62
+   ],
+   "anchor": [
+    23,
+    61
+   ],
+   "footprint": [
+    [
+     -20,
+     -7
+    ],
+    [
+     20,
+     -7
+    ],
+    [
+     20,
+     0
+    ],
+    [
+     -20,
+     0
+    ]
+   ],
+   "blocks": true
+  },
+  {
+   "id": "sofa",
+   "name": "소파",
+   "price": 160,
+   "size": [
+    104,
+    77
+   ],
+   "anchor": [
+    52,
+    76
+   ],
+   "footprint": [
+    [
+     -46,
+     -12
+    ],
+    [
+     46,
+     -12
+    ],
+    [
+     46,
+     0
+    ],
+    [
+     -46,
+     0
+    ]
+   ],
+   "blocks": true
+  },
+  {
+   "id": "vending",
+   "name": "자판기",
+   "price": 200,
+   "size": [
+    40,
+    76
+   ],
+   "anchor": [
+    20,
+    75
+   ],
+   "footprint": [
+    [
+     -18,
+     -7
+    ],
+    [
+     18,
+     -7
+    ],
+    [
+     18,
+     0
+    ],
+    [
+     -18,
+     0
+    ]
+   ],
+   "blocks": true
+  },
+  {
+   "id": "arcade",
+   "name": "오락기",
+   "price": 280,
+   "size": [
+    43,
+    74
+   ],
+   "anchor": [
+    21,
+    73
+   ],
+   "footprint": [
+    [
+     -17,
+     -7
+    ],
+    [
+     17,
+     -7
+    ],
+    [
+     17,
+     0
+    ],
+    [
+     -17,
+     0
+    ]
+   ],
+   "blocks": true
+  }
+ ]
+}
