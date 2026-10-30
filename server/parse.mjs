@@ -1,6 +1,6 @@
 // Turns one transcript JSONL line into privacy-safe events. Transcript lines are untrusted:
 // this never throws and never copies prompts, answers, thinking or tool results.
-import { describeTool, clip, MAX_LEN } from './sanitize.mjs';
+import { describeTool, clip, cleanLine, cleanTodos, TODO_TEXT_MAX, MAX_LEN } from './sanitize.mjs';
 import config from '../config.json' with { type: 'json' };
 
 const NAME_MAX = config.parse.nameMaxChars; // title, run id, workflow name
@@ -22,6 +22,16 @@ function toolEvent(block, ts) {
   if (name === 'Agent') {
     if (typeof input.subagent_type === 'string') ev.agentType = clip(input.subagent_type, MAX_LEN);
     if (typeof input.description === 'string') ev.description = clip(input.description, MAX_LEN);
+  }
+  // Whiteboard to-dos: TodoWrite replaces the list, TaskCreate adds an item, TaskUpdate (ids count up from 1) sets a status.
+  if (name === 'TodoWrite') {
+    const todos = cleanTodos(input.todos, 'content');
+    if (todos) ev.todos = todos;
+  } else if (name === 'TaskCreate') {
+    const text = cleanLine(input.subject, TODO_TEXT_MAX);
+    if (text) ev.taskCreate = text;
+  } else if (name === 'TaskUpdate' && typeof input.status === 'string') {
+    ev.taskUpdate = { id: Number(input.taskId), status: input.status };
   }
   return ev;
 }
@@ -49,7 +59,9 @@ function parseObject(o) {
   if (o.type === 'user') {
     for (const b of content) {
       if (isObj(b) && b.type === 'tool_result') {
-        evs.push({ kind: 'toolDone', ts, toolUseId: String(b.tool_use_id ?? '') });
+        const done = { kind: 'toolDone', ts, toolUseId: String(b.tool_use_id ?? '') };
+        if (b.is_error === true) done.error = true; // only the flag, never the result text
+        evs.push(done);
       }
     }
     const r = o.toolUseResult;

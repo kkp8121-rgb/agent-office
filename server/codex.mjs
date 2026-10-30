@@ -5,7 +5,7 @@
 import { lstat, open, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { FileTail } from './tail.mjs';
-import { clip, firstWord, MAX_LEN } from './sanitize.mjs';
+import { clip, cleanTodos, firstWord, MAX_LEN } from './sanitize.mjs';
 import { isSafeId } from './sessions.mjs';
 
 /** @typedef {import('./parse.mjs').Ev} Ev */
@@ -138,6 +138,17 @@ function functionCall(p, ts) {
     }
     return tool(ts, id, 'Agent', taskName ? `위임 · ${taskName}` : '위임');
   }
+  if (name === 'update_plan') { // the plan is the session's to-do list: only step texts and statuses are copied
+    const ev = tool(ts, id, name, '할 일 정리');
+    try {
+      const a = JSON.parse(p.arguments);
+      const todos = isObj(a) ? cleanTodos(a.plan, 'step') : null;
+      if (todos) ev.todos = todos;
+    } catch {
+      // arguments is not JSON: no list
+    }
+    return ev;
+  }
   if (name === COLLAB_WAIT) return tool(ts, id, COLLAB_WAIT, '동료 기다리는 중');
   if (COLLAB.has(name)) return tool(ts, id, name, '동료와 협업');
   if (name.startsWith('mcp__')) {
@@ -215,6 +226,8 @@ function parseEntry(text) {
     } else if (p.type === 'task_complete' || p.type === 'turn_aborted') {
       out.turn = 'end';
       out.evs.push({ kind: 'end', ts });
+    } else if (p.type === 'exec_command_end' && Number.isFinite(p.exit_code)) {
+      out.evs.push({ kind: 'toolResult', ts, error: p.exit_code !== 0 }); // only the exit code, never the output
     } else if (p.type === 'item_completed') {
       out.evs.push(...itemCompleted(p, ts));
     }

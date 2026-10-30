@@ -15,6 +15,7 @@ function fakeOffice() {
     snapshots: 0,
     snapshot() { o.snapshots++; return { floors: [], seq: 0 }; },
     drainLog: () => [],
+    drainSignals: () => [],
     queryLog: () => [],
   };
   return o;
@@ -114,7 +115,7 @@ test('T8A: main.mjs --open spawn uses DETACHED_OPTIONS', () => {
 
 test('F26: a new client never overwrites the last-sent state of an older one', async (t) => {
   let floors = [{ a: 1 }];
-  const office = { snapshot: () => ({ floors, seq: 0 }), drainLog: () => [], queryLog: () => [] };
+  const office = { snapshot: () => ({ floors, seq: 0 }), drainLog: () => [], drainSignals: () => [], queryLog: () => [] };
   const server = createServer(loadConfig(), office, {});
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   t.after(() => { server.closeSse(); server.close(); server.closeAllConnections(); });

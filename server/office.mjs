@@ -20,6 +20,10 @@ const isLogged = (name) => LOGGED_TOOLS.has(name) || name.startsWith('mcp__');
 // Control characters plus Unicode format characters (bidi overrides, zero-width): none may reach the screen.
 const UNSAFE_NAME_CHARS = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
 
+const TODO_VIEW_MAX = 12; // to-do items on the whiteboard; the in-progress one is always among them
+const SIGNAL_CAP = 100; // live events (phase, fail) waiting for the next broadcast; the oldest are dropped past this
+const LEAD_KEY = 'lead'; // agent key of the main session in fail events
+
 const isFiniteNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
 function folderOf(cwd) {
@@ -53,6 +57,7 @@ export class Office {
     this.departedColors = new Map(); // sessionId -> palette index of a floor that left, for the log page
     this.evicted = new WeakSet(); // entries that left the ring (a merge must not revive them)
     this.logSeq = 0;
+    this.signals = []; // live events for the page (type 'phase' / 'fail'), emptied by drainSignals()
 
     for (const h of Array.isArray(saved?.hidden) ? saved.hidden : []) {
       if (h && typeof h.sessionId === 'string' && isFiniteNum(h.pid) && isFiniteNum(h.startedAt)) {
@@ -189,6 +194,10 @@ export class Office {
       colorIndex,
       aiTitle: '',
       lead: { name: lead.name, role: lead.role, sprite: lead.key, head: '', state: 'idle', bubble: '', lastRead: null },
+      createdAt: this.now, // events stamped before this are backfill: they drive state but raise no live signal
+      todoItems: [], // [{text, status, gone?}] of the main session
+      liveRuns: new Set(), // runIds whose launch was seen live (not in backfill)
+      runPhases: new Map(), // runId -> {phase, armed}: armed once a phase change may raise a signal
       boardLine: '',
       boardRun: '', // runId that owns boardLine
       workflows: new Map(), // runId -> {name, scriptPath}
@@ -292,6 +301,7 @@ export class Office {
         if (ev.title) f.aiTitle = ev.title;
       } else if (ev.kind === 'workflowLaunch') {
         if (ev.runId) f.workflows.set(ev.runId, { name: ev.workflowName, scriptPath: ev.scriptPath });
+        if (this.#isLive(f, ev)) f.liveRuns.add(ev.runId);
       } else {
         this.#actorEvent(f, f.lead, ev, now, true, opts.logSince);
       }
@@ -314,6 +324,36 @@ export class Office {
     actor.since = now;
   }
 
+  #isLive(f, ev) {
+    return ev.ts > 0 && ev.ts >= f.createdAt;
+  }
+
+  #signal(sig) {
+    this.signals.push({ ...sig, at: this.now });
+    if (this.signals.length > SIGNAL_CAP) this.signals.shift();
+  }
+
+  /** Consecutive failures per actor: a success resets, a failure counts; only a live failure is announced. */
+  #toolResult(f, actor, ev, isLead) {
+    if (!ev.error) {
+      actor.failStreak = 0;
+      return;
+    }
+    actor.failStreak = (actor.failStreak ?? 0) + 1;
+    if (!f.hidden && this.#isLive(f, ev)) this.#signal({ type: 'fail', sessionId: f.sessionId, agent: isLead ? LEAD_KEY : actor.key, streak: actor.failStreak });
+  }
+
+  #applyTodos(f, ev) {
+    if (ev.todos) f.todoItems = ev.todos.map((t) => ({ ...t }));
+    else if (ev.taskCreate) f.todoItems.push({ text: ev.taskCreate, status: 'pending' });
+    else if (ev.taskUpdate) {
+      const t = f.todoItems[ev.taskUpdate.id - 1];
+      if (!t) return;
+      if (ev.taskUpdate.status === 'deleted') t.gone = true;
+      else if (ev.taskUpdate.status === 'pending' || ev.taskUpdate.status === 'in_progress' || ev.taskUpdate.status === 'completed') t.status = ev.taskUpdate.status;
+    }
+  }
+
   #actorEvent(f, actor, ev, now, isLead, logSince = 0) {
     if (!isLead && actor.state === 'done') return;
     const t = ev.ts > 0 ? ev.ts : now;
@@ -322,12 +362,18 @@ export class Office {
 
     switch (ev.kind) {
       case 'tool':
+        if (isLead) this.#applyTodos(f, ev);
         this.#setState(actor, 'working', ev.text, now);
         if (quiet) break;
         if (READ_TOOLS.has(ev.name)) this.#logRead(f, actor, t);
         else if (isLogged(ev.name)) this.#log(f, actor, t, ev.text);
         break;
+      case 'toolResult': // Codex command end: counts toward the failure streak only
+        this.#toolResult(f, actor, ev, isLead);
+        break;
       case 'toolDone':
+        if (f.provider === 'claude') this.#toolResult(f, actor, ev, isLead); // Codex counts its command ends instead
+      // falls through
       case 'think':
         this.#setState(actor, 'thinking', BUBBLE_THINKING, now);
         break;
@@ -476,6 +522,7 @@ export class Office {
     const f = this.floors.get(sessionId);
     if (!f) return;
     if (p.done) {
+      f.runPhases.delete(runId);
       f.doneRuns.add(runId);
       if (f.boardRun === runId) {
         f.boardLine = '';
@@ -487,10 +534,26 @@ export class Office {
     const max = this.cfg.log.headMaxChars;
     const name = clip(p.name ?? '', max);
     const current = clip(p.current ?? '', max);
+    // A phase change raises a signal only for a run seen starting live, or after its first phase was seen: a run that was
+    // already under way when the office found it must not call a meeting for phases that are past.
+    let seen = f.runPhases.get(runId);
+    if (!seen) f.runPhases.set(runId, (seen = { phase: '', armed: f.liveRuns.has(runId) }));
+    if (current && current !== seen.phase) {
+      if (seen.armed && !f.hidden) this.#signal({ type: 'phase', sessionId, phase: current });
+      seen.phase = current;
+      seen.armed = true;
+    }
     const phases = Array.isArray(p.phases) ? p.phases : [];
     const idx = phases.indexOf(p.current);
     f.boardRun = runId;
     f.boardLine = !current ? name : phases.length && idx >= 0 ? `${name} · ${current} ${idx + 1}/${phases.length}` : `${name} · ${current}`;
+  }
+
+  /** Live events since the last call, oldest first: {type:'phase', sessionId, phase, at} and {type:'fail', sessionId, agent, streak, at}. */
+  drainSignals() {
+    const out = this.signals;
+    if (out.length) this.signals = [];
+    return out;
   }
 
   workflowRuns(sessionId) {
@@ -569,6 +632,22 @@ export class Office {
     return out;
   }
 
+  /** {items:[{text,status}], done, total}: at most TODO_VIEW_MAX items, a window that keeps the in-progress (else first open) item. */
+  #todoView(f) {
+    const all = f.todoItems.filter((t) => !t.gone);
+    let start = 0;
+    if (all.length > TODO_VIEW_MAX) {
+      const cur = all.findIndex((t) => t.status === 'in_progress');
+      const at = cur >= 0 ? cur : Math.max(0, all.findIndex((t) => t.status === 'pending'));
+      start = Math.max(0, Math.min(at - 3, all.length - TODO_VIEW_MAX));
+    }
+    return {
+      items: all.slice(start, start + TODO_VIEW_MAX).map((t) => ({ text: t.text, status: t.status })),
+      done: all.filter((t) => t.status === 'completed').length,
+      total: all.length,
+    };
+  }
+
   snapshot() {
     const visible = [...this.floors.values()].filter((f) => !f.hidden);
     visible.sort((a, b) => a.startedAt - b.startedAt || a.seq - b.seq);
@@ -587,6 +666,7 @@ export class Office {
         status: f.status,
         lead: { name: f.lead.name, role: f.lead.role, sprite: f.lead.sprite, state: f.lead.state, bubble: f.lead.bubble },
         board: { title, line: f.boardLine },
+        todos: this.#todoView(f),
         reports: f.reports,
         workflows: [...f.workflows.keys()].filter((id) => !f.doneRuns.has(id)).length,
         agents: [...f.agents.values()].map((a) => ({

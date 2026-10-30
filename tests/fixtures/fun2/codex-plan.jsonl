@@ -1,0 +1,3 @@
+{"timestamp":"2026-10-28T10:00:00.000Z","type":"response_item","payload":{"type":"function_call","name":"update_plan","call_id":"c1","arguments":"{\"explanation\":\"SECRET-EXPLAIN\",\"plan\":[{\"step\":\"설계 확인\",\"status\":\"completed\"},{\"step\":\"구현하기\",\"status\":\"in_progress\"},{\"step\":\"시험 돌리기\",\"status\":\"pending\"}]}"}}
+{"timestamp":"2026-10-28T10:00:01.000Z","type":"event_msg","payload":{"type":"exec_command_end","call_id":"c2","exit_code":2,"aggregated_output":"SECRET-OUTPUT"}}
+{"timestamp":"2026-10-28T10:00:02.000Z","type":"event_msg","payload":{"type":"exec_command_end","call_id":"c3","exit_code":0}}

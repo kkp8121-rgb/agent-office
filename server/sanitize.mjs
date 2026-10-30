@@ -12,6 +12,31 @@ export function clip(s, n) {
   return chars.length <= n ? chars.join('') : chars.slice(0, n - 1).join('') + '…';
 }
 
+// To-do list items (whiteboard): one short line of text and a status, nothing else from the list is kept.
+export const TODO_TEXT_MAX = 20;
+const TODO_PARSE_MAX = 100; // items read from one list; the office shows fewer
+const TODO_STATUSES = new Set(['pending', 'in_progress', 'completed']);
+// Control characters plus Unicode format characters (bidi overrides, zero-width) and line breaks.
+const UNSAFE_LINE_CHARS = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
+
+/** Single line without control characters, clipped to n characters ('' for anything but a string). */
+export function cleanLine(s, n) {
+  if (typeof s !== 'string') return '';
+  return clip(s.slice(0, n * 4).replace(UNSAFE_LINE_CHARS, ' ').replace(/\s+/g, ' ').trim(), n);
+}
+
+/** Todo list from untrusted JSON: [{text, status}] taking `textKey` of each entry, or null if `list` is not an array. */
+export function cleanTodos(list, textKey) {
+  if (!Array.isArray(list)) return null;
+  const out = [];
+  for (const t of list.slice(0, TODO_PARSE_MAX)) {
+    if (typeof t !== 'object' || t === null) continue;
+    const text = cleanLine(t[textKey], TODO_TEXT_MAX);
+    if (text) out.push({ text, status: TODO_STATUSES.has(t.status) ? t.status : 'pending' });
+  }
+  return out;
+}
+
 function baseName(p) {
   return String(p ?? '').split(/[\\/]/).filter(Boolean).pop() ?? '';
 }
@@ -64,6 +89,8 @@ const DESCRIBERS = {
   Glob: () => '검색 중',
   Agent: (i) => (i?.description ? `위임 · ${i.description}` : '위임'),
   Task: () => '할 일 정리',
+  TaskCreate: () => '할 일 정리',
+  TaskUpdate: () => '할 일 정리',
   TodoWrite: () => '할 일 정리',
   Skill: (i) => (i?.skill ? `스킬 · ${i.skill}` : '스킬 사용'),
   Workflow: () => '워크플로 시작',

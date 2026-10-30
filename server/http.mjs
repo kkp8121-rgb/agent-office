@@ -100,6 +100,7 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
   /** Sends `state` only when it differs from the last one sent, and every new or updated log entry. */
   server.broadcast = () => {
     const entries = office.drainLog(); // drained even without clients so entries never pile up
+    const signals = office.drainSignals(); // live phase / fail events: not replayed to a client that connects later
     if (clients.size === 0) { // nobody to send to: skip the snapshot and its stringify; the next client gets a full state
       lastStateJson = null;
       return;
@@ -111,6 +112,7 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
     for (const res of clients) {
       if (changed) res.write(frame('state', snap));
       if (entries.length) res.write(frame('log', entries));
+      for (const sig of signals) res.write(frame(sig.type, sig));
     }
   };
 
