@@ -38,7 +38,7 @@ test('lines: never the previous line, every line of a pool shows up', () => {
 
 test('lines: every situation has at least 8 distinct lines that fit a bubble; day parts have a greeting pool', () => {
   for (const [name, pool] of Object.entries(L)) {
-    assert.ok(pool.length >= 8, `${name} has ${pool.length}`);
+    assert.ok(pool.length >= (name === 'snackEat' || name === 'snackDone' ? 1 : 8), `${name} has ${pool.length}`); // the two snack words are one fixed line each
     assert.equal(new Set(pool).size, pool.length, `${name} repeats a line`);
     const max = name === 'report' || name === 'meetingBoss' ? 26 : 16;
     for (const line of pool) assert.ok([...line].length <= max, `${name}: ${line}`);

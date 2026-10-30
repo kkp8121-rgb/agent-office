@@ -13,6 +13,8 @@ import { chooseCatAct, openPoint, otherFloor } from './cat.mjs';
 import { legVars } from './walk.mjs';
 import { boardCapacity, boardFrame, itemWindow, todoKey } from './board.mjs';
 import { assignSpots, clipPhase, moodKind, patDue } from './meeting.mjs';
+import { lightAt, msToNextChange, placeSeason, seasonOn } from './season.mjs';
+import { pickAt, snackOutcome } from './snack.mjs';
 
 // Visual constants (how things look/move, not planning numbers; those come from /api/ui).
 const WALK_PX_PER_SEC = 150;
@@ -31,9 +33,18 @@ const BIG_WIDTH_PX = 250; // width of the enlarged to-do list (.wbig)
 const BIG_GAP_PX = 6; // its distance from the floor edge and from the board
 const TODO_MARK = { in_progress: '▶', completed: '✓', pending: '☐' };
 const NO_TODOS = { items: [], done: 0, total: 0 };
-const FX_URL = '/assets/fx/'; // the failure faces (sweat-drop, rain-cloud-1/2)
+const FX_URL = '/assets/fx/'; // the failure faces (sweat-drop, rain-cloud-1/2) and the snack sparkle (sparkle-1/2)
+const SNACK_URL = '/assets/snacks/snack-'; // + coffee|donut|cookie|fish + .png
+const ITEMS_URL = '/assets/seasonal/items.json'; // size and anchor of every decoration
+const SKY_Z = 1; // the window glass tint: above the room picture, below every object
+const WALL_Z_BELOW = 2; // wall decorations draw this far under the lowest floor object (zBase), above the glass tint
+const SPARKLE_SPOTS = [[-14, -10], [12, -26], [-6, -40]]; // where the three sparkles hover, from the character's feet (the tag layer origin)
+const SNACK_PIP_TIP = '작은 창에서는 간식을 줄 수 없습니다 (창 사이로는 끌 수 없어요)';
 
-const DEBUG = new URLSearchParams(location.search).get('debug');
+const QUERY = new URLSearchParams(location.search);
+const DEBUG = QUERY.get('debug');
+let seasonQuery = ['halloween', 'christmas', 'lunar', 'none'].includes(QUERY.get('season')) ? QUERY.get('season') : null; // ?season= overrides the date (for checking)
+let lightQuery = ['day', 'sunset', 'night'].includes(QUERY.get('time')) ? QUERY.get('time') : null; // ?time= overrides the hour
 const DEBUG_NAV = DEBUG === 'nav'; // ?debug=nav draws the walking grid and every scene point over each scene floor
 const DEBUG_AMBIENT = DEBUG === 'ambient'; // ?debug=ambient makes the office life 10x faster and exposes window.__ambient
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -76,7 +87,7 @@ function fitFloors() {
   if (mini) {
     // mini layout: floors only, the whole window minus the body padding
     const cs = doc.defaultView.getComputedStyle(doc.body);
-    availW = doc.documentElement.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    availW = doc.body.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight); // the body, not the root: the root's width ignores the reserved scrollbar gutter
     availH = doc.documentElement.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   } else {
     const cs = getComputedStyle(appEl);
@@ -171,6 +182,7 @@ function setupScenes() {
       busy: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.press || a.grab || a.play || a.say || a.steam || a.mood).length, 0),
       cat: () => (cat ? { sid: cat.frec.sid, x: cat.rec.x, y: cat.rec.y, walking: !!cat.rec.walk, timer: cat.timer, cls: cat.rec.el.className } : null),
       signal: (type, data) => (type === 'phase' ? onPhase : onFail)(data), // the SSE handlers, without the stream
+      sky: (s, l) => { seasonQuery = s; lightQuery = l; applyTime(); }, // switches the season and the light like a date or hour change would
       meetings: () => [...floorRecs.values()].filter((f) => f.meeting).length,
       catDo: (act) => { // makes the cat start `act` (sleep, spot, desk, stroll, leave) now
         if (!cat || cat.rec.grab) return;
@@ -719,6 +731,7 @@ function liftUp(rec) {
   if (rec.play) endPlay(rec.play, rec);
   clearSay(rec);
   clearSteam(rec);
+  clearSnack(rec);
   abortTrip(rec);
   freeze(rec); // a walking character stops where it is
   clearGestures(rec);
@@ -872,6 +885,7 @@ function cancelGrab(rec) {
   clearSay(rec);
   clearSteam(rec);
   clearMood(rec);
+  clearSnack(rec);
   const g = rec.grab;
   if (!g) return;
   if (g.timer) clockTimers.clearTimeout(g.timer);
@@ -1263,6 +1277,180 @@ function onFail(sig) {
   startScene(boss, { kind: 'pat', other: { id: rec } });
 }
 
+// ---------- seasons, day and night windows, snacks (screen play only: nothing is sent or saved) ----------
+
+let decorItems = []; // assets/seasonal/items.json
+let season = 'none'; // halloween | christmas | lunar | none
+let light = 'day'; // day | sunset | night
+let skyTimer = 0; // clockTimers token: the one timer to the next hour or date boundary
+
+/** The window glass of a floor: one svg of polygons, filled by the stage's data-light (nothing is drawn by day). */
+function makeSky(frec) {
+  const windows = frec.scene.raw.windows;
+  if (!windows?.length) return;
+  const [w, h] = frec.scene.r.size;
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'sky');
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.setAttribute('width', String(w));
+  svg.setAttribute('height', String(h));
+  for (const poly of windows) {
+    const p = document.createElementNS(SVG_NS, 'polygon');
+    p.setAttribute('points', poly.map((pt) => pt.join(',')).join(' '));
+    svg.append(p);
+  }
+  frec.stage.prepend(svg);
+}
+
+/** z of a decoration: floor ones by their foot line like a character, desk ones just above the desk they stand on, wall ones under every object. */
+function decorZ(frec, anchor) {
+  const { zBase } = ui.depth;
+  if (anchor.kind === 'wall') return zBase - WALL_Z_BELOW;
+  if (anchor.kind === 'floor') return zBase + 2 * Math.round(anchor.at[1]);
+  const [ax, ay] = anchor.at;
+  const desks = new Set(frec.scene.r.objects.filter((o) => /desk/.test(o.kind)).map((o) => o.id));
+  let z = zBase;
+  for (const n of frec.scene.nodes) if (desks.has(n.objId) && ax >= n.x && ax <= n.x + n.w && ay >= n.y && ay <= n.y + n.h) z = Math.max(z, n.z + 1);
+  return z;
+}
+
+/** Brings one floor in step with the season and the light. A floor that is not shown is left as it is and catches up when it is shown. */
+function syncDecor(frec) {
+  if (frec.off) return;
+  setAttr(frec.stage, 'data-light', light);
+  if (frec.decorSeason === season) return;
+  frec.decorSeason = season;
+  frec.decor?.remove();
+  frec.decor = null;
+  const placed = season === 'none' ? [] : placeSeason(decorItems, frec.scene.raw.seasonal ?? [], season, frec.design);
+  if (!placed.length) return;
+  const box = el('div', 'decor');
+  for (const { anchor, item } of placed) {
+    const img = el('img');
+    img.src = `/assets/${item.file}`;
+    img.alt = '';
+    img.draggable = false;
+    Object.assign(img.style, {
+      left: `${anchor.at[0] - item.anchor[0]}px`, top: `${anchor.at[1] - item.anchor[1]}px`, width: `${item.size[0]}px`, height: `${item.size[1]}px`, zIndex: String(decorZ(frec, anchor)),
+    });
+    box.append(img);
+  }
+  frec.stage.append(box);
+  frec.decor = box;
+}
+
+/** Reads the date and the hour (or the query), updates every shown floor, and sets the one timer for the next change. */
+function applyTime() {
+  if (skyTimer) clockTimers.clearTimeout(skyTimer);
+  skyTimer = 0;
+  const now = new Date();
+  season = seasonQuery ?? seasonOn(now, ui.ui.season);
+  light = lightQuery ?? lightAt(now.getHours(), ui.ui.daylight);
+  for (const f of floorRecs.values()) syncDecor(f);
+  if (!paused()) skyTimer = clockTimers.setTimeout(applyTime, msToNextChange(now, ui.ui.daylight));
+}
+
+// -- snacks: drag one from the top bar onto a character --
+
+const snacksEl = $('snacks');
+let snackDrag = null; // {id, kind, ghost}: the one drag in progress
+
+/** In the small window the floors are another window: a drag cannot cross, so the snacks wait with a tooltip. */
+function syncSnacks() {
+  const off = pipWin !== null;
+  for (const b of snacksEl.querySelectorAll('button')) {
+    b.dataset.tip ??= b.title;
+    setAttr(b, 'aria-disabled', String(off));
+    setAttr(b, 'title', off ? SNACK_PIP_TIP : b.dataset.tip);
+  }
+}
+
+function clearSnack(rec) {
+  const s = rec.snack;
+  if (!s) return;
+  rec.snack = null;
+  clockTimers.clearTimeout(s.timer);
+  s.hand?.remove();
+  s.spark?.remove();
+}
+
+/** The shown character under a point, or null. A held, finished or leaving one does not take a snack. */
+function snackTargetAt(cx, cy) {
+  const rects = [];
+  const add = (rec) => {
+    if (rec.grab || rec.state === 'done' || rec.el.classList.contains('gone')) return;
+    const r = rec.body.getBoundingClientRect();
+    if (r.width) rects.push({ id: rec, left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+  };
+  for (const f of floorRecs.values()) if (!f.off) for (const a of f.agents.values()) add(a);
+  if (cat && !cat.frec.off) add(cat.rec);
+  return pickAt(rects, cx, cy, ui.ui.snack.dropMarginPx);
+}
+
+/** A snack dropped on `rec`: it eats (hands, "냠냠", then sparkles and a cheer), is full, or refuses. Only one of these at a time per character. */
+function giveSnack(rec, kind) {
+  const S = ui.ui.snack;
+  const out = snackOutcome(kind, !!rec.isCat, rec.snackAt, Date.now(), S.cooldownSeconds);
+  if (out !== 'eat') return sayFor(rec, line(out === 'full' ? 'snackFull' : rec.isCat ? 'snackNoCat' : 'snackNoFish'), S.refuseMs);
+  clearSnack(rec);
+  rec.snackAt = Date.now();
+  const hand = el('img', 'snackhand');
+  hand.src = `${SNACK_URL}${kind}.png`;
+  hand.alt = '';
+  rec.tagRoot.append(hand);
+  sayFor(rec, line('snackEat'), S.eatMs);
+  if (rec.isCat) {
+    if (rec.walk) freeze(rec);
+    if (rec.el.classList.contains('cat-sleep')) setCatPose('sit');
+    catAt(S.eatMs + S.sparkleMs + catC.pet.pauseMs, catNext); // it enjoys it first, then goes on with its day
+  }
+  const s = { hand, spark: null, timer: 0 };
+  rec.snack = s;
+  s.timer = clockTimers.setTimeout(() => {
+    hand.remove();
+    s.hand = null;
+    s.spark = el('div', 'sparkle');
+    SPARKLE_SPOTS.forEach(([x, y], k) => {
+      const i = el('i');
+      Object.assign(i.style, { left: `${x}px`, top: `${y}px`, backgroundImage: `url(${FX_URL}sparkle-${(k % 2) + 1}.png)` });
+      i.style.setProperty('--k', String(k));
+      s.spark.append(i);
+    });
+    rec.tagRoot.append(s.spark);
+    sayFor(rec, line(rec.isCat ? 'catSnackDone' : 'snackDone'), S.sparkleMs);
+    if (rec.isCat) burstHearts(rec, catC.pet.hearts[2]);
+    s.timer = clockTimers.setTimeout(() => clearSnack(rec), S.sparkleMs);
+  }, S.eatMs);
+}
+
+for (const b of snacksEl.querySelectorAll('button')) {
+  const move = (e) => snackDrag.ghost.style.setProperty('transform', `translate(${e.clientX}px, ${e.clientY}px) translate(-50%, -50%)`);
+  b.addEventListener('pointerdown', (e) => {
+    if (!e.isPrimary || e.button !== 0 || !ui || pipWin || snackDrag) return;
+    e.preventDefault();
+    b.setPointerCapture(e.pointerId);
+    const ghost = el('img', 'snack-ghost');
+    ghost.src = `${SNACK_URL}${b.dataset.snack}.png`;
+    ghost.alt = '';
+    document.body.append(ghost);
+    snackDrag = { id: e.pointerId, kind: b.dataset.snack, ghost };
+    move(e);
+  });
+  b.addEventListener('pointermove', (e) => {
+    if (snackDrag?.id === e.pointerId) move(e);
+  });
+  const end = (e) => {
+    if (snackDrag?.id !== e.pointerId) return;
+    const d = snackDrag;
+    snackDrag = null;
+    d.ghost.remove();
+    if (b.hasPointerCapture(e.pointerId)) b.releasePointerCapture(e.pointerId);
+    const rec = e.type === 'pointerup' ? snackTargetAt(e.clientX, e.clientY) : null; // anywhere else: nothing happens
+    if (rec) giveSnack(rec, d.kind);
+  };
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(type, end);
+}
+
 // ---------- office cat: one cat for the whole office (screen play only: nothing is sent or saved) ----------
 
 /** The cat's one timer (at most one is pending; a walk is a CSS transition and needs none). */
@@ -1411,17 +1599,10 @@ function catRelocate() {
   if (!document.body.classList.contains('paused')) catAt(between(Math.random, catC.firstDelayMs), catNext);
 }
 
-/** A plain click on the cat: hearts and a purr, and a bigger one for each quick click after it (ui.cat.pet). */
-function petCat(rec) {
-  if (rec.grab) return;
-  const P = catC.pet;
-  if (rec.walk) freeze(rec);
-  cat.poke = nextPoke(cat.poke, performance.now(), P);
-  const lv = cat.poke.level;
-  if (rec.el.classList.contains('cat-sleep')) setCatPose('sit'); // a sleeper wakes up
-  sayFor(rec, line(`catPet${lv}`), P.sayMs);
+/** `n` hearts float up from the cat; each removes itself when its animation ends. */
+function burstHearts(rec, n) {
   const hearts = el('div', 'hearts');
-  for (let k = 0; k < P.hearts[lv - 1]; k++) {
+  for (let k = 0; k < n; k++) {
     const h = el('i', '', '♥');
     h.style.setProperty('--k', String(k));
     h.style.setProperty('--hx', String(((k * 7) % 5 - 2) * 7)); // a little spread, the same every time
@@ -1432,6 +1613,18 @@ function petCat(rec) {
     if (!hearts.firstChild) hearts.remove();
   });
   rec.tagRoot.append(hearts);
+}
+
+/** A plain click on the cat: hearts and a purr, and a bigger one for each quick click after it (ui.cat.pet). */
+function petCat(rec) {
+  if (rec.grab) return;
+  const P = catC.pet;
+  if (rec.walk) freeze(rec);
+  cat.poke = nextPoke(cat.poke, performance.now(), P);
+  const lv = cat.poke.level;
+  if (rec.el.classList.contains('cat-sleep')) setCatPose('sit'); // a sleeper wakes up
+  sayFor(rec, line(`catPet${lv}`), P.sayMs);
+  burstHearts(rec, P.hearts[lv - 1]);
   clearGestures(rec);
   void rec.body.offsetWidth;
   rec.body.classList.add(lv >= P.maxLevel ? 'fid-hop' : 'squash');
@@ -1703,6 +1896,8 @@ function createFloor(fv) {
   rec.clock = makeClock(rec);
   rec.todos = NO_TODOS;
   makeBoard(rec);
+  makeSky(rec);
+  syncDecor(rec);
   if (DEBUG_NAV) {
     rec.dbg = buildNavDebug(rec, sc);
     stage.append(rec.dbg.svg);
@@ -2034,6 +2229,8 @@ function connect() {
 function pause() {
   clearTimeout(retryTimer);
   clearRotate();
+  if (skyTimer) clockTimers.clearTimeout(skyTimer);
+  skyTimer = 0;
   if (es) es.close();
   document.body.classList.add('paused');
   closeBig();
@@ -2051,6 +2248,7 @@ async function resume() {
   if (!ui) return init(); // the first /api/ui failed while the tab was in front
   await refreshState();
   if (document.hidden) return; // hidden again while the state was loading: stay paused
+  applyTime(); // the date or the hour may have changed while hidden
   for (const f of floorRecs.values()) startAmbient(f, true);
   catSync();
   armRotate();
@@ -2144,6 +2342,7 @@ function setOff(f, off) {
     for (const a of f.agents.values()) settleNow(a);
   } else {
     renderBoard(f);
+    syncDecor(f);
     startAmbient(f, true);
   }
 }
@@ -2267,6 +2466,7 @@ async function openPip() {
   holdEl.hidden = false;
   w.addEventListener('resize', fitFloors);
   w.addEventListener('pagehide', pipClosed);
+  syncSnacks();
   for (const f of floorRecs.values()) f.clock.kick(); // move the one clock timer to the small window
   armRotate(); // and the rotation timer
   fitFloors();
@@ -2284,6 +2484,7 @@ function pipClosed() {
     t.win = window;
     t.id = window.setTimeout(t.fire, Math.max(0, t.at - Date.now()));
   }
+  syncSnacks();
   holdEl.before(floorsEl);
   holdEl.hidden = true;
   floorsEl.style.zoom = '';
@@ -2329,7 +2530,13 @@ async function init() {
     return;
   }
   sessionPalette = ui.ui.sessionPalette;
+  try {
+    decorItems = await (await fetch(ITEMS_URL)).json();
+  } catch {
+    decorItems = []; // no pictures list: the rooms stay plain
+  }
   setupScenes();
+  applyTime();
   connEl.hidden = true;
   if (document.hidden) document.body.classList.add('paused');
   else connect();

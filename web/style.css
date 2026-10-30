@@ -323,6 +323,7 @@ html:has(.pip-mini) { scrollbar-gutter: stable; }
   #app { flex-direction: column; align-items: center; }
   #panel { width: 100%; max-width: 1024px; position: static; max-height: none; }
   #panel #log { flex: none; max-height: 40vh; }
+  body.single #panel { display: none; } /* one floor fills the window: no panel under it, so no scrollbar (the person's own choice stays as it was) */
 }
 
 /* ---- full log page ---- */
@@ -369,3 +370,26 @@ li.completed .tx { text-decoration: line-through; }
 .mood.cloud i + i { animation-delay: -.5s; }
 @keyframes mood-drip { 0% { transform: translateY(-2px); } 100% { transform: translateY(3px); opacity: .6; } }
 @keyframes mood-swap { 0% { opacity: 1; } 50% { opacity: 0; } }
+
+/* ---- seasonal decorations, day and night windows, snacks ---- */
+.decor { position: absolute; inset: 0; pointer-events: none; }
+.decor img { position: absolute; image-rendering: pixelated; }
+/* the glass of the windows only; it sits above the room picture and below every object, so frames and plants stay as they are */
+.sky { position: absolute; left: 0; top: 0; z-index: 1; pointer-events: none; }
+.sky polygon { fill: transparent; transition: fill 1s; }
+.stage[data-light="sunset"] .sky polygon { fill: rgba(255, 140, 50, .42); }
+.stage[data-light="night"] .sky polygon { fill: rgba(14, 24, 74, .62); }
+#snacks { display: flex; align-items: center; gap: 4px; margin-right: 6px; padding-right: 10px; border-right: 1px solid var(--line); }
+#topbar button.snack { padding: 1px 5px; display: flex; align-items: center; cursor: grab; touch-action: none; }
+#topbar button.snack img { height: 16px; width: auto; image-rendering: pixelated; pointer-events: none; }
+.snack-ghost { position: fixed; left: 0; top: 0; z-index: 200000; pointer-events: none; image-rendering: pixelated; height: 32px; width: auto; }
+.snackhand { position: absolute; left: 12px; top: -20px; transform: translate(-50%, -100%); pointer-events: none; image-rendering: pixelated; animation: snack-bite .45s steps(1) infinite; }
+.agt.sitting .snackhand { top: -12px; }
+.agt.cat .snackhand { left: 14px; top: -2px; }
+@keyframes snack-bite { 50% { transform: translate(-50%, -100%) translateY(-2px); } }
+.sparkle { position: absolute; left: 0; top: -30px; width: 0; height: 0; pointer-events: none; }
+.agt.sitting .sparkle { top: -22px; }
+.agt.cat .sparkle { top: -14px; }
+.sparkle i { position: absolute; width: 11px; height: 11px; margin: -5px 0 0 -5px; background-size: 100% 100%; image-rendering: pixelated; animation: glint .7s ease-in-out infinite; animation-delay: calc(var(--k) * -.23s); }
+@keyframes glint { 0%, 100% { transform: scale(.4); opacity: 0; } 50% { transform: scale(1.15); opacity: 1; } }
+#topbar button.snack[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
