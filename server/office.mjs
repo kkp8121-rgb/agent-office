@@ -53,8 +53,6 @@ export class Office {
     this.departedColors = new Map(); // sessionId -> palette index of a floor that left, for the log page
     this.evicted = new WeakSet(); // entries that left the ring (a merge must not revive them)
     this.logSeq = 0;
-    /** Called for every sub-agent that really finished (see syncAgents); the shop credits it once. */
-    this.onFinish = null;
 
     for (const h of Array.isArray(saved?.hidden) ? saved.hidden : []) {
       if (h && typeof h.sessionId === 'string' && isFiniteNum(h.pid) && isFiniteNum(h.startedAt)) {
@@ -350,10 +348,6 @@ export class Office {
     const fresh = [];
     for (const m of metas) {
       const a = f.agents.get(m.agentId);
-      // A real finish only: not an abandoned agent, and not a Codex sub-agent that was merely silent (ended === false).
-      if (this.onFinish && m.finished && !m.abandoned && m.ended !== false) {
-        this.onFinish({ provider: f.provider, sessionId, agentId: m.agentId, mtimeMs: m.mtimeMs, live: a !== undefined, hidden: f.hidden }, now);
-      }
       if (!a) {
         if (!m.finished && !m.abandoned) fresh.push(m);
       } else if (m.abandoned && !m.finished && a.state !== 'done') {

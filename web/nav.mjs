@@ -313,11 +313,6 @@ export function createNav(scenes, nav) {
       if (cache.size > nav.pathCache) cache.delete(cache.keys().next().value);
       return p && p.map((q) => q.slice());
     },
-    /** The scene of `design` changed (furniture placed): its grid bakes again on next use and its cached paths are dropped. */
-    invalidate(design) {
-      grids.delete(design);
-      for (const key of [...cache.keys()]) if (key.startsWith(`${design}|`)) cache.delete(key);
-    },
     stats: () => ({ ...stat }),
   };
 }

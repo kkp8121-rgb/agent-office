@@ -19,20 +19,6 @@
           "play": { "reportRadiusPx": 90, "highFiveRadiusPx": 46, "reportSayMs": 3000, "replyDelayMs": 1400, "replyMs": 2400, "endPauseMs": 200, "bubbleLeanPx": 46, "highFiveMs": 2300, "bossLineMs": 2400,
                     "greetMs": 2400, "talkMs": 2600, "mutterChance": 0.45, "nightTalkChance": 0.6,
                     "statusBubbles": ["생각 중", "응답 없음", "입력 대기", "작업 중", "퇴근 중"] },
-          "decor": { "floatMs": 1500, "toastMs": 3200, "maxFloats": 8, "houseApproachPx": 20,
-                     "items": {
-                     "plant-small": { "size": [29, 36], "anchor": [14, 35] },
-                     "poster-stand": { "size": [43, 56], "anchor": [21, 55] },
-                     "rug": { "size": [96, 32], "anchor": [48, 31] },
-                     "plant-big": { "size": [56, 70], "anchor": [28, 69] },
-                     "floor-lamp": { "size": [24, 68], "anchor": [12, 67] },
-                     "bookshelf": { "size": [39, 74], "anchor": [19, 73] },
-                     "cat-house": { "size": [34, 38], "anchor": [17, 37] },
-                     "fish-tank": { "size": [46, 62], "anchor": [23, 61] },
-                     "sofa": { "size": [104, 77], "anchor": [52, 76] },
-                     "vending": { "size": [40, 76], "anchor": [20, 75] },
-                     "arcade": { "size": [43, 74], "anchor": [21, 73] }
-                     } },
           "lines": {
             "lift": ["앗!", "으앗, 뭐죠?", "어어어?", "떴다 떴어!", "잠깐만요!", "저 들렸어요!", "어, 어, 어?", "하늘이 보여요!", "누가 절 들었어요?", "으헉!"],
             "liftLead": ["나 사장인데?!", "이게 무슨 일이죠?", "사장을 들다니!", "어머, 내려놔요!", "저기요, 저 사장인데요?", "이거 놔요~!", "사장 대접이 이래요?", "아니, 이럴 수가!", "내 결재는 어쩌고!", "당장 내려놔요!"],
@@ -99,7 +85,7 @@
           "cat": {
             "name": "치즈", "firstDelayMs": [3000, 9000], "moveEveryMs": [180000, 420000],
             "weights": { "stroll": 3, "desk": 3, "sleep": 2, "spot": 2 },
-            "sleepKinds": ["sofa", "cat-house"], "sitKinds": ["window", "shelf", "plant", "coffee", "water", "other"],
+            "sleepKinds": ["sofa"], "sitKinds": ["window", "shelf", "plant", "coffee", "water", "other"],
             "pauseMs": [1500, 4500], "sitMs": [8000, 25000], "sleepMs": [40000, 120000], "deskMs": [15000, 40000],
             "reactChance": 0.5, "reactMs": 2200, "landMs": 1400,
             "pet": { "resetMs": 2500, "maxLevel": 4, "sayMs": 2200, "pauseMs": 900, "hearts": [1, 2, 3, 5] } },
@@ -149,25 +135,5 @@
   "scenesDir": "assets/scenes",
   "nav": { "cellPx": 8, "inflatePx": 12, "snapRadiusCells": 6, "pathCache": 256, "overflowSearchPx": 200, "overflowMaxOverlap": 0.35, "spriteWidthPx": 44, "trayRowPx": 28, "arrivalGapPx": 24 },
   "depth": { "sliceTolerancePx": 6, "sliceWidthPx": 16, "sliceOverlapPx": 1, "pickMarginPx": 22, "zBase": 1000, "frontZ": 7000, "faceTopPx": 24, "seatShowPx": 28 },
-  "designOrder": ["studio2", "lounge", "library", "greenhouse"],
-  "shop": {
-    "startCoins": 50,
-    "coinsPerAgent": 10,
-    "creditWindowHours": 24,
-    "creditKeepHours": 72,
-    "maxPerRoom": 24,
-    "catalog": [
-      { "id": "plant-small", "name": "화분", "price": 30, "blocks": true, "footprint": [[-8,-5],[8,-5],[8,0],[-8,0]] },
-      { "id": "poster-stand", "name": "포스터 입간판", "price": 40, "blocks": true, "footprint": [[-11,-5],[11,-5],[11,0],[-11,0]] },
-      { "id": "rug", "name": "러그", "price": 70, "blocks": false, "footprint": [[-40,-16],[40,-16],[40,0],[-40,0]] },
-      { "id": "plant-big", "name": "큰 화분", "price": 60, "blocks": true, "footprint": [[-12,-6],[12,-6],[12,0],[-12,0]] },
-      { "id": "floor-lamp", "name": "스탠드 조명", "price": 80, "blocks": true, "footprint": [[-6,-4],[6,-4],[6,0],[-6,0]] },
-      { "id": "bookshelf", "name": "책장", "price": 100, "blocks": true, "footprint": [[-17,-6],[17,-6],[17,0],[-17,0]] },
-      { "id": "cat-house", "name": "고양이 집", "price": 120, "blocks": true, "footprint": [[-14,-6],[14,-6],[14,0],[-14,0]] },
-      { "id": "fish-tank", "name": "어항", "price": 150, "blocks": true, "footprint": [[-20,-7],[20,-7],[20,0],[-20,0]] },
-      { "id": "sofa", "name": "소파", "price": 160, "blocks": true, "footprint": [[-46,-12],[46,-12],[46,0],[-46,0]] },
-      { "id": "vending", "name": "자판기", "price": 200, "blocks": true, "footprint": [[-18,-7],[18,-7],[18,0],[-18,0]] },
-      { "id": "arcade", "name": "오락기", "price": 280, "blocks": true, "footprint": [[-17,-7],[17,-7],[17,0],[-17,0]] }
-    ]
-  }
+  "designOrder": ["studio2", "lounge", "library", "greenhouse"]
 }

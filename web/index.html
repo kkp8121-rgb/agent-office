@@ -8,7 +8,6 @@
 <link rel="stylesheet" href="/web/style.css">
 </head>
 <body>
-<div id="coins" role="status" aria-label="코인" hidden><i class="coin" aria-hidden="true"></i><b id="coin-n">0</b></div>
 <main id="app">
   <div id="floors"></div>
   <div id="pip-hold" hidden>
@@ -22,20 +21,11 @@
     <h2 class="log-head"><span>기록</span><a href="/log" target="_blank" rel="noopener">전체 기록 ↗</a></h2>
     <div id="log" role="log" aria-label="기록"></div>
     <div class="foot">
-      <button id="shop-open" type="button" aria-expanded="false" aria-controls="shop" hidden>상점</button>
-      <button id="decorate" type="button" aria-pressed="false" hidden>꾸미기</button>
       <button id="pip" type="button" hidden title="항상 위 작은 창으로 띄우기">작은 창</button>
       <button id="quit" type="button">끄기</button>
     </div>
   </aside>
 </main>
-<aside id="shop" aria-label="상점" hidden>
-  <header><h2 id="shop-title">상점</h2><button id="shop-close" type="button">닫기</button></header>
-  <p id="shop-hint"></p>
-  <section id="shop-store"><h3>가구</h3><ul id="shop-list"></ul></section>
-  <section id="shop-inv"><h3>보관함</h3><ul id="inv-list"></ul><p id="inv-empty">비어 있어요. 상점에서 가구를 사면 여기에 들어와요.</p></section>
-</aside>
-<div id="toast" role="status" hidden></div>
 <div id="conn" role="status" hidden></div>
 <script src="/web/logrow.js"></script>
 <script type="module" src="/web/app.js"></script>
