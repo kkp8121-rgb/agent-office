@@ -1,0 +1,317 @@
+[
+ {
+  "file": "seasonal/halloween-pumpkin-small.png",
+  "name": "halloween-pumpkin-small",
+  "label": "작은 호박등",
+  "size": [
+   16,
+   18
+  ],
+  "anchor": [
+   8,
+   17
+  ],
+  "kind": "desk",
+  "season": "halloween"
+ },
+ {
+  "file": "seasonal/halloween-pumpkin-big.png",
+  "name": "halloween-pumpkin-big",
+  "label": "큰 호박등",
+  "size": [
+   30,
+   30
+  ],
+  "anchor": [
+   15,
+   29
+  ],
+  "kind": "floor",
+  "season": "halloween"
+ },
+ {
+  "file": "seasonal/halloween-bats.png",
+  "name": "halloween-bats",
+  "label": "박쥐 가랜드",
+  "size": [
+   46,
+   19
+  ],
+  "anchor": [
+   23,
+   0
+  ],
+  "kind": "wall",
+  "season": "halloween"
+ },
+ {
+  "file": "seasonal/halloween-ghost.png",
+  "name": "halloween-ghost",
+  "label": "촛불 든 유령",
+  "size": [
+   25,
+   26
+  ],
+  "anchor": [
+   12,
+   25
+  ],
+  "kind": "floor",
+  "season": "halloween"
+ },
+ {
+  "file": "seasonal/christmas-tree.png",
+  "name": "christmas-tree",
+  "label": "작은 트리",
+  "size": [
+   27,
+   54
+  ],
+  "anchor": [
+   13,
+   53
+  ],
+  "kind": "floor",
+  "season": "christmas"
+ },
+ {
+  "file": "seasonal/christmas-wreath.png",
+  "name": "christmas-wreath",
+  "label": "리스",
+  "size": [
+   24,
+   23
+  ],
+  "anchor": [
+   12,
+   0
+  ],
+  "kind": "wall",
+  "season": "christmas"
+ },
+ {
+  "file": "seasonal/christmas-gifts.png",
+  "name": "christmas-gifts",
+  "label": "선물 상자 더미",
+  "size": [
+   28,
+   37
+  ],
+  "anchor": [
+   14,
+   36
+  ],
+  "kind": "floor",
+  "season": "christmas"
+ },
+ {
+  "file": "seasonal/christmas-lights.png",
+  "name": "christmas-lights",
+  "label": "꼬마전구 줄",
+  "size": [
+   56,
+   18
+  ],
+  "anchor": [
+   28,
+   0
+  ],
+  "kind": "wall",
+  "season": "christmas"
+ },
+ {
+  "file": "seasonal/lunar-pouch.png",
+  "name": "lunar-pouch",
+  "label": "복주머니",
+  "size": [
+   15,
+   18
+  ],
+  "anchor": [
+   7,
+   17
+  ],
+  "kind": "desk",
+  "season": "lunar"
+ },
+ {
+  "file": "seasonal/lunar-lantern.png",
+  "name": "lunar-lantern",
+  "label": "청사초롱",
+  "size": [
+   12,
+   40
+  ],
+  "anchor": [
+   6,
+   0
+  ],
+  "kind": "wall",
+  "season": "lunar"
+ },
+ {
+  "file": "seasonal/lunar-kite.png",
+  "name": "lunar-kite",
+  "label": "연",
+  "size": [
+   13,
+   36
+  ],
+  "anchor": [
+   6,
+   0
+  ],
+  "kind": "wall",
+  "season": "lunar"
+ },
+ {
+  "file": "seasonal/lunar-tray.png",
+  "name": "lunar-tray",
+  "label": "한과 · 떡 쟁반과 세뱃돈",
+  "size": [
+   26,
+   18
+  ],
+  "anchor": [
+   13,
+   17
+  ],
+  "kind": "desk",
+  "season": "lunar"
+ },
+ {
+  "file": "snacks/snack-coffee.png",
+  "name": "snack-coffee",
+  "label": "커피",
+  "size": [
+   10,
+   16
+  ],
+  "anchor": [
+   5,
+   15
+  ],
+  "kind": "hand",
+  "season": "snack"
+ },
+ {
+  "file": "snacks/snack-donut.png",
+  "name": "snack-donut",
+  "label": "도넛",
+  "size": [
+   14,
+   12
+  ],
+  "anchor": [
+   7,
+   11
+  ],
+  "kind": "hand",
+  "season": "snack"
+ },
+ {
+  "file": "snacks/snack-cookie.png",
+  "name": "snack-cookie",
+  "label": "쿠키",
+  "size": [
+   13,
+   12
+  ],
+  "anchor": [
+   6,
+   11
+  ],
+  "kind": "hand",
+  "season": "snack"
+ },
+ {
+  "file": "snacks/snack-fish.png",
+  "name": "snack-fish",
+  "label": "고양이 간식 생선",
+  "size": [
+   15,
+   9
+  ],
+  "anchor": [
+   7,
+   8
+  ],
+  "kind": "hand",
+  "season": "snack"
+ },
+ {
+  "file": "fx/sweat-drop.png",
+  "name": "sweat-drop",
+  "label": "땀방울",
+  "size": [
+   7,
+   9
+  ],
+  "anchor": [
+   3,
+   8
+  ],
+  "kind": "fx",
+  "season": "fx"
+ },
+ {
+  "file": "fx/rain-cloud-1.png",
+  "name": "rain-cloud-1",
+  "label": "먹구름 1",
+  "size": [
+   14,
+   11
+  ],
+  "anchor": [
+   7,
+   10
+  ],
+  "kind": "fx",
+  "season": "fx"
+ },
+ {
+  "file": "fx/rain-cloud-2.png",
+  "name": "rain-cloud-2",
+  "label": "먹구름 2",
+  "size": [
+   14,
+   11
+  ],
+  "anchor": [
+   7,
+   10
+  ],
+  "kind": "fx",
+  "season": "fx"
+ },
+ {
+  "file": "fx/sparkle-1.png",
+  "name": "sparkle-1",
+  "label": "반짝임 1",
+  "size": [
+   11,
+   11
+  ],
+  "anchor": [
+   5,
+   10
+  ],
+  "kind": "fx",
+  "season": "fx"
+ },
+ {
+  "file": "fx/sparkle-2.png",
+  "name": "sparkle-2",
+  "label": "반짝임 2",
+  "size": [
+   11,
+   11
+  ],
+  "anchor": [
+   5,
+   10
+  ],
+  "kind": "fx",
+  "season": "fx"
+ }
+]
