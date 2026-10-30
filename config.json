@@ -19,6 +19,20 @@
           "play": { "reportRadiusPx": 90, "highFiveRadiusPx": 46, "reportSayMs": 3000, "replyDelayMs": 1400, "replyMs": 2400, "endPauseMs": 200, "bubbleLeanPx": 46, "highFiveMs": 2300, "bossLineMs": 2400,
                     "greetMs": 2400, "talkMs": 2600, "mutterChance": 0.45, "nightTalkChance": 0.6,
                     "statusBubbles": ["생각 중", "응답 없음", "입력 대기", "작업 중", "퇴근 중"] },
+          "decor": { "floatMs": 1500, "toastMs": 3200, "maxFloats": 8, "houseApproachPx": 20,
+                     "items": {
+                     "plant-small": { "size": [29, 36], "anchor": [14, 35] },
+                     "poster-stand": { "size": [43, 56], "anchor": [21, 55] },
+                     "rug": { "size": [96, 32], "anchor": [48, 31] },
+                     "plant-big": { "size": [56, 70], "anchor": [28, 69] },
+                     "floor-lamp": { "size": [24, 68], "anchor": [12, 67] },
+                     "bookshelf": { "size": [39, 74], "anchor": [19, 73] },
+                     "cat-house": { "size": [34, 38], "anchor": [17, 37] },
+                     "fish-tank": { "size": [46, 62], "anchor": [23, 61] },
+                     "sofa": { "size": [104, 77], "anchor": [52, 76] },
+                     "vending": { "size": [40, 76], "anchor": [20, 75] },
+                     "arcade": { "size": [43, 74], "anchor": [21, 73] }
+                     } },
           "lines": {
             "lift": ["앗!", "으앗, 뭐죠?", "어어어?", "떴다 떴어!", "잠깐만요!", "저 들렸어요!", "어, 어, 어?", "하늘이 보여요!", "누가 절 들었어요?", "으헉!"],
             "liftLead": ["나 사장인데?!", "이게 무슨 일이죠?", "사장을 들다니!", "어머, 내려놔요!", "저기요, 저 사장인데요?", "이거 놔요~!", "사장 대접이 이래요?", "아니, 이럴 수가!", "내 결재는 어쩌고!", "당장 내려놔요!"],
@@ -85,7 +99,7 @@
           "cat": {
             "name": "치즈", "firstDelayMs": [3000, 9000], "moveEveryMs": [180000, 420000],
             "weights": { "stroll": 3, "desk": 3, "sleep": 2, "spot": 2 },
-            "sleepKinds": ["sofa"], "sitKinds": ["window", "shelf", "plant", "coffee", "water", "other"],
+            "sleepKinds": ["sofa", "cat-house"], "sitKinds": ["window", "shelf", "plant", "coffee", "water", "other"],
             "pauseMs": [1500, 4500], "sitMs": [8000, 25000], "sleepMs": [40000, 120000], "deskMs": [15000, 40000],
             "reactChance": 0.5, "reactMs": 2200, "landMs": 1400,
             "pet": { "resetMs": 2500, "maxLevel": 4, "sayMs": 2200, "pauseMs": 900, "hearts": [1, 2, 3, 5] } },

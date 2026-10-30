@@ -10,6 +10,8 @@ import { daypart, nextPoke, openBox, pickLine, playPartner, throwPath, throwVelo
 import { between, chooseFidget, chooseSpot, createFloorClock, rngFor, tripRange } from './ambient.mjs';
 import { chooseCatAct, openPoint, otherFloor } from './cat.mjs';
 import { legVars } from './walk.mjs';
+import { blockedPolys, decorNodes, houseSpots } from './decor.mjs';
+import { createShop } from './shop.mjs';
 
 // Visual constants (how things look/move, not planning numbers; those come from /api/ui).
 const WALK_PX_PER_SEC = 150;
@@ -35,6 +37,7 @@ const emptyEl = $('empty');
 const connEl = $('conn');
 const holdEl = $('pip-hold');
 const pipBtn = $('pip');
+const coinsEl = $('coins');
 
 const STATUS_TEXT = { busy: '작업 중', waiting: '입력 대기', leaving: '퇴근 중' };
 const PROVIDER_TEXT = { claude: 'Claude', codex: 'Codex' };
@@ -78,7 +81,8 @@ function showConn(text) {
 
 // ---------- scenes (layered rooms) ----------
 
-const scenes = new Map(); // design -> {r: resolved scene, raw, url, nodes: object draw nodes}
+const scenes = new Map(); // design -> {r: resolved scene, raw, url, nodes: depth nodes (objects + furniture), baseNodes: objects only, decorNodes, placed}
+const navScenes = new Map(); // design -> the scene the walking grid bakes from (r plus the furniture that blocks)
 let nav = null; // createNav over every scene
 let amb = null; // ui.ui.ambient (scaled down under ?debug=ambient)
 let catC = null; // ui.ui.cat (scaled down under ?debug=ambient)
@@ -133,9 +137,11 @@ function scaleCat(c, k) {
 function setupScenes() {
   for (const [design, raw] of Object.entries(ui.scenes ?? {})) {
     const r = resolveScene(raw);
-    scenes.set(design, { r, raw, url: raw.url, nodes: objectNodes(r, ui.depth) });
+    const nodes = objectNodes(r, ui.depth);
+    scenes.set(design, { r, raw, url: raw.url, nodes, baseNodes: nodes, decorNodes: [], placed: [] });
+    navScenes.set(design, r);
   }
-  nav = createNav(new Map([...scenes].map(([design, s]) => [design, s.r])), ui.nav);
+  nav = createNav(navScenes, ui.nav);
   sitSet = new Set(ui.sitSprites ?? []);
   amb = DEBUG_AMBIENT ? scaleAmbient(ui.ui.ambient, 0.1) : ui.ui.ambient;
   catC = DEBUG_AMBIENT ? scaleCat(ui.ui.cat, 0.1) : ui.ui.cat;
@@ -1125,8 +1131,9 @@ function catNext() {
     if (seat?.visit) desks.push({ x: seat.visit[0], y: seat.visit[1], face: seat.at[0] < seat.visit[0] ? 'left' : 'right', agent: a });
   }
   const grid = nav.grid(frec.design);
+  const houses = houseSpots(frec.scene.placed, (p) => nav.snap(frec.design, [p.x, p.y + ui.ui.decor.houseApproachPx]));
   const pick = chooseCatAct(Math.random, {
-    cat: catC, spots: r.spots, taken: takenSpots(frec, null), desks, point: () => openPoint(Math.random, grid),
+    cat: catC, spots: [...r.spots, ...houses], taken: takenSpots(frec, null), desks, point: () => openPoint(Math.random, grid),
     leaveDue: floorRecs.size > 1 && Date.now() >= cat.leaveAt, force: cat.force,
   });
   cat.force = '';
@@ -1141,7 +1148,8 @@ function catNext() {
     return;
   }
   cat.spotId = pick.spotId ?? '';
-  goTo(rec, frec, { x: pick.x, y: pick.y, face: pick.face, seated: false, seat: null }, () => {
+  const house = houses.find((h) => h.id === pick.spotId); // a cat house: out of its front, into it, like a desk
+  goTo(rec, frec, { x: pick.x, y: pick.y, face: pick.face, seated: false, seat: house ? { at: house.at, sit: null, approach: house.approach } : null }, () => {
     setCatPose(pick.pose);
     if (pick.desk && Math.random() < catC.reactChance) chatter(pick.desk.agent, line('catNear'), catC.reactMs);
     catAt(pick.ms, catNext);
@@ -1313,6 +1321,69 @@ function renderAgent(av, floorEl) {
   }
 }
 
+// ---------- decor: furniture bought in the shop, placed in a room (shop.mjs); drawn on every floor of that room design ----------
+
+let shop = null; // createShop(...) once the office has a shop
+
+/** Redraws the furniture of one floor from its room's list. Plain scenery: it only takes the pointer in 꾸미기 mode. */
+function renderDecor(frec) {
+  for (const d of frec.decorEls.values()) d.remove();
+  frec.decorEls.clear();
+  for (const n of frec.scene.decorNodes) {
+    const img = el('img', 'decor');
+    img.src = `/assets/decor/${n.item}.png`;
+    img.alt = '';
+    img.draggable = false;
+    img.dataset.uid = n.uid;
+    img.dataset.item = n.item;
+    Object.assign(img.style, { left: `${n.x}px`, top: `${n.y}px`, zIndex: String(n.z) });
+    frec.stage.append(img);
+    frec.decorEls.set(n.uid, img);
+  }
+}
+
+/** The furniture of some rooms changed: bake those rooms' walking grids once, redraw their floors, and send walkers on new routes. */
+function applyDecor(designs, placed) {
+  for (const design of designs) {
+    const sc = scenes.get(design);
+    if (!sc) continue;
+    sc.placed = placed[design] ?? [];
+    sc.decorNodes = decorNodes(sc.placed, shop.kinds(), ui.ui.decor.items, ui.depth);
+    sc.nodes = [...sc.baseNodes, ...sc.decorNodes];
+    navScenes.set(design, { ...sc.r, blocked: [...sc.r.blocked, ...blockedPolys(sc.placed, shop.kinds())] });
+    nav.invalidate(design);
+    for (const f of floorRecs.values()) {
+      if (f.design !== design) continue;
+      renderDecor(f);
+      for (const a of f.agents.values()) {
+        if (!a.walk || a.grab || a.press || a.play) continue;
+        if (a.away && a.trip?.cur) startLeg(f, a);
+        else if (a.target) goTo(a, f, a.target);
+      }
+    }
+    if (cat?.frec.design === design) catDecorChanged();
+  }
+}
+
+/** The cat's walk crosses new furniture, or the bed it sleeps in is gone: it picks again from where it stands. */
+function catDecorChanged() {
+  const { rec } = cat;
+  if (rec.grab || rec.press || rec.el.classList.contains('gone')) return;
+  const bedGone = cat.spotId.startsWith('decor:') && !cat.frec.scene.placed.some((p) => `decor:${p.uid}` === cat.spotId);
+  if (!rec.walk && !bedGone) return;
+  if (cat.timer) clockTimers.clearTimeout(cat.timer);
+  cat.timer = 0;
+  freeze(rec);
+  catNext();
+}
+
+/** 꾸미기 mode turns character play off (grab, poke, throw, cat): anything half done is dropped now. */
+function setPlayOff(off) {
+  if (!off) return;
+  for (const f of floorRecs.values()) for (const a of f.agents.values()) cancelGrab(a);
+  if (cat) cancelGrab(cat.rec);
+}
+
 // ---------- floors ----------
 
 /** One object (or one strip of a sliced object): a div that shows its piece of the atlas. */
@@ -1415,7 +1486,7 @@ function createFloor(fv) {
   stage.classList.add('scened');
   stage.style.backgroundImage = `url(${sc.url}${encodeURIComponent(r.shell)})`;
   stage.style.setProperty('--atlas', `url(${sc.url}${encodeURIComponent(r.atlas)})`);
-  for (const n of sc.nodes) stage.append(objNode(n));
+  for (const n of sc.baseNodes) stage.append(objNode(n));
   if (r.front) {
     const front = el('div', 'front');
     front.style.backgroundImage = `url(${sc.url}${encodeURIComponent(r.front)})`;
@@ -1452,7 +1523,7 @@ function createFloor(fv) {
   root.append(stage);
   const rec = {
     el: root, stage, bt, bl, fno, ft, ff, fs, prov, reports, agents: new Map(), populated: false,
-    sid: fv.sessionId, design: fv.design, scene: sc, status: fv.status, dbg: null, clock: null, clockOn: false, warned: false,
+    sid: fv.sessionId, design: fv.design, scene: sc, status: fv.status, dbg: null, clock: null, clockOn: false, warned: false, decorEls: new Map(),
   };
   rec.clock = makeClock(rec);
   if (DEBUG_NAV) {
@@ -1460,6 +1531,7 @@ function createFloor(fv) {
     stage.append(rec.dbg.svg);
   }
   floorRecs.set(fv.sessionId, rec);
+  renderDecor(rec);
   return rec;
 }
 
@@ -1768,6 +1840,8 @@ function connect() {
   es.addEventListener('open', () => { connEl.hidden = true; });
   es.addEventListener('state', (ev) => render(JSON.parse(ev.data)));
   es.addEventListener('log', (ev) => appendLog(JSON.parse(ev.data)));
+  es.addEventListener('shop', (ev) => shop?.apply(JSON.parse(ev.data)));
+  es.addEventListener('earn', (ev) => shop?.earn(JSON.parse(ev.data)));
   es.addEventListener('error', () => {
     showConn('연결이 끊겼습니다. 다시 연결하는 중…');
     // The browser retries by itself unless the server refused the stream (then the state is CLOSED).
@@ -1785,6 +1859,7 @@ function pause() {
     for (const a of f.agents.values()) settleNow(a);
   }
   catSettle();
+  shop?.clearFloats();
 }
 
 async function resume() {
@@ -1824,6 +1899,8 @@ async function openPip() {
   }
   d.documentElement.style.setProperty('--sit-h', `${ui.sitHeight}px`);
   d.body.classList.add('pip-mini');
+  shop?.forceOut(); // 꾸미기 stays in the main page
+  d.body.append(coinsEl);
   landFlights(); // moving the floors cancels running animations
   pipWin = w;
   d.body.append(floorsEl);
@@ -1845,6 +1922,8 @@ function pipClosed() {
     t.win = window;
     t.id = window.setTimeout(t.fire, Math.max(0, t.at - Date.now()));
   }
+  shop?.clearFloats();
+  document.body.append(coinsEl);
   holdEl.before(floorsEl);
   holdEl.hidden = true;
   floorsEl.style.zoom = '';
@@ -1891,6 +1970,23 @@ async function init() {
   }
   sessionPalette = ui.ui.sessionPalette;
   setupScenes();
+  shop = createShop({ ui: () => ui, floorRecs, floorsEl, pipOpen: () => !!pipWin, applyDecor, setPlayOff });
+  if (!(await shop.load())) shop = null;
+  if (shop && DEBUG === 'shop') { // ?debug=shop: what the evidence runs read
+    window.__shop = {
+      state: () => shop.debug(),
+      decor: () => [...scenes].map(([design, s]) => [design, s.placed.length, s.nodes.length]),
+      timers: () => liveTimers.size,
+      cat: () => (cat ? { sid: cat.frec.sid, x: cat.rec.x, y: cat.rec.y, spot: cat.spotId, cls: cat.rec.el.className, walking: !!cat.rec.walk } : null),
+      catDo: (act) => {
+        if (!cat || cat.rec.grab) return;
+        if (cat.timer) clockTimers.clearTimeout(cat.timer);
+        cat.timer = 0;
+        cat.force = act;
+        catNext();
+      },
+    };
+  }
   connEl.hidden = true;
   if (document.hidden) document.body.classList.add('paused');
   else connect();
