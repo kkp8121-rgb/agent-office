@@ -1,6 +1,6 @@
 // Scene validator CLI: node scripts/check-scenes.mjs [--dir <scenesDir>] [--json <design>] [design...]
 // Prints OK / WARN / FAIL lines per design and exits 1 when any design fails. --json prints one design's resolved
-// scene, baked grid, draw nodes and warnings (for art/scene_sheet.py).
+// scene, baked grid, draw nodes, warnings and the optional decor anchors (whiteboard, windows, meeting, seasonal) (for art/scene_sheet.py).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +34,7 @@ function run(design) {
     return { errors: [`1단계 형식: scene.json 을 읽지 못했습니다 (${e.message})`], warnings: [], resolved: null };
   }
   const res = checkScene(raw, { atlasSize: readPngSize(path.join(dir, design, String(raw?.atlas ?? ''))), cfg });
+  res.decor = { whiteboard: raw.whiteboard, windows: raw.windows, meeting: raw.meeting, seasonal: raw.seasonal };
   if (raw?.design !== design) res.errors.unshift(`1단계 형식: design: 폴더 이름 "${design}" 과 같아야 합니다`);
   return res;
 }
@@ -43,7 +44,7 @@ for (const design of designs) {
   const res = run(design);
   if (jsonDesign === design) {
     const { cols, rows, cellPx, open } = res.grid ?? { cols: 0, rows: 0, cellPx: 0, open: [] };
-    console.log(JSON.stringify({ resolved: res.resolved, grid: { cols, rows, cellPx, open: Array.from(open).join('') }, nodes: res.nodes, warnings: res.warnings, errors: res.errors }));
+    console.log(JSON.stringify({ resolved: res.resolved, grid: { cols, rows, cellPx, open: Array.from(open).join('') }, nodes: res.nodes, decor: res.decor, warnings: res.warnings, errors: res.errors }));
     if (!res.resolved) failed = true;
     continue;
   }

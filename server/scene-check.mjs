@@ -1,4 +1,4 @@
-// Scene validator, stages 1-9 of the design (§10.1). Used by scripts/check-scenes.mjs and the tests; the server only
+// Scene validator, stages 1-10 of the design (§10.1). Used by scripts/check-scenes.mjs and the tests; the server only
 // runs stage 1 at start-up. Stage 6 only warns. It never decodes a picture: every check works on polygons and rects.
 import { checkSceneFormat, polyMaxY, polyMinY, polysOverlap, pointInPolys, resolveScene, segHitsPoly } from '../web/scene.mjs';
 import { bakeGrid, findPath, isOpen } from '../web/nav.mjs';
@@ -165,6 +165,69 @@ export function checkScene(raw, { atlasSize, cfg, minSeats }) {
     const back = backAt(s.desk.footprint, s.sitAt[0]);
     if (!(s.sitAt[1] < back)) errors.push(`9단계 앉은 자세: ${s.label} sitAt.y(${Math.round(s.sitAt[1])}) 가 책상 뒤쪽 선(${Math.round(back)})보다 작아야 합니다`);
     if (s.chair && polyMaxY(s.chair.footprint) > s.sitAt[1] - 2) errors.push(`9단계 앉은 자세: ${s.label} 의자 ${s.chair.id} 앞쪽이 sitAt.y−2 이하여야 합니다`);
+  }
+
+  // 10. optional anchors for the whiteboard text, the window tint, the workflow meeting and the seasonal decorations
+  const [sw, sh] = r.size;
+  const inside = (p) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite) && p[0] >= 0 && p[0] <= sw && p[1] >= 0 && p[1] <= sh;
+  const bad = (what, why) => errors.push(`10단계 장식 앵커: ${what} ${why}`);
+  const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  const gap = nav.arrivalGapPx;
+  const boardFace = r.spots.find((sp) => sp.kind === 'whiteboard')?.face; // the way the existing whiteboard spot looks
+  if (raw.whiteboard !== undefined) {
+    const q = raw.whiteboard?.quad; // top-left, top-right, bottom-right, bottom-left of the writing surface
+    if (!Array.isArray(q) || q.length !== 4 || !q.every(inside)) bad('whiteboard.quad', '는 장면 안의 점 4개 [왼위, 오른위, 오른아래, 왼아래] 여야 합니다');
+    else {
+      const [tl, tr, br, bl] = q;
+      const slope = (a, b) => (b[1] - a[1]) / (b[0] - a[0]);
+      const top = slope(tl, tr);
+      const bottom = slope(bl, br);
+      if (!(tr[0] > tl[0] && br[0] > bl[0] && bl[1] > tl[1] && br[1] > tr[1])) bad('whiteboard.quad', '의 점 순서가 왼위, 오른위, 오른아래, 왼아래 가 아닙니다');
+      else if (Math.abs(tl[0] - bl[0]) > 3 || Math.abs(tr[0] - br[0]) > 3) bad('whiteboard.quad', '의 좌우 변은 수직이어야 합니다 (벽 기울기는 위아래 변에만 있음)');
+      else if (Math.abs(top) < 0.2 || Math.abs(bottom) < 0.2 || Math.sign(top) !== Math.sign(bottom) || Math.abs(top - bottom) > 0.25) bad('whiteboard.quad', `의 위·아래 변이 벽의 기울기를 따르지 않습니다 (기울기 ${top.toFixed(2)} / ${bottom.toFixed(2)})`);
+    }
+  }
+  if (raw.windows !== undefined) {
+    if (!Array.isArray(raw.windows) || !raw.windows.length) bad('windows', '는 다각형 목록이어야 합니다');
+    else raw.windows.forEach((poly, i) => { if (!Array.isArray(poly) || poly.length < 3 || !poly.every(inside)) bad(`windows[${i}]`, '는 장면 안의 점 3개 이상이어야 합니다'); });
+  }
+  if (raw.meeting !== undefined) {
+    const m = raw.meeting;
+    const spots = Array.isArray(m?.spots) ? m.spots : [];
+    const all = [['boss', m?.boss], ...spots.map((s, i) => [`spots[${i}]`, s])];
+    if (spots.length < 6 || spots.length > 8) bad('meeting.spots', `는 6~8곳이어야 합니다 (지금 ${spots.length})`);
+    for (const [label, s] of all) {
+      if (!inside(s?.at) || (s.face !== 'left' && s.face !== 'right')) { bad(`meeting.${label}`, '는 {at:[x, y], face:"left"|"right"} 여야 합니다'); continue; }
+      if (boardFace && s.face !== boardFace) bad(`meeting.${label}`, `의 face 가 화이트보드 자리의 방향(${boardFace})과 다릅니다`);
+      if (isOpen(grid, r.door.at)) reach(`meeting.${label}`, s.at, 10);
+    }
+    const ok = all.filter(([, s]) => inside(s?.at));
+    for (let i = 0; i < ok.length; i++) {
+      for (let j = i + 1; j < ok.length; j++) if (near(ok[i][1].at, ok[j][1].at) < gap) bad(`meeting.${ok[i][0]} 와 ${ok[j][0]}`, `가 ${Math.round(near(ok[i][1].at, ok[j][1].at))}px 로 가깝습니다 (${gap}px 이상이어야 함)`);
+    }
+    // a seat's own points and the door stay a full gap away; idle, tray and spot places only need to be "not on" (half a gap)
+    const strict = [['door', r.door.at], ...r.seats.flatMap((s) => [[`seats[${s.i}].at`, s.at], [`seats[${s.i}].sitAt`, s.sitAt], [`seats[${s.i}].approach`, s.approach], ...(s.visit ? [[`seats[${s.i}].visit`, s.visit]] : [])]), ['lead.at', r.lead.at], ['lead.sitAt', r.lead.sitAt], ['lead.approach', r.lead.approach]];
+    const loose = [...r.idle.map((s, i) => [`idle[${i}]`, s.at]), ...r.tray.queue.map((p, i) => [`tray.queue[${i}]`, p]), ...r.spots.flatMap((s, i) => [[`spots[${i}]`, s.at], ...(s.pair ? [[`spots[${i}].pair`, s.pair]] : [])])];
+    for (const [label, s] of ok) {
+      for (const [other, p] of strict) if (near(s.at, p) < gap) bad(`meeting.${label}`, `가 ${other} 와 ${Math.round(near(s.at, p))}px 로 가깝습니다 (${gap}px 이상이어야 함)`);
+      for (const [other, p] of loose) if (near(s.at, p) < gap / 2) bad(`meeting.${label}`, `가 ${other} 위에 놓였습니다 (${Math.round(near(s.at, p))}px)`);
+    }
+  }
+  if (raw.seasonal !== undefined) {
+    const list = Array.isArray(raw.seasonal) ? raw.seasonal : [];
+    const need = { floor: 3, wall: 2, desk: 3 };
+    for (const [kind, n] of Object.entries(need)) if (list.filter((a) => a?.kind === kind).length < n) bad('seasonal', `에 ${kind} 앵커가 ${n}개 이상 있어야 합니다`);
+    const deskBoxes = r.objects.filter((o) => /desk/.test(o.kind)).map((o) => ({ id: o.id, box: [o.at[0] - o.anchor[0], o.at[1] - o.anchor[1], o.at[0] - o.anchor[0] + o.rect[2], o.at[1] - o.anchor[1] + o.rect[3]] }));
+    const ids = new Set();
+    list.forEach((a, i) => {
+      const label = `seasonal[${i}]${a?.id ? `(${a.id})` : ''}`;
+      if (typeof a?.id !== 'string' || !a.id || ids.has(a.id)) bad(label, 'id 가 없거나 겹칩니다');
+      ids.add(a?.id);
+      if (!['floor', 'wall', 'desk'].includes(a?.kind) || !inside(a?.at) || !Array.isArray(a.max) || a.max.length !== 2 || !a.max.every((v) => Number.isFinite(v) && v > 0 && v <= 80)) return bad(label, '는 {id, kind:"floor"|"wall"|"desk", at:[x, y], max:[w, h]} 여야 합니다');
+      if (a.kind === 'floor' && isOpen(grid, a.at)) bad(label, `${fmt(a.at)} 가 걸을 수 있는 칸입니다 (바닥 장식이 길을 막으면 안 됩니다)`);
+      if (a.kind === 'desk' && !deskBoxes.some((d) => a.at[0] >= d.box[0] && a.at[0] <= d.box[2] && a.at[1] >= d.box[1] && a.at[1] <= d.box[3])) bad(label, `${fmt(a.at)} 가 어느 책상 그림 안에도 없습니다`);
+      for (let j = 0; j < i; j++) if (inside(list[j]?.at) && near(a.at, list[j].at) < 20) bad(label, `와 seasonal[${j}] 가 ${Math.round(near(a.at, list[j].at))}px 로 가깝습니다 (20px 이상이어야 함)`);
+    });
   }
 
   return { errors, warnings, grid, resolved: r, nodes };
