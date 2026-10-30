@@ -975,6 +975,8 @@ const hopOnce = (rec) => {
   rec.body.classList.add('fid-hop');
 };
 
+const isStatusText = (t) => ui.ui.play.statusBubbles.includes(t.replace(/[….\s]+$/, ''));
+
 /** The visitor has arrived: the report (what it really does now, then the boss answers) or the high-five. */
 function sceneAct(sc) {
   const { guest, host } = sc;
@@ -982,7 +984,7 @@ function sceneAct(sc) {
   const P = ui.ui.play;
   const away = host.x < guest.x ? 1 : -1; // the guest's bubble leans away from the host and the host's the other way
   if (sc.kind === 'report') {
-    const task = guest.bubbleText;
+    const task = isStatusText(guest.bubbleText) ? '' : guest.bubbleText; // a status word ("생각 중…") is not a task
     sayFor(guest, task ? line('report', task) : line('reportRest'), P.reportSayMs, away * P.bubbleLeanPx);
     sc.timer = clockTimers.setTimeout(() => {
       sayFor(host, line('bossReply'), P.replyMs, -away * P.bubbleLeanPx);
@@ -994,8 +996,9 @@ function sceneAct(sc) {
   hopOnce(guest);
   hopOnce(host);
   sc.spark = el('div', 'spark', '짝!');
-  sc.spark.style.left = `${(host.x - guest.x) / 2}px`;
-  guest.tagRoot.append(sc.spark);
+  sc.spark.style.left = `${(guest.x + host.x) / 2}px`;
+  sc.spark.style.top = `${(guest.y + host.y) / 2}px`;
+  guest.frec.stage.append(sc.spark); // its own layer above the name tags (the tag layers stack by character)
   sayFor(guest, line('highFive'), P.highFiveMs, away * P.bubbleLeanPx);
   sayFor(host, line('highFive'), P.highFiveMs, -away * P.bubbleLeanPx);
   sc.timer = clockTimers.setTimeout(() => endPlay(sc, null), P.highFiveMs + P.endPauseMs);
@@ -1038,6 +1041,7 @@ function catEnter(rec) {
     e.classList.remove('enter-in');
     void e.offsetWidth;
     e.classList.add('enter-in');
+    e.addEventListener('animationend', (ev) => ev.target === e && e.classList.remove('enter-in'), { once: true });
   }
 }
 
