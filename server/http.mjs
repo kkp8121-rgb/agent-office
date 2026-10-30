@@ -63,7 +63,7 @@ function readBody(req, max) {
   });
 }
 
-export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConnect } = {}) {
+export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConnect, shop, onShopChange } = {}) {
   const clients = new Set(); // open SSE responses
   let lastStateJson = null; // last floors JSON sent; null = send the next state in full
 
@@ -92,13 +92,28 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
     res.write(frame('state', snap));
     if (clients.size === 0) lastStateJson = JSON.stringify(snap.floors); // only client: in sync now; an older client's baseline is never overwritten
     res.write(frame('log', office.queryLog({ limit: cfg.log.sendCap }).reverse()));
+    if (shop) res.write(frame('shop', shop.view()));
     clients.add(res);
     res.on('close', () => clients.delete(res));
     onSseConnect?.();
   }
 
   /** Sends `state` only when it differs from the last one sent, and every new or updated log entry. */
+  /** Sends the shop state when it changed since the last send, then every earn event. */
+  let shopSent = -1;
+  function pushShop() {
+    const earns = shop.drainEvents(); // drained even without clients
+    if (clients.size === 0) return;
+    const changed = shop.version !== shopSent;
+    shopSent = shop.version;
+    for (const res of clients) {
+      if (changed) res.write(frame('shop', shop.view()));
+      for (const e of earns) res.write(frame('earn', e));
+    }
+  }
+
   server.broadcast = () => {
+    if (shop) pushShop();
     const entries = office.drainLog(); // drained even without clients so entries never pile up
     if (clients.size === 0) { // nobody to send to: skip the snapshot and its stringify; the next client gets a full state
       lastStateJson = null;
@@ -201,7 +216,38 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
     return sendJson(res, 200, { entries, titles: office.logTitles(ids), colors: office.logColors(ids), capped: entries.length === filter.limit });
   }
 
+  /** Shop POSTs: {ok:true, ...} on success, {ok:false, code, message} with a Korean message otherwise. */
+  async function handleShopPost(path, body, res) {
+    let json;
+    try {
+      json = JSON.parse(body);
+    } catch {
+      return sendJson(res, 400, { ok: false, code: 'bad-request', message: '요청이 올바르지 않아요' });
+    }
+    if (!isObj(json)) return sendJson(res, 400, { ok: false, code: 'bad-request', message: '요청이 올바르지 않아요' });
+    let r;
+    switch (path) {
+      case '/api/shop/buy': r = shop.buy(json.item); break;
+      case '/api/shop/place': r = shop.place(json.item, json.design, json.x, json.y); break;
+      case '/api/shop/move': r = shop.move(json.uid, json.x, json.y); break;
+      case '/api/shop/store': r = shop.store(json.uid); break;
+      default: return notFound(res);
+    }
+    if (!r.ok) return sendJson(res, r.status, { ok: false, code: r.code, message: r.message });
+    try {
+      await onShopChange?.();
+    } catch (e) {
+      console.error('상점 저장 실패:', e?.message ?? e);
+      pushShop();
+      return sendJson(res, 500, { ok: false, code: 'save-failed', message: '저장하지 못했어요. 잠시 뒤 다시 시도해 주세요' });
+    }
+    pushShop();
+    const { status, ok, ...rest } = r;
+    return sendJson(res, 200, { ok: true, ...rest, shop: shop.view() });
+  }
+
   async function handlePost(path, body, res) {
+    if (shop && path.startsWith('/api/shop/')) return handleShopPost(path, body, res);
     if (path === '/api/shutdown') {
       res.writeHead(204, { Connection: 'close' });
       res.end(() => onShutdown?.());
@@ -249,6 +295,9 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
       case '/api/state': return sendJson(res, 200, office.snapshot());
       case '/api/log': return sendLog(res, query);
       case '/api/ui': return sendJson(res, 200, uiConfig());
+      case '/api/shop':
+        if (!shop) return notFound(res);
+        return sendJson(res, 200, { ...shop.view(), catalog: shop.catalogView(), coinsPerAgent: cfg.shop.coinsPerAgent, maxPerRoom: cfg.shop.maxPerRoom });
       case '/api/events':
         if (!server.listening) return sendText(res, 503, 'closing', { Connection: 'close' }); // shutting down: no new streams
         return openEvents(res);

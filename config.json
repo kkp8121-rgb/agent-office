@@ -135,5 +135,25 @@
   "scenesDir": "assets/scenes",
   "nav": { "cellPx": 8, "inflatePx": 12, "snapRadiusCells": 6, "pathCache": 256, "overflowSearchPx": 200, "overflowMaxOverlap": 0.35, "spriteWidthPx": 44, "trayRowPx": 28, "arrivalGapPx": 24 },
   "depth": { "sliceTolerancePx": 6, "sliceWidthPx": 16, "sliceOverlapPx": 1, "pickMarginPx": 22, "zBase": 1000, "frontZ": 7000, "faceTopPx": 24, "seatShowPx": 28 },
-  "designOrder": ["studio2", "lounge", "library", "greenhouse"]
+  "designOrder": ["studio2", "lounge", "library", "greenhouse"],
+  "shop": {
+    "startCoins": 50,
+    "coinsPerAgent": 10,
+    "creditWindowHours": 24,
+    "creditKeepHours": 72,
+    "maxPerRoom": 24,
+    "catalog": [
+      { "id": "plant-small", "name": "화분", "price": 30, "blocks": true, "footprint": [[-8,-5],[8,-5],[8,0],[-8,0]] },
+      { "id": "poster-stand", "name": "포스터 입간판", "price": 40, "blocks": true, "footprint": [[-11,-5],[11,-5],[11,0],[-11,0]] },
+      { "id": "rug", "name": "러그", "price": 70, "blocks": false, "footprint": [[-40,-16],[40,-16],[40,0],[-40,0]] },
+      { "id": "plant-big", "name": "큰 화분", "price": 60, "blocks": true, "footprint": [[-12,-6],[12,-6],[12,0],[-12,0]] },
+      { "id": "floor-lamp", "name": "스탠드 조명", "price": 80, "blocks": true, "footprint": [[-6,-4],[6,-4],[6,0],[-6,0]] },
+      { "id": "bookshelf", "name": "책장", "price": 100, "blocks": true, "footprint": [[-17,-6],[17,-6],[17,0],[-17,0]] },
+      { "id": "cat-house", "name": "고양이 집", "price": 120, "blocks": true, "footprint": [[-14,-6],[14,-6],[14,0],[-14,0]] },
+      { "id": "fish-tank", "name": "어항", "price": 150, "blocks": true, "footprint": [[-20,-7],[20,-7],[20,0],[-20,0]] },
+      { "id": "sofa", "name": "소파", "price": 160, "blocks": true, "footprint": [[-46,-12],[46,-12],[46,0],[-46,0]] },
+      { "id": "vending", "name": "자판기", "price": 200, "blocks": true, "footprint": [[-18,-7],[18,-7],[18,0],[-18,0]] },
+      { "id": "arcade", "name": "오락기", "price": 280, "blocks": true, "footprint": [[-17,-7],[17,-7],[17,0],[-17,0]] }
+    ]
+  }
 }

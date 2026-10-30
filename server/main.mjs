@@ -6,6 +6,7 @@ import { Poller } from './poller.mjs';
 import { createServer } from './http.mjs';
 import { DETACHED_OPTIONS } from './launch.mjs';
 import { loadSaved, saveSaved } from './hidden.mjs';
+import { Shop } from './shop.mjs';
 
 const EXIT_PORT_BUSY = 2;
 
@@ -13,6 +14,8 @@ const cfg = loadConfig();
 const dataDir = cfg.dataDir;
 const office = new Office(cfg, loadSaved(dataDir));
 const poller = new Poller(cfg, office);
+const shop = new Shop(cfg);
+office.onFinish = (info, now) => shop.credit(info, now);
 
 // ---- persistence: only when the saved part changed (hide/rename, or hide records dropped at session end) ----
 
@@ -25,6 +28,17 @@ function saveIfChanged() {
   const snapshot = office.saved();
   const result = saving.then(() => saveSaved(dataDir, snapshot)).then(() => { savedVersion = version; });
   saving = result.catch(() => {}); // a failed save must not block the next one; callers see the rejection
+  return result;
+}
+
+let shopVersion = -1; // the fresh store is written at the first round
+let shopSaving = Promise.resolve();
+
+function saveShopIfChanged() {
+  if (shop.version === shopVersion) return shopSaving;
+  const version = shop.version;
+  const result = shopSaving.then(() => shop.save()).then(() => { shopVersion = version; });
+  shopSaving = result.catch(() => {});
   return result;
 }
 
@@ -44,7 +58,7 @@ function shutdown() {
   const closed = new Promise((resolve) => server.close(resolve));
   server.closeSse();
   server.closeAllConnections();
-  inflight.then(saveIfChanged).then(() => closed).finally(() => process.exit(0));
+  inflight.then(saveIfChanged).then(saveShopIfChanged).then(() => closed).finally(() => process.exit(0));
 }
 
 // A browser just connected while the loop sleeps at the idle rate: poll now instead of showing a stale floor.
@@ -54,7 +68,7 @@ function wake() {
   inflight = round();
 }
 
-const server = createServer(cfg, office, { onSavedChange: saveIfChanged, onShutdown: shutdown, onSseConnect: wake });
+const server = createServer(cfg, office, { onSavedChange: saveIfChanged, onShutdown: shutdown, onSseConnect: wake, shop, onShopChange: saveShopIfChanged });
 
 server.on('error', (e) => {
   if (e.code === 'EADDRINUSE') {
@@ -90,6 +104,7 @@ async function round() {
     server.broadcast();
   });
   await step(failures, saveIfChanged);
+  await step(failures, saveShopIfChanged);
   if (failures.length === 0) lastError = '';
   running = false;
   if (!closing) timer = setTimeout(() => { inflight = round(); }, pollDelayMs(cfg, server.sseClients));

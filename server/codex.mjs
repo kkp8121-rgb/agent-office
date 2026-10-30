@@ -488,6 +488,7 @@ export class CodexSource {
           agentType: `codex:${k.meta.agentRole ?? '__default'}`,
           description: k.meta.taskName,
           finished: finished(k),
+          ended: k.turn === 'end', // a real end, not only silence
           transcriptPath: k.path,
           mtimeMs: k.lastTs || now,
           workflow: null,
