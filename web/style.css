@@ -119,7 +119,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: none; position: absolute; left: 14px; bottom: 58px; font-weight: 800; font-size: 12px; color: #6a5aa8;
   animation: zz 2.4s ease-in-out infinite;
 }
-/* a girl who wrote nothing for agent.staleMs sleeps at full colour: her zZ sits just above the head, in the tag layer (above every desk), outlined to read on any floor */
+/* a girl who wrote nothing for agent.staleMs fades and sleeps: her zZ sits just above the head, in the tag layer (above every desk), outlined to read on any floor */
 .agt .zz {
   --zz-size: 16px; --zz-left: 10px; --zz-stand: 64px; --zz-sit: 48px;
   left: var(--zz-left); bottom: var(--zz-stand); font-size: var(--zz-size); line-height: 1; color: #5a49a0;
@@ -127,6 +127,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .agt.sitting .zz { bottom: var(--zz-sit); }
 .st-stale .zz { display: block; }
+.st-stale .spr { opacity: .5; }
 
 .st-idle .spr, .st-enter .spr { animation: breathe 2.8s ease-in-out infinite; }
 .st-thinking .spr { animation: breathe 3.6s ease-in-out infinite; }
