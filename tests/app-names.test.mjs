@@ -92,7 +92,7 @@ test('config: chip and counter strings live in config.json ui', () => {
   const { ui } = loadConfig();
   assert.deepEqual(Object.keys(ui.origin).sort(), ['claudeApp', 'codexApp', 'codexWork']);
   assert.equal(ui.origin.codexWork, 'Codex 앱 · Work');
-  assert.ok(ui.reportsTitle.includes('{n}') && ui.reportsTitle.includes('일꾼'));
+  assert.ok(ui.reportsTitle.includes('{n}') && ui.reportsTitle.includes('직원'));
 });
 
 // ---- codex meta ----------------------------------------------------------------------------

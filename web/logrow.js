@@ -65,10 +65,10 @@ function fillLogRow(row, e) {
 
 /** Session filter label: a live floor's title, else the last title the server remembers, else a bare id prefix. */
 function sessionLabel(sessionId, liveTitles, knownTitles) {
-  return liveTitles.get(sessionId) ?? (knownTitles && Object.hasOwn(knownTitles, sessionId) ? knownTitles[sessionId] : undefined) ?? `지난 세션 ${sessionId.slice(0, 8)}`;
+  return liveTitles.get(sessionId) ?? (knownTitles && Object.hasOwn(knownTitles, sessionId) ? knownTitles[sessionId] : undefined) ?? `지난 층 ${sessionId.slice(0, 8)}`;
 }
 
 function logMetaText(count, capped) {
-  if (!count) return '기록이 없습니다';
+  if (!count) return '업무 일지가 없습니다';
   return capped ? `최근 ${count}건만 표시 · 최신 순` : `${count}건 · 최신 순`;
 }

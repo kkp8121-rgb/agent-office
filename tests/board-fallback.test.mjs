@@ -255,7 +255,7 @@ test('board web: boardSheet builds the header and rows of each kind', () => {
   const items = [{ text: '가', status: 'completed' }, { text: '나', status: 'in_progress' }];
   assert.deepEqual(boardSheet({ sheet: { kind: 'phases', n: 2, total: 4, items, more: 2 } }, L), { head: '단계 2/4', items, more: 2 });
   assert.equal(boardSheet({ sheet: { kind: 'phases', n: 2, total: 0, items, more: 0 } }, L).head, '단계 2');
-  assert.equal(boardSheet({ sheet: { kind: 'agents', total: 3, items, more: 1 } }, L).head, '일꾼 3명');
+  assert.equal(boardSheet({ sheet: { kind: 'agents', total: 3, items, more: 1 } }, L).head, '직원 3명');
   assert.deepEqual(boardSheet({ sheet: { kind: 'title', text: '제목' } }, L), { head: '', items: [{ text: '제목', status: 'plain' }], more: 0 });
 });
 

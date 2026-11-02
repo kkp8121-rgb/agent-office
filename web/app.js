@@ -2020,9 +2020,9 @@ function createRow(fv) {
   edit.addEventListener('click', () => startRename(fv.sessionId, nm, title));
   const eye = el('button', 'eye', '숨김');
   eye.type = 'button';
-  eye.title = '이 세션 숨기기';
+  eye.title = '이 층 숨기기';
   eye.addEventListener('click', () => {
-    if (window.confirm('이 세션을 다시 실행할 때까지 안 보입니다')) setHidden(fv.sessionId, true);
+    if (window.confirm('이 층은 다시 실행할 때까지 안 보입니다')) setHidden(fv.sessionId, true);
   });
   root.append(el('i', 'dot'), nm, edit, eye);
   const rec = { el: root, nm, title, meta, edit, eye };
@@ -2036,7 +2036,7 @@ function renderRow(fv, rec) {
   rec.edit.setAttribute('aria-label', `${fv.title} 이름 바꾸기`);
   rec.eye.setAttribute('aria-label', `${fv.title} 숨기기`);
   const subs = fv.agents.filter((a) => a.state !== 'done').length;
-  setText(rec.meta, `${fv.floorNo}F · ${originText(fv)} · 서브 ${subs}${fv.workflows > 0 ? ` · 워크플로 ${fv.workflows}` : ''}`);
+  setText(rec.meta, `${fv.floorNo}F · ${originText(fv)} · 직원 ${subs}${fv.workflows > 0 ? ` · 프로젝트 ${fv.workflows}` : ''}`);
 }
 
 // ---------- rename ----------
@@ -2050,7 +2050,7 @@ function startRename(sessionId, host, titleEl) {
   input.maxLength = ui.nameMaxChars;
   input.value = fv.title === fv.autoTitle ? '' : fv.title;
   input.placeholder = fv.autoTitle;
-  input.setAttribute('aria-label', '세션 이름');
+  input.setAttribute('aria-label', '층 이름');
   const err = el('span', 'err');
   let busy = false;
   let closed = false;
@@ -2634,7 +2634,7 @@ function setFollow(on) {
 
 function applyPanel() {
   document.body.classList.toggle('panel-off', panelOff);
-  setText(panelBtn, panelOff ? '세션 창 보이기' : '세션 창 숨기기');
+  setText(panelBtn, panelOff ? '층별 안내 보이기' : '층별 안내 숨기기');
   setAttr(panelBtn, 'aria-expanded', String(!panelOff));
   fitFloors();
 }

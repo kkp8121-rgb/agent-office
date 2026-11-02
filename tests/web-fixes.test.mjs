@@ -24,13 +24,13 @@ test('web: session label prefers live title, then remembered title, then id pref
   const call = (sid, known) => run(`sessionLabel(${JSON.stringify(sid)}, new Map([['live1','지금 세션']]), ${JSON.stringify(known)})`);
   assert.equal(call('live1', { live1: '옛 이름' }), '지금 세션');
   assert.equal(call('gone1', { gone1: '결제 리뷰' }), '결제 리뷰');
-  assert.equal(call('abcdefghijkl', {}), '지난 세션 abcdefgh');
-  assert.equal(call('abcdefghijkl', undefined), '지난 세션 abcdefgh');
+  assert.equal(call('abcdefghijkl', {}), '지난 층 abcdefgh');
+  assert.equal(call('abcdefghijkl', undefined), '지난 층 abcdefgh');
 });
 
 test('web: log meta line says when the list is capped', () => {
   const run = loadLogrow();
-  assert.equal(run('logMetaText(0, false)'), '기록이 없습니다');
+  assert.equal(run('logMetaText(0, false)'), '업무 일지가 없습니다');
   assert.equal(run('logMetaText(12, false)'), '12건 · 최신 순');
   assert.equal(run('logMetaText(500, true)'), '최근 500건만 표시 · 최신 순');
 });
@@ -46,5 +46,5 @@ test('web: tray slots never coincide, even for 24 finished agents', () => {
 
 test('web: hasOwn title lookup ignores inherited keys', () => {
   const run = loadLogrow();
-  assert.equal(run(`sessionLabel('constructor', new Map(), {})`), '지난 세션 construc');
+  assert.equal(run(`sessionLabel('constructor', new Map(), {})`), '지난 층 construc');
 });

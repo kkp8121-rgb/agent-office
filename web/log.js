@@ -42,7 +42,7 @@ async function load() {
     [state, log] = await Promise.all([getJson('/api/state'), getJson(`/api/log?${params}`)]);
     if (!sessionPalette.length) sessionPalette = (await getJson('/api/ui')).ui.sessionPalette;
   } catch {
-    if (mine === seq) metaEl.textContent = '기록을 불러오지 못했습니다. 서버가 켜져 있는지 확인하세요.';
+    if (mine === seq) metaEl.textContent = '업무 일지를 불러오지 못했습니다. 서버가 켜져 있는지 확인하세요.';
     return;
   }
   if (mine !== seq) return;

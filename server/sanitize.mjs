@@ -93,7 +93,7 @@ const DESCRIBERS = {
   TaskUpdate: () => '할 일 정리',
   TodoWrite: () => '할 일 정리',
   Skill: (i) => (i?.skill ? `스킬 · ${i.skill}` : '스킬 사용'),
-  Workflow: () => '워크플로 시작',
+  Workflow: () => '프로젝트 시작',
   WebSearch: () => '웹 조사 중',
   WebFetch: () => '웹 조사 중',
 };

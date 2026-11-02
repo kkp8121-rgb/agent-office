@@ -22,7 +22,7 @@ test('sanitize: search never exposes pattern', () => {
 test('sanitize: delegation, skill, mcp, unknown', () => {
   assert.equal(describeTool('Agent', {subagent_type:'worker', description:'기록 구조 조사'}), '위임 · 기록 구조 조사');
   assert.equal(describeTool('Skill', {skill:'superpowers:brainstorming'}), '스킬 · superpowers:brainstorming');
-  assert.equal(describeTool('Workflow', {script:'...'}), '워크플로 시작');
+  assert.equal(describeTool('Workflow', {script:'...'}), '프로젝트 시작');
   assert.equal(describeTool('WebSearch', {query:'q'}), '웹 조사 중');
   assert.equal(describeTool('mcp__notion__API-post-page', {}), 'notion 도구 사용');
   assert.equal(describeTool('FooBar', {}), 'FooBar 사용 중');

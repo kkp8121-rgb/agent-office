@@ -23,9 +23,9 @@
     </div>
     <button id="theme" type="button" aria-pressed="false"></button>
     <button id="follow" type="button" aria-pressed="false"></button>
-    <button id="rotate" type="button" aria-pressed="false" title="전체 화면 세션을 차례로 돌려 보기">순환</button>
+    <button id="rotate" type="button" aria-pressed="false" title="전체 화면에서 층을 차례로 돌아보기">순환</button>
     <button id="fullscreen" type="button" title="전체 화면으로 보기">전체 화면</button>
-    <button id="panel-toggle" type="button" aria-controls="panel" aria-expanded="true">세션 창 숨기기</button>
+    <button id="panel-toggle" type="button" aria-controls="panel" aria-expanded="true">층별 안내 숨기기</button>
     <button id="pip" type="button" hidden title="항상 위 작은 창으로 띄우기">작은 창</button>
     <button id="settings" type="button" popovertarget="settings-panel" aria-haspopup="dialog" aria-expanded="false"></button>
     <div id="settings-panel" popover role="dialog" aria-labelledby="settings-title">
@@ -45,11 +45,11 @@
     <button id="pip-back" type="button">여기로 되돌리기</button>
   </div>
   <aside id="panel">
-    <h2>세션</h2>
+    <h2>층별 안내</h2>
     <div id="sessions"></div>
-    <div id="empty" hidden>실행 중인 세션이 없습니다. Claude Code나 Codex를 실행하면 층이 생깁니다.</div>
-    <h2 class="log-head"><span>기록</span><a href="/log" target="_blank" rel="noopener">전체 기록 ↗</a></h2>
-    <div id="log" role="log" aria-label="기록"></div>
+    <div id="empty" hidden>아직 일하는 층이 없습니다. Claude Code나 Codex를 실행하면 층이 생깁니다.</div>
+    <h2 class="log-head"><span>업무 일지</span><a href="/log" target="_blank" rel="noopener">전체 업무 일지 ↗</a></h2>
+    <div id="log" role="log" aria-label="업무 일지"></div>
   </aside>
 </main>
 <div id="conn" role="status" hidden></div>
