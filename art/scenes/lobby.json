@@ -1,0 +1,91 @@
+{
+  "referencePrompt": "Use your image generation tool to create a pixel-art game background, 16:9, 1280x720 target, in EXACTLY the same pixel-art style, palette, dark outlines and pixel size as the attached lounge.png and library.png: the grand ground-floor LOBBY of the same company office, seen in a three-quarter FRONT view (the back wall faces the viewer as a flat rectangle, the left and right walls recede, the floor is seen from about 35 degrees above). The back wall is double height and is almost entirely a giant curved LED display wall like a stock-exchange board: a wide flat centre screen and two wing screens angled toward the viewer, each a solid uniform very dark navy blue (#0b1a3a) surface with a thin black bezel, plus a thin dark ticker strip under each screen. The screens are switched off: NO text, NO numbers, NO charts, NO logos, NO reflections, NO glow patterns on them. A row of small ceiling spotlights above the screens. Polished light stone floor. In front of the screens a low glass railing with planters. Five rows of eight small wooden office desks drawn diagonally (long side from upper-left to lower-right, the BACK of each monitor facing the viewer, an office chair behind each desk), a reception desk at the front right next to a glass door in the right wall, a lounge corner at the front left with two sofas, a low table and a rug, big potted plants along the side walls. No people, no windows to the outside, no text anywhere. Outside the room: the same flat cream background as the attached images.",
+  "refs": [
+    "art/floors/lounge.png",
+    "art/floors/library.png"
+  ],
+  "shellPrompt": "Use your image generation tool to edit the attached image lobby.png: output the SAME room (same pixel-art style, same camera, same walls, same LED screens exactly as they are — uniform dark navy, no text —, same spotlights, same door, same floor, same 16:9 aspect ratio, same cream background outside the room) but with EVERY free-standing floor object removed: no desks, chairs, monitors, reception desk, sofas, tables, plants, railing, planters. Keep every rug and floor mat exactly where it is. Only the empty room shell with floor, rugs, walls, screens and wall-mounted items remains. Save the result as shell.png in the current directory.",
+  "shell": {
+    "ref": "art/floors/lobby.png",
+    "size": [
+      1280,
+      720
+    ]
+  },
+  "sheets": [
+    {
+      "id": "s1",
+      "rows": 2,
+      "ref": "art/floors/lobby.png",
+      "pieces": [
+        "desk",
+        "chair",
+        "reception",
+        "sofa",
+        "table",
+        "railing"
+      ],
+      "prompt": "Use your image generation tool to create a sprite sheet of 6 separate furniture objects in EXACTLY the same pixel-art style, palette, dark outlines, pixel size and camera as the objects in the attached lobby.png. Layout: TWO rows of 3 objects with wide empty gaps, each object alone, on a flat solid #FF00FF magenta background (no shadow, no floor, no glow). Row 1: 1) one small wooden office desk drawn diagonally exactly like the desks in the image (long side upper-left to lower-right), a monitor on the near long edge with its BACK toward the viewer, a keyboard, no chair; 2) a dark grey office swivel chair, same diagonal angle, seat facing the lower-left toward the viewer, nobody in it; 3) a long curved reception desk with a light wood top and a dark front panel, no text. Row 2: 4) a navy fabric sofa for three, seen diagonally, facing the lower-right; 5) a low round coffee table; 6) a section of low glass railing on a planter box with small plants. Do not use magenta inside the objects. No text."
+    },
+    {
+      "id": "s2",
+      "rows": 2,
+      "ref": "art/floors/lobby.png",
+      "pieces": [
+        "palm",
+        "plant-big",
+        "fern",
+        "stand",
+        "cart",
+        "bench"
+      ],
+      "prompt": "Use your image generation tool to create a sprite sheet of 6 separate furniture objects in EXACTLY the same pixel-art style, palette, dark outlines, pixel size and camera as the objects in the attached lobby.png. Layout: TWO rows of 3 objects with wide empty gaps, each object alone, on a flat solid #FF00FF magenta background (no shadow, no floor, no glow). Row 1: 1) a tall potted palm in a square cream stone planter; 2) a big leafy green potted plant in a terracotta pot; 3) a fern in a square wooden planter. Row 2: 4) a small information stand (a slim stand with a blank dark screen, no text); 5) a coffee cart with cups; 6) a wooden bench. Do not use magenta inside the objects. No text."
+    }
+  ],
+  "kinds": {
+    "desk": {
+      "piece": "s1/piece-0",
+      "width": 76
+    },
+    "chair": {
+      "piece": "s1/piece-1",
+      "height": 42
+    },
+    "reception": {
+      "piece": "s1/piece-2",
+      "width": 130
+    },
+    "sofa": {
+      "piece": "s1/piece-3",
+      "width": 112
+    },
+    "table": {
+      "piece": "s1/piece-4",
+      "width": 48
+    },
+    "palm": {
+      "piece": "s2/piece-0",
+      "height": 92
+    },
+    "plant-big": {
+      "piece": "s2/piece-1",
+      "height": 74
+    },
+    "fern": {
+      "piece": "s2/piece-2",
+      "height": 52
+    },
+    "stand": {
+      "piece": "s2/piece-3",
+      "height": 60
+    },
+    "cart": {
+      "piece": "s2/piece-4",
+      "width": 64
+    },
+    "bench": {
+      "piece": "s2/piece-5",
+      "width": 90
+    }
+  }
+}
