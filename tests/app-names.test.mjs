@@ -29,6 +29,13 @@ test('parse: custom-title is a title that outranks ai-title; agent-name is ignor
   assert.equal(parseLine(JSON.stringify({ type: 'custom-title', customTitle: 'x'.repeat(500) }))[0].title.length, loadConfig().parse.nameMaxChars);
 });
 
+test('parse: claude titles are cleaned of control, bidi and line-break characters like other titles', () => {
+  const dirty = 'a‮b\u0007c\nd​e';
+  assert.equal(parseLine(JSON.stringify({ type: 'custom-title', customTitle: dirty }))[0].title, 'a b c d e');
+  assert.equal(parseLine(JSON.stringify({ type: 'ai-title', aiTitle: dirty }))[0].title, 'a b c d e');
+  assert.deepEqual(parseLine(JSON.stringify({ type: 'ai-title', aiTitle: '‮\u0007' })), []);
+});
+
 test('parse: only entrypoint claude-desktop yields an origin event, and never copies other fields', () => {
   const line = (entrypoint) => JSON.stringify({ type: 'attachment', entrypoint, userType: 'external', promptSource: 'sdk', cwd: 'C:\\SECRET' });
   assert.deepEqual(parseLine(line('claude-desktop')), [{ kind: 'origin', ts: 0, origin: 'claudeApp' }]);

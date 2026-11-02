@@ -44,12 +44,12 @@ function parseObject(o) {
   const evs = [];
 
   if (o.type === 'ai-title') {
-    const title = str(o.aiTitle, NAME_MAX);
+    const title = cleanLine(o.aiTitle, NAME_MAX);
     return title ? [{ kind: 'title', ts: 0, title }] : [];
   }
   // Titles the Claude desktop app sets itself: it outranks the generated one.
   if (o.type === 'custom-title') {
-    const title = str(o.customTitle, NAME_MAX);
+    const title = cleanLine(o.customTitle, NAME_MAX);
     return title ? [{ kind: 'title', ts: 0, title, rank: TITLE_RANK_CUSTOM }] : [];
   }
 
