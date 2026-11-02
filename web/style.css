@@ -24,6 +24,10 @@
   --leave-bg: #e2ddd0;
   --shadow: rgba(59, 47, 34, .35);
   --room-dim: 0; /* dark mode: app.js sets it from ui.dark.roomDim */
+  --backdrop: transparent; /* dark mode: the page colour that covers the painted backdrop around a room (outside scene.json outline) */
+  --zz: #6a5aa8;
+  --zz-agt: #5a49a0;
+  --zz-edge: var(--paper);
   --walk-ms: 1200ms;
   --lift: 28px;
   --bar-h: 38px;
@@ -52,6 +56,10 @@
   --wait-bg: #5a4513;
   --leave-bg: #3a362d;
   --shadow: rgba(0, 0, 0, .55);
+  --backdrop: var(--bg);
+  --zz: #f6f1ff;
+  --zz-agt: #f6f1ff;
+  --zz-edge: #0b0818;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
@@ -78,6 +86,10 @@
     --wait-bg: #5a4513;
     --leave-bg: #3a362d;
     --shadow: rgba(0, 0, 0, .55);
+    --backdrop: var(--bg);
+    --zz: #f6f1ff;
+    --zz-agt: #f6f1ff;
+    --zz-edge: #0b0818;
   }
 }
 * { box-sizing: border-box; }
@@ -105,6 +117,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 /* dark mode: one static veil over the room art of each floor (no filter); above the front layer, below name tags, bubbles and the plaque */
 .stage::after { content: ""; position: absolute; inset: 0; z-index: 7500; pointer-events: none; background: rgb(6, 9, 28); opacity: var(--room-dim); }
+/* dark mode: the room art is an opaque picture on a painted backdrop; this static cover (scene.json "outline" as the hole, set by app.js in --bd-clip) paints that backdrop in the page colour, above the veil so it matches the page exactly. Light mode: transparent. */
+.stage::before { content: ""; position: absolute; inset: 0; z-index: 7501; pointer-events: none; background: var(--backdrop); clip-path: var(--bd-clip); }
 .sign {
   position: absolute; top: 8px; right: 8px; max-width: calc(100% - 340px); z-index: 9000;
   display: flex; align-items: center; gap: 8px; padding: 4px 10px;
@@ -197,14 +211,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .agt.quiet .bub.txt { display: none; }
 .agt.quiet .bub.dot { animation: none; visibility: visible; }
 .zz {
-  display: none; position: absolute; left: 14px; bottom: 58px; font-weight: 800; font-size: 12px; color: #6a5aa8;
+  display: none; position: absolute; left: 14px; bottom: 58px; font-weight: 800; font-size: 12px; color: var(--zz);
   animation: zz 2.4s ease-in-out infinite;
 }
 /* a girl who wrote nothing for agent.staleMs fades and sleeps: her zZ sits just above the head, in the tag layer (above every desk), outlined to read on any floor */
 .agt .zz {
   --zz-size: 16px; --zz-left: 10px; --zz-stand: 64px; --zz-sit: 48px;
-  left: var(--zz-left); bottom: var(--zz-stand); font-size: var(--zz-size); line-height: 1; color: #5a49a0;
-  text-shadow: -1px 0 var(--paper), 1px 0 var(--paper), 0 -1px var(--paper), 0 1px var(--paper);
+  left: var(--zz-left); bottom: var(--zz-stand); font-size: var(--zz-size); line-height: 1; color: var(--zz-agt);
+  text-shadow: -1px 0 var(--zz-edge), 1px 0 var(--zz-edge), 0 -1px var(--zz-edge), 0 1px var(--zz-edge);
 }
 .agt.sitting .zz { bottom: var(--zz-sit); }
 .st-stale .zz { display: block; }

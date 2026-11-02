@@ -191,6 +191,9 @@ export function checkScene(raw, { atlasSize, cfg, minSeats }) {
     if (!Array.isArray(raw.windows) || !raw.windows.length) bad('windows', '는 다각형 목록이어야 합니다');
     else raw.windows.forEach((poly, i) => { if (!Array.isArray(poly) || poly.length < 3 || !poly.every(inside)) bad(`windows[${i}]`, '는 장면 안의 점 3개 이상이어야 합니다'); });
   }
+  if (raw.outline !== undefined) {
+    if (!Array.isArray(raw.outline) || raw.outline.length < 3 || !raw.outline.every(inside)) bad('outline', '은 장면 안의 점 3개 이상이어야 합니다 (방 바깥 배경을 어둡게 덮을 때 구멍이 되는 방 윤곽)');
+  }
   if (raw.meeting !== undefined) {
     const m = raw.meeting;
     const spots = Array.isArray(m?.spots) ? m.spots : [];

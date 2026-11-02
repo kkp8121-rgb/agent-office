@@ -19,6 +19,7 @@ test('fun2 scene: all four rooms carry whiteboard, windows, meeting and seasonal
     const raw = load(d);
     const res = check(d, raw);
     assert.deepEqual(res.errors, [], d);
+    assert.ok(raw.outline.length >= 3, d);
     assert.equal(raw.whiteboard.quad.length, 4, d);
     assert.ok(raw.windows.length >= 2 && raw.windows.every((p) => p.length >= 3), d);
     assert.ok(raw.meeting.spots.length >= 6 && raw.meeting.spots.length <= 8, d);

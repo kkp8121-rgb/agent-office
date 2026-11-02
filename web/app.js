@@ -1887,6 +1887,8 @@ function createFloor(fv) {
   }
   const reportsAt = [r.tray.at[0] + r.reports[0], r.tray.at[1] + r.reports[1]];
   stage.style.backgroundSize = `${r.size[0]}px ${r.size[1]}px`;
+  // dark mode backdrop cover: the whole scene minus the room outline (evenodd hole), see .stage::before
+  if (r.outline) stage.style.setProperty('--bd-clip', `path(evenodd, "M0 0H${r.size[0]}V${r.size[1]}H0Z M${r.outline.map((p) => p.join(' ')).join(' L')}Z")`);
 
   const board = el('div', 'board');
   const [bx, by, bw] = r.board; // the plaque's height is its text (style.css .board)
