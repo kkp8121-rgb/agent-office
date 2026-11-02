@@ -43,8 +43,8 @@ function fakeLog() {
 test('F14: an updated log row moves to its place by ts', () => {
   const { kids, logEl, mk } = fakeLog();
   const ctx = vm.createContext({
-    logEl, logRows: new Map(), forcedHidden: new Map(), ui: { ui: { logDomCap: 300 } },
-    createLogRow: mk,
+    logEl, logRows: new Map(), forcedHidden: new Map(), ui: { ui: { logDomCap: 300, follow: { eventWeight: 1 } } },
+    createLogRow: mk, noteActivity: () => {}, followPoke: () => {},
     fillLogRow: (row, e) => Object.assign(row.dataset, { id: e.id, sid: e.sessionId, ts: String(e.ts) }),
     learnColors: () => {},
   });

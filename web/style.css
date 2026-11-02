@@ -309,6 +309,7 @@ body.paused *, body.paused *::before, body.paused *::after { animation-play-stat
 #topbar button:disabled { opacity: .5; cursor: default; }
 #topbar .tab { min-width: 28px; padding: 2px 8px; font-weight: 700; border-bottom: 4px solid var(--c, var(--muted)); }
 #topbar .tab[aria-pressed="true"] { border-bottom-color: var(--c, var(--muted)); }
+#topbar .tab.following::after { content: "●"; margin-left: 3px; font-size: 7px; vertical-align: middle; }
 body.panel-off #panel, body.fs #panel { display: none; }
 #conn {
   position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 99999;

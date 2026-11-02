@@ -5,7 +5,7 @@ import { resolveScene, trayPoint } from './scene.mjs';
 import { createNav } from './nav.mjs';
 import { charZ, objectNodes, splitWalk } from './depth.mjs';
 import { fitZoom } from './pip.mjs';
-import { orderFloors, nextFloor, fallbackFloor, fitBox } from './view.mjs';
+import { orderFloors, nextFloor, fallbackFloor, fitBox, pruneEvents, activityScore, busiestFloor, chooseFollow } from './view.mjs';
 import { dropPoint, restSpotNear, shouldLift } from './grab.mjs';
 import { daypart, nextPoke, openBox, pickLine, playPartner, throwPath, throwVelocity } from './play.mjs';
 import { between, chooseFidget, chooseSpot, createFloorClock, rngFor, tripRange } from './ambient.mjs';
@@ -174,6 +174,9 @@ function setupScenes() {
   amb = DEBUG_AMBIENT ? scaleAmbient(ui.ui.ambient, 0.1) : ui.ui.ambient;
   catC = DEBUG_AMBIENT ? scaleCat(ui.ui.cat, 0.1) : ui.ui.cat;
   document.documentElement.style.setProperty('--sit-h', `${ui.sitHeight}px`);
+  if (DEBUG === 'follow') { // ?debug=follow: what the follow mode sees, for checking it from outside
+    window.__follow = { state: () => ({ on: following, rotating, shown: shownId, timer: followTimer !== 0, timers: liveTimers.size, scores: [...followScores(Date.now())] }) };
+  }
   if (DEBUG_AMBIENT) {
     window.__ambient = {
       timers: () => liveTimers.size,
@@ -1176,6 +1179,8 @@ const paused = () => document.body.classList.contains('paused');
  * announces the phase, and after ui.meeting.seconds they walk back. Only a floor on show meets; there is no queue for the others.
  */
 function onPhase(sig) {
+  noteActivity(sig.sessionId, Date.now(), ui.ui.follow.phaseWeight);
+  followPoke();
   const frec = floorRecs.get(sig.sessionId);
   const spots = frec?.scene.raw.meeting;
   if (!spots || frec.off || paused() || frec.status === 'leaving') return;
@@ -1267,6 +1272,8 @@ function showMood(rec, streak) {
 
 /** A command or test failed (SSE "fail"): the mood shows; from ui.fail.patStreak in a row the boss comes to comfort (not for the boss itself). */
 function onFail(sig) {
+  noteActivity(sig.sessionId, Date.now(), ui.ui.follow.eventWeight);
+  followPoke();
   const frec = floorRecs.get(sig.sessionId);
   const rec = frec?.agents.get(sig.agent);
   if (!rec || frec.off || paused() || rec.state === 'done' || rec.el.classList.contains('gone')) return;
@@ -2101,12 +2108,14 @@ function render(state) {
   const list = state.floors.filter((f) => !forcedHidden.has(f.sessionId));
   const ids = new Set(list.map((f) => f.sessionId));
   const viewMoved = reconcileView(list);
+  for (const id of [...activity.keys()]) if (!ids.has(id)) activity.delete(id);
   for (const id of [...floorRecs.keys()]) if (!ids.has(id)) removeSession(id, false);
 
   lastFloors = new Map(list.map((f) => [f.sessionId, f]));
   const floorEls = [];
   const rowEls = [];
   for (const fv of list) {
+    trackActivity(fv);
     const frec = floorRecs.get(fv.sessionId) ?? createFloor(fv);
     renderFloor(fv, frec.el);
     floorEls.push(frec.el);
@@ -2118,9 +2127,12 @@ function render(state) {
   syncOrder(sessionsEl, rowEls);
   emptyEl.hidden = list.length > 0;
   syncTabs();
-  if (viewMoved) applyView();
-  else fitFloors();
+  if (viewMoved) {
+    applyView();
+    if (following) shownSince = 0; // the floor was fallen back to, not chosen: a clearly busier one may take over at once
+  } else fitFloors();
   catSync();
+  followPoke();
 }
 
 async function refreshState() {
@@ -2196,6 +2208,7 @@ function appendLog(entries) {
       fillLogRow(row, e);
       continue;
     }
+    noteActivity(e.sessionId, e.ts, ui.ui.follow.eventWeight);
     let before = logEl.firstElementChild;
     while (before && Number(before.dataset.ts) > e.ts) before = before.nextElementSibling;
     logEl.insertBefore(row, before);
@@ -2207,6 +2220,7 @@ function appendLog(entries) {
     logRows.delete(last.dataset.id);
     last.remove();
   }
+  followPoke();
 }
 
 // ---------- connection ----------
@@ -2230,6 +2244,7 @@ function connect() {
 function pause() {
   clearTimeout(retryTimer);
   clearRotate();
+  clearFollowTimer();
   if (skyTimer) clockTimers.clearTimeout(skyTimer);
   skyTimer = 0;
   if (es) es.close();
@@ -2261,12 +2276,20 @@ async function resume() {
 const tabListEl = $('tab-list');
 const allBtn = $('view-all');
 const rotateBtn = $('rotate');
+const followBtn = $('follow');
 const fsBtn = $('fullscreen');
 const panelBtn = $('panel-toggle');
 const tabRecs = new Map(); // sessionId -> floor button
 let viewIds = []; // session ids in floor order, as of the last state
 let shownId = null; // the one floor on show, or null for the whole stack
 let rotating = false;
+let following = false; // follow the busiest floor (exclusive with rotating)
+let followTimer = 0; // clockTimers token: the one pending re-check, only while following
+let followDue = 0; // when that timer is due (to move it to the small window)
+let followLast = 0; // when the last check ran (throttle)
+let shownSince = 0; // when the shown floor came on screen (dwell)
+let shownWas = null;
+const activity = new Map(); // sessionId -> {events: [{t, w}] newest last, states: Map(key -> state), todos: string}
 let rotateTimer = 0; // clockTimers token: one chain, only while rotating (it follows the small window like the clocks)
 let panelOff = false; // the person's own choice; fullscreen hides the panel on top of it
 
@@ -2287,7 +2310,10 @@ function reconcileView(list) {
     const keep = fallbackFloor(viewIds, shownId, ids);
     moved = keep !== shownId;
     shownId = keep;
-    if (keep === null) setRotate(false);
+    if (keep === null) {
+      setRotate(false);
+      setFollow(false);
+    }
   }
   viewIds = ids;
   return moved;
@@ -2320,14 +2346,20 @@ function syncTabs() {
     tabRecs.delete(id);
   }
   syncOrder(tabListEl, btns);
+  markFollow();
 }
 
 /** Shows only the shown floor (the others are laid out nowhere and stand still), or the whole stack. */
 function applyView() {
+  if (shownId !== shownWas) {
+    shownWas = shownId;
+    shownSince = Date.now();
+  }
   document.body.classList.toggle('single', shownId !== null);
   for (const [id, f] of floorRecs) setOff(f, shownId !== null && id !== shownId);
   for (const [id, b] of tabRecs) setAttr(b, 'aria-pressed', String(id === shownId));
   setAttr(allBtn, 'aria-pressed', String(shownId === null));
+  markFollow();
   fitFloors();
   catSync();
 }
@@ -2350,12 +2382,14 @@ function setOff(f, off) {
 
 function pickFloor(id) {
   setRotate(false);
+  setFollow(false);
   shownId = shownId === id ? null : id;
   applyView();
 }
 
 function showAll() {
   setRotate(false);
+  setFollow(false);
   shownId = null;
   applyView();
 }
@@ -2385,9 +2419,113 @@ function setRotate(on) {
   rotating = on && (shownId !== null || viewIds.length > 0);
   setAttr(rotateBtn, 'aria-pressed', String(rotating));
   if (!rotating) return;
+  setFollow(false);
   shownId ??= viewIds[0];
   applyView();
   armRotate();
+}
+
+/** Records one event of a floor (log row, state change, phase...) for the follow score; events older than the window are not kept. */
+function noteActivity(sessionId, ts, weight) {
+  const a = activity.get(sessionId);
+  if (!a) return;
+  const now = Date.now();
+  const t = Math.min(ts, now);
+  if (t < now - ui.ui.follow.windowSeconds * 1000) return;
+  a.events.push({ t, w: weight });
+  pruneEvents(a.events, now, ui.ui.follow);
+}
+
+const isBusy = (state) => state === 'working' || state === 'thinking';
+
+/** Compares a floor's snapshot with the last one: a todo change, a new character, or a character starting to work or think is an event. */
+function trackActivity(fv) {
+  const first = !activity.has(fv.sessionId);
+  if (first) activity.set(fv.sessionId, { events: [], states: new Map(), todos: '' });
+  const a = activity.get(fv.sessionId);
+  const todos = JSON.stringify(fv.todos ?? null);
+  const next = new Map([['lead', fv.lead.state]]);
+  for (const av of fv.agents) next.set(av.key, av.state);
+  if (!first) {
+    const now = Date.now();
+    const w = ui.ui.follow.eventWeight;
+    if (todos !== a.todos) noteActivity(fv.sessionId, now, w);
+    for (const [key, state] of next) {
+      const prev = a.states.get(key);
+      if (prev === undefined || (isBusy(state) && !isBusy(prev))) noteActivity(fv.sessionId, now, w);
+    }
+  }
+  a.todos = todos;
+  a.states = next;
+}
+
+/** Score of every floor now. */
+function followScores(now) {
+  const scores = new Map();
+  for (const id of viewIds) {
+    const fv = lastFloors.get(id);
+    const a = activity.get(id);
+    if (!fv || !a) continue;
+    const working = (isBusy(fv.lead.state) ? 1 : 0) + fv.agents.filter((av) => isBusy(av.state)).length;
+    scores.set(id, activityScore(pruneEvents(a.events, now, ui.ui.follow), working, now, ui.ui.follow));
+  }
+  return scores;
+}
+
+function clearFollowTimer() {
+  if (followTimer) clockTimers.clearTimeout(followTimer);
+  followTimer = 0;
+}
+
+/** The one pending re-check, where the clocks are now (this page, or the small window). */
+function armFollow(ms) {
+  clearFollowTimer();
+  followDue = Date.now() + ms;
+  followTimer = clockTimers.setTimeout(followCheck, ms);
+}
+
+/** Looks at the scores and moves to a clearly busier floor once the shown one has had its dwell time; if only the dwell is missing, re-checks when it ends. */
+function followCheck() {
+  followTimer = 0;
+  if (!following || paused()) return;
+  const now = Date.now();
+  followLast = now;
+  const pick = chooseFollow({ ids: viewIds, scores: followScores(now), current: shownId, now, shownSince }, ui.ui.follow);
+  if (pick.id !== null && pick.id !== shownId) {
+    shownId = pick.id;
+    applyView();
+  } else if (pick.waitMs > 0) armFollow(pick.waitMs);
+}
+
+/** Activity arrived: check now, or at most once per throttleMs; nothing new is armed while a check is already pending. */
+function followPoke() {
+  if (!following || followTimer || paused()) return;
+  const wait = followLast + ui.ui.follow.throttleMs - Date.now();
+  if (wait <= 0) followCheck();
+  else armFollow(wait);
+}
+
+/** The followed floor's button wears a dot (css .following) and says so in its tooltip. */
+function markFollow() {
+  for (const [id, b] of tabRecs) {
+    const on = following && id === shownId;
+    if (b.classList.contains('following') !== on) b.classList.toggle('following', on);
+    const fv = lastFloors.get(id);
+    if (fv) setAttr(b, 'title', on ? `${fv.floorNo}층 · ${fv.title} · ${ui.ui.follow.marker}` : `${fv.floorNo}층 · ${fv.title}`);
+  }
+}
+
+/** Follow on: the single-floor view of the busiest floor right away (all quiet: the one on show, else the first floor); off: stay where it is. */
+function setFollow(on) {
+  clearFollowTimer();
+  following = on && viewIds.length > 0;
+  setAttr(followBtn, 'aria-pressed', String(following));
+  if (following) {
+    setRotate(false);
+    shownId = busiestFloor(viewIds, followScores(Date.now()), shownId, ui.ui.follow.minScore) ?? shownId ?? viewIds[0];
+    followLast = Date.now();
+    applyView();
+  } else markFollow();
 }
 
 function applyPanel() {
@@ -2399,6 +2537,7 @@ function applyPanel() {
 
 allBtn.addEventListener('click', showAll);
 rotateBtn.addEventListener('click', () => setRotate(!rotating));
+followBtn.addEventListener('click', () => setFollow(!following));
 panelBtn.addEventListener('click', () => {
   panelOff = !panelOff;
   try {
@@ -2470,6 +2609,7 @@ async function openPip() {
   syncSnacks();
   for (const f of floorRecs.values()) f.clock.kick(); // move the one clock timer to the small window
   armRotate(); // and the rotation timer
+  if (followTimer) armFollow(Math.max(0, followDue - Date.now())); // and the pending follow check
   fitFloors();
 }
 
@@ -2531,6 +2671,8 @@ async function init() {
     return;
   }
   sessionPalette = ui.ui.sessionPalette;
+  setText(followBtn, ui.ui.follow.label);
+  followBtn.title = ui.ui.follow.title;
   try {
     decorItems = await (await fetch(ITEMS_URL)).json();
   } catch {
