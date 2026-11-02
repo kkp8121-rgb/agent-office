@@ -6,7 +6,7 @@ import { createNav } from './nav.mjs';
 import { charZ, objectNodes, splitWalk } from './depth.mjs';
 import { fitZoom } from './pip.mjs';
 import { LOBBY_ID, orderFloors, nextFloor, fallbackFloor, fitBox, pruneEvents, activityScore, busiestFloor, chooseFollow, viewOrder } from './view.mjs';
-import { assignLobbySeats, changeOf, clockParts, employeeRows, headline, indexRows, lobbyRoster, msToNextMinute, newsText, officeScore, pageCount, pageRows, pushSample, tableCapacity } from './lobby.mjs';
+import { assignLobbySeats, backRowSeats, changeOf, clockParts, employeeRows, headline, indexRows, lobbyRoster, msToNextMinute, newsText, officeScore, pageCount, pageRows, pushSample, tableCapacity } from './lobby.mjs';
 import { dropPoint, restSpotNear, shouldLift } from './grab.mjs';
 import { daypart, nextPoke, openBox, pickLine, playPartner, throwPath, throwVelocity } from './play.mjs';
 import { between, chooseFidget, chooseSpot, createFloorClock, rngFor, tripRange } from './ambient.mjs';
@@ -2194,7 +2194,7 @@ function createLobby() {
   floorsEl.append(root);
   lobby = {
     el: root, stage, scene: sc, off: true, dirty: false, floors: [], roster: [], seatMap: new Map(), chars: new Map(), populated: false, news: [],
-    hist: new Map(), page: 0, pages: 1, pageAt: 0, timer: 0, wall, crop, cropped: false, writes: 0, boardLine, more,
+    hist: new Map(), page: 0, pages: 1, pageAt: 0, timer: 0, wall, crop, cropped: false, writes: 0, boardLine, more, backRow: backRowSeats(sc.r.seats),
   };
   setText(lobbyBtn, L.tabText);
   setAttr(lobbyBtn, 'title', L.tab);
@@ -2277,6 +2277,7 @@ function lobbyFigure(e, slot) {
     rec.tag.style.setProperty('--on', readableOn(color));
   }
   const odd = slot.i % 2 === 1;
+  rec.tagRoot.classList.toggle('back', slot.kind === 'seat' && lb.backRow.has(slot.i)); // only the back row keeps its text bubble (style.css)
   rec.el.classList.toggle('odd', odd);
   rec.tagRoot.classList.toggle('odd', odd);
   const leaving = e.floorStatus === 'leaving';

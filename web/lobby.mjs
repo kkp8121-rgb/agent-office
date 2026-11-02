@@ -244,6 +244,15 @@ export function indexRows(floors, scores, changes, labels, max) {
   return { rows, more: sorted.length - rows.length };
 }
 
+/**
+ * The seats of the back row (the smallest y): only their full text bubbles are shown in the lobby, because above them there is the wall;
+ * a bubble over any other row would sit on the face of the figure behind. Returns the set of seat indexes.
+ */
+export function backRowSeats(seats) {
+  const top = Math.min(...seats.map((s) => s.at[1]));
+  return new Set(seats.flatMap((s, i) => (s.at[1] <= top + 4 ? [i] : [])));
+}
+
 /** Sum of every floor's score (the 사무실 지수). */
 export const officeScore = (scores) => [...scores.values()].reduce((s, v) => s + v, 0);
 

@@ -8,7 +8,7 @@ import { Office } from '../server/office.mjs';
 import { checkScene } from '../server/scene-check.mjs';
 import { readPngSize } from '../server/scenes.mjs';
 import {
-  assignLobbySeats, changeOf, changeText, clip, clockParts, employeeRows, fmtDuration, headline, indexRows, lobbyRoster, msToNextMinute,
+  assignLobbySeats, backRowSeats, changeOf, changeText, clip, clockParts, employeeRows, fmtDuration, headline, indexRows, lobbyRoster, msToNextMinute,
   newsText, officeScore, pageCount, pageRows, pushSample, stateLabel, tableCapacity,
 } from '../web/lobby.mjs';
 import { quadFrame } from '../web/board.mjs';
@@ -577,4 +577,14 @@ test('lobby tags: the floor number rides a chip in the team colour, a 팀장 get
   assert.match(css, /\.floor\.lobby \.tag \.lead \{[^}]*color: var\(--c\)/);
   assert.doesNotMatch(css, /\.floor\.lobby \.tag::before/, 'the plain dot is gone');
   assert.doesNotMatch(css, /@media[^{]*dark[^{]*\{[^}]*\.tag \.lead/, 'same marker in light and dark');
+});
+
+test('lobby bubbles: only the back row (smallest y) of the shipped scene keeps a text bubble', () => {
+  const seats = check(lobbyRaw()).resolved.seats;
+  const back = backRowSeats(seats);
+  const ys = new Set([...back].map((i) => seats[i].at[1]));
+  assert.equal(back.size, 8);
+  assert.equal(ys.size, 1);
+  assert.equal([...ys][0], Math.min(...seats.map((s) => s.at[1])));
+  assert.deepEqual([...backRowSeats([{ at: [1, 50] }, { at: [2, 30] }, { at: [3, 33] }, { at: [4, 90] }])].sort(), [1, 2]);
 });

@@ -587,8 +587,11 @@ body.paused .wx-a, body.paused .wx-b, body.paused .wx-f { animation-play-state: 
 .floor.lobby .tag .lead[hidden] { display: none; }
 .lobby-more { padding: 1px 6px; font-size: 10px; }
 /* the folded bubble sits beside the head: above it, the desk row behind (62 px apart) would hide its chest and chin */
-.floor.lobby .agt .bub.dot, .floor.lobby .agt.odd .bub.dot { left: calc(50% + 16px); bottom: 44px; transform: none; }
-.floor.lobby .agt .bub.dot::after { display: none; }
+/* no folded 「...」 bubbles in the lobby (noise, and they covered faces in the crowd); a full text bubble only above the back row, never over a face */
+.floor.lobby .agt .bub.dot, .floor.lobby .agt:not(.back) .bub { display: none; }
+/* a sleepy figure stays readable: a faint grey cue instead of a ghost; her zZ sits beside the head, in the gap between desks, clear of every name tag */
+.floor.lobby .st-stale .spr { opacity: .85; filter: grayscale(.55) brightness(.92); }
+.floor.lobby .agt .zz { left: calc(50% + 16px); bottom: 44px; }
 #topbar .tab.lobby { border-bottom-color: var(--c); }
 
 /* the screens: a dark navy box laid on each screen quad (one shear, like the whiteboard), dot-matrix background, KRX-like colours */
@@ -630,18 +633,23 @@ body.paused .wx-a, body.paused .wx-b, body.paused .wx-f { animation-play-state: 
 .led-idx { display: flex; align-items: baseline; gap: 5px; height: 21px; }
 .led-idx .lbl { color: var(--led-name); font-weight: 800; }
 .led-idx .val { font-size: 19px; line-height: 21px; font-weight: 700; }
-.led-idx .chg { margin-left: auto; font-size: 9px; }
-.led-cells { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8px; }
-.led-cells .cell { display: flex; align-items: baseline; justify-content: space-between; gap: 3px; height: 14px; }
-.led-cells .lbl { font-size: 8px; color: var(--led-ink); overflow: hidden; text-overflow: ellipsis; }
-.led-cells .val { font-size: 12px; line-height: 14px; font-weight: 700; }
+.led-idx .chg { font-size: 9px; }
+.led-cells { display: grid; grid-template-columns: 1fr 1fr; column-gap: 6px; }
+/* label and value side by side on one line (the value right after its label), a hairline under every row and a stripe on every other row carry the eye along the slanted panel */
+.led-cells .cell { display: flex; align-items: baseline; gap: 4px; height: 14px; box-sizing: border-box; border-bottom: 1px solid rgba(127, 211, 255, .3); }
+.led-cells .cell:nth-child(3), .led-cells .cell:nth-child(4) { background: rgba(127, 211, 255, .14); }
+.led-cells .lbl { font-size: 8px; color: var(--led-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.led-cells .val { font-size: 12px; line-height: 13px; font-weight: 700; }
 .led-cells .val[data-alarm="on"] { color: var(--led-up); } /* 실패 above 0: red */
-.led .lf { grid-template-columns: 4px 20px minmax(0, 1fr) 20px 26px; }
+/* the floor's index and change sit right after the floor number (the title, which may be clipped, comes last), with a hairline under every row and a stripe on every other row */
+.led .lf { grid-template-columns: 4px 15px 17px 31px minmax(0, 1fr); column-gap: 2px; box-sizing: border-box; border-bottom: 1px solid rgba(127, 211, 255, .3); }
+.led .lf:nth-child(even) { background: rgba(127, 211, 255, .2); }
+.led .lf:nth-child(odd) { background: rgba(127, 211, 255, .05); }
 .led .lf .chip { height: 7px; }
 .led .lf .fs { text-align: right; }
-.led .lf .fc { text-align: right; font-size: 8px; }
+.led .lf .fc { text-align: left; font-size: 8px; }
 .led .lf .fl { color: var(--led-ink); }
-.led .lf .ft { color: var(--led-name); }
+.led .lf .ft { order: 5; color: var(--led-name); }
 .led-tickerLeft, .led-tickerCenter, .led-tickerRight { display: flex; align-items: center; padding: 0 4px; }
 .led .tk-l { flex: none; margin-right: 6px; color: var(--led-name); font-weight: 800; }
 .led .tk-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--led-ink); font-size: 9px; }
