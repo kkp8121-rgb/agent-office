@@ -5,9 +5,9 @@ import { createReadStream, readdirSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { isSafeId } from './sessions.mjs';
+import { INDEX_HTML, LOG_HTML } from './pages.mjs';
 
 const TYPES = {
-  '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -25,6 +25,10 @@ const IMAGE_CACHE = 'max-age=3600';
 // Sent with every response: the page must never be framed by another site (clickjacking of hide / quit).
 const SECURITY_HEADERS = { 'X-Frame-Options': 'DENY', 'Content-Security-Policy': "frame-ancestors 'none'" };
 const STATIC_DIRS = ['web', 'assets'];
+// The two pages come from server/pages.mjs (no .html files on disk); encoded once.
+const PAGE_HEADERS = { 'Content-Type': 'text/html; charset=utf-8' };
+const INDEX_PAGE = Buffer.from(INDEX_HTML, 'utf8');
+const LOG_PAGE = Buffer.from(LOG_HTML, 'utf8');
 
 const isObj = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 
@@ -36,6 +40,11 @@ function sendJson(res, status, obj) {
 function sendText(res, status, text, extra = {}) {
   res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8', ...extra });
   res.end(text);
+}
+
+function sendPage(res, body) {
+  res.writeHead(200, { ...PAGE_HEADERS, 'Content-Length': body.length });
+  res.end(body);
 }
 
 const notFound = (res) => sendText(res, 404, 'not found');
@@ -268,8 +277,8 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
       case '/api/events':
         if (!server.listening) return sendText(res, 503, 'closing', { Connection: 'close' }); // shutting down: no new streams
         return openEvents(res);
-      case '/': return sendStatic(res, 'web', 'index.html');
-      case '/log': return sendStatic(res, 'web', 'log.html');
+      case '/': return sendPage(res, INDEX_PAGE);
+      case '/log': return sendPage(res, LOG_PAGE);
       default:
     }
     if (path.startsWith('/scenes/') && cfg.scenesDir) return sendStatic(res, 'scenes', path.slice('/scenes/'.length), cfg.scenesDir);

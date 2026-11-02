@@ -1,5 +1,5 @@
 // Play with the characters (pure): poke escalation, throw velocity and flight path, who a drop lands near, which line to say.
-// Numbers and lines come from `ui.poke`, `ui.throw`, `ui.play` and `ui.lines`. Pointer and DOM handling live in app.js.
+// Numbers and lines come from `ui.poke`, `ui.throw`, `ui.play` and `ui.lines`. Pointer and DOM handling live in app.mjs.
 
 /** Poke state after a click at `now`: the level goes up while clicks follow each other within `resetMs`, otherwise it starts again at 1. */
 export function nextPoke(prev, now, p) {

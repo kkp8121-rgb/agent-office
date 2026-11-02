@@ -1,6 +1,6 @@
 'use strict';
 // Full log page. One fetch on load, one per filter change, one per 「새로 고침」 click. No timers, no streaming.
-// Row rendering comes from logrow.js, shared with the main page.
+// Row rendering comes from logrow.mjs, shared with the main page.
 
 const $ = (id) => document.getElementById(id);
 const sessionSel = $('fsession');

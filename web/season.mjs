@@ -1,5 +1,5 @@
 // Seasonal decorations and the light outside the windows (pure): which season a date is in, how bright it is outside, when that
-// changes next, and which decoration goes on which anchor. Dates and hours come from `ui.season` and `ui.daylight`; DOM lives in app.js.
+// changes next, and which decoration goes on which anchor. Dates and hours come from `ui.season` and `ui.daylight`; DOM lives in app.mjs.
 
 /** Month and day (1-based) of the Korean lunar new year in `year`: the first day of lunar month 1 (Intl "dangi" calendar). */
 export function lunarNewYear(year) {

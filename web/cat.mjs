@@ -1,5 +1,5 @@
 // The office cat (pure): which floor it visits next, what it does next and where. Numbers come from `ui.cat`.
-// Timers, DOM and walking live in app.js.
+// Timers, DOM and walking live in app.mjs.
 import { between } from './ambient.mjs';
 
 /** The centre of a random walkable cell of a navigation grid, or null when there is none. */

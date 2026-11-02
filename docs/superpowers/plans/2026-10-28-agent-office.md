@@ -59,8 +59,8 @@ agent-office/
     main.mjs                  진입점 (Task 5)
     launch.mjs                런처 본체 (Task 8)
   web/
-    index.html  style.css  app.js     건물·층·캐릭터·기록 칸 (Task 6)
-    log.html    log.js                전체 기록 (Task 7)
+    index.html  style.css  app.mjs     건물·층·캐릭터·기록 칸 (Task 6)
+    log.html    log.mjs                전체 기록 (Task 7)
   assets/
     floors/<design>.png       층 배경 (studio 는 Task 1, 넓은 4종은 Task 10)
     sprites/<roleKey>.png     64px 높이 캐릭터 (default 는 Task 1, 나머지 Task 9)
@@ -372,7 +372,7 @@ test('sanitize: output is bounded to 80 chars', () =>
 ### Task 6: 화면 — 건물 · 층 · 캐릭터 · 기록 칸 (+ 그림 정리 도구 · 시연기)
 
 **Files:**
-- Create: `web/index.html`, `web/style.css`, `web/app.js`, `scripts/demo-feed.mjs`
+- Create: `web/index.html`, `web/style.css`, `web/app.mjs`, `scripts/demo-feed.mjs`
 - Modify: `config.json`(`layouts.studio` 좌표 보정만)
 
 **Interfaces:**
@@ -392,7 +392,7 @@ test('sanitize: output is bounded to 80 chars', () =>
 - 모든 사용자 글은 한국어, 외부 리소스 0.
 
 - [ ] **Step 1: (Task 1 에서 만든 `assets/floors/studio.png`·`assets/sprites/default.png` 가 있는지 확인)**
-- [ ] **Step 2: `web/index.html`·`style.css`·`app.js`·`scripts/demo-feed.mjs` 구현** — 함수 이름: `connect()`, `render(state)`, `renderFloor(floorView, el)`, `renderAgent(agentView, floorEl)`, `walkTo(el, x, y)`, `appendLog(entries)`, `setHidden(sessionId, hidden)`, `pause()`/`resume()`.
+- [ ] **Step 2: `web/index.html`·`style.css`·`app.mjs`·`scripts/demo-feed.mjs` 구현** — 함수 이름: `connect()`, `render(state)`, `renderFloor(floorView, el)`, `renderAgent(agentView, floorEl)`, `walkTo(el, x, y)`, `appendLog(entries)`, `setHidden(sessionId, hidden)`, `pause()`/`resume()`.
 - [ ] **Step 3: 시연기로 화면 확인** — 시연기 + 서버(47811) 띄우고 크롬 헤드리스로 3초·15초 두 장 캡처(`--virtual-time-budget`, `--window-size=1400,1100`). 확인 항목: 층 2개가 위아래로, 캐릭터가 책상 위치에 서 있음(배경 의자와 어긋나면 `config.json` desks/aisle/lead/tray 좌표 보정 후 재캡처), 말풍선끼리 겹치지 않음, 기록 칸 형식이 참고 화면과 같음, 실제 `POST /api/hide` 뒤 캡처에서 그 층·목록 줄·기록이 사라짐, `POST /api/rename` 뒤 층 표지·화이트보드·목록에 새 이름. 시연기는 세션 하나를 「다시 실행」(같은 sessionId, 새 자식 프로세스 pid)하는 동작도 넣어, 숨긴 층이 다시 나타나는지 캡처로 확인. 캡처 경로를 보고에 남긴다.
 - [ ] **Step 4: 일시정지 확인** — 헤드리스에서 `document.dispatchEvent(new Event('visibilitychange'))` 를 `document.hidden` 이 true 인 상태로 흉내 내기 어렵다면, `pause()` 를 직접 불러 `getComputedStyle(agentEl).animationPlayState === 'paused'` 와 EventSource `readyState === 2` 를 확인하는 작은 시험 페이지 스크립트로 대신한다.
 - [ ] **Step 5: 끄기** — 시연기·서버를 각자 PID 로 종료.
@@ -403,7 +403,7 @@ test('sanitize: output is bounded to 80 chars', () =>
 ### Task 7: 전체 기록 페이지
 
 **Files:**
-- Create: `web/log.html`, `web/log.js`
+- Create: `web/log.html`, `web/log.mjs`
 - Modify: `server/http.mjs` — `GET /api/log?session=<sid>&name=<이름>&limit=<n>` → `office.queryLog(...)`(limit 기본 500, 최대 `cfg.log.cap`)
 - Test: `tests/server.test.mjs` 에 `server: /api/log filters by session and excludes hidden` 추가
 

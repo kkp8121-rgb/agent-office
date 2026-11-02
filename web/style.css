@@ -24,7 +24,7 @@
   --wait-bg: #fbe7b8;
   --leave-bg: #e2ddd0;
   --shadow: rgba(59, 47, 34, .35);
-  --room-dim: 0; /* dark mode: app.js sets it from ui.dark.roomDim */
+  --room-dim: 0; /* dark mode: app.mjs sets it from ui.dark.roomDim */
   --backdrop: transparent; /* dark mode: the page colour that covers the painted backdrop around a room (outside scene.json outline) */
   --zz: #6a5aa8;
   --zz-agt: #5a49a0;
@@ -118,7 +118,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background-repeat: no-repeat; background-position: 0 0; image-rendering: pixelated;
   box-shadow: 0 2px 0 var(--shadow);
 }
-/* window views (scene.json "view", app.js createFloor): the room picture has holes where the glass is, the outside view is painted under it as background layers
+/* window views (scene.json "view", app.mjs createFloor): the room picture has holes where the glass is, the outside view is painted under it as background layers
    (shell, then the view, then nothing else), anchored in scene pixels so neighbouring panes show neighbouring parts of one picture. The light picks the image:
    day, sunset (the day image plus one static gradient, no extra art) or night (also forced by dark mode); no script, no timer, no filter. */
 .stage.viewed { background-color: #8fc9ee; background-image: var(--shell), var(--view-day); }
@@ -126,7 +126,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .stage.viewed[data-light="night"] { background-color: #16204a; background-image: var(--shell), var(--view-night); }
 /* dark mode: one static veil over the room art of each floor (no filter); above the front layer, below name tags, bubbles and the plaque */
 .stage::after { content: ""; position: absolute; inset: 0; z-index: 7500; pointer-events: none; background: rgb(6, 9, 28); opacity: var(--room-dim); }
-/* dark mode: the room art is an opaque picture on a painted backdrop; this static cover (scene.json "outline" as the hole, set by app.js in --bd-clip) paints that backdrop in the page colour, above the veil so it matches the page exactly. Light mode: transparent. */
+/* dark mode: the room art is an opaque picture on a painted backdrop; this static cover (scene.json "outline" as the hole, set by app.mjs in --bd-clip) paints that backdrop in the page colour, above the veil so it matches the page exactly. Light mode: transparent. */
 .stage::before { content: ""; position: absolute; inset: 0; z-index: 7501; pointer-events: none; background: var(--backdrop); clip-path: var(--bd-clip); }
 .sign {
   position: absolute; top: 8px; right: 8px; max-width: calc(100% - 340px); z-index: 9000;
@@ -206,7 +206,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .agt.sitting.odd .bub.dot { bottom: 56px; }
 .bub.empty { display: none; }
 .bub.dot { padding: 0 5px; min-width: 22px; text-align: center; font-size: 12px; font-weight: 800; line-height: 1.1; letter-spacing: 1px; visibility: hidden; pointer-events: auto; cursor: help; }
-/* the folded bubble says what it is: hovering it shows the full words in a small popup (app.js setBubble puts them in data-full; the girl carries them as her title) */
+/* the folded bubble says what it is: hovering it shows the full words in a small popup (app.mjs setBubble puts them in data-full; the girl carries them as her title) */
 .bub.dot:hover::before {
   content: attr(data-full); position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); white-space: nowrap;
   font-size: 10px; font-weight: 400; letter-spacing: 0; line-height: 1.2; padding: 2px 6px; background: var(--paper); border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--shadow);
@@ -267,7 +267,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 @keyframes bubhide { from { visibility: visible; } to { visibility: hidden; } }
 @keyframes bubshow { from { visibility: hidden; } to { visibility: visible; } }
 
-/* ---- grabbing: a character can be picked up, swung and dropped (app.js "grabbing"). Lift height is --lift. ---- */
+/* ---- grabbing: a character can be picked up, swung and dropped (app.mjs "grabbing"). Lift height is --lift. ---- */
 .body { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .body img { -webkit-user-drag: none; }
 .st-done .body { cursor: default; }
@@ -301,9 +301,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .body.thump { animation: thump .6s ease-in; }
 
-/* ---- play: poke, report, high-five, small talk (app.js "play"). A canned line hides the character's own bubble while it shows. ---- */
+/* ---- play: poke, report, high-five, small talk (app.mjs "play"). A canned line hides the character's own bubble while it shows. ---- */
 .agt.talk .bub:not(.say) { display: none; }
-.agt.meet .tag { display: none; } /* workflow meeting: six name tags at the board would pile up (class set and cleared in app.js with `talk`) */
+.agt.meet .tag { display: none; } /* workflow meeting: six name tags at the board would pile up (class set and cleared in app.mjs with `talk`) */
 .bub.say { transform: translateX(calc(-50% + var(--sx, 0px))); animation: bubpop .18s ease-out; }
 .bub.say::after { margin-left: calc(-4px - var(--sx, 0px)); }
 @keyframes bubpop { from { transform: translateX(calc(-50% + var(--sx, 0px))) scale(.6); opacity: 0; } }
@@ -325,7 +325,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 @keyframes spark { 0% { transform: translateX(-50%) scale(.3) rotate(-12deg); opacity: 0; } 15% { transform: translateX(-50%) scale(1.25) rotate(6deg); opacity: 1; } 30% { transform: translateX(-50%) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
 
 /* ---- walking legs: no new art. While .walking, the body picture is cut at the hip line (--hip) and its own legs are drawn
-   again as two halves (left/right of --sp, app.js makeLegs); every half step (steps(1) over .4s: two steps, matching stride's
+   again as two halves (left/right of --sp, app.mjs makeLegs); every half step (steps(1) over .4s: two steps, matching stride's
    two bobs) the halves swap: legs apart, then crossed with the front one lifted 1px. Nothing runs while standing. ---- */
 .spr img.leg { display: none; position: absolute; }
 .walking .spr img.leg { display: block; }
@@ -335,7 +335,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 @keyframes leg-l { 0% { transform: translate(-2px, 0); } 50% { transform: translate(2px, -1px); } }
 @keyframes leg-r { 0% { transform: translate(2px, 0); } 50% { transform: translate(-2px, 0); } }
 
-/* ---- office cat (app.js "office cat"): five pictures in .spr, the root's class picks one; two walking frames swap by steps() ---- */
+/* ---- office cat (app.mjs "office cat"): five pictures in .spr, the root's class picks one; two walking frames swap by steps() ---- */
 .ag.cat .spr img { height: auto; }
 .ag.cat .body { left: -18px; top: -32px; width: 36px; height: 32px; }
 .ag.cat .spr img:not(.stand) { display: none; position: absolute; }
@@ -420,7 +420,7 @@ body.panel-off #panel, body.fs #panel { display: none; }
   background: var(--ink); color: var(--paper); padding: 6px 14px; border-radius: 6px;
 }
 
-/* picture-in-picture: the floors move into a small always-on-top window (app.js openPip); only floors, scaled to the width.
+/* picture-in-picture: the floors move into a small always-on-top window (app.mjs openPip); only floors, scaled to the width.
    The same class on a normal page's body shows the mini layout for checking. */
 #pip-hold { flex: none; width: 320px; padding: 16px; text-align: center; color: var(--muted); border: 2px dashed var(--line); border-radius: 8px; }
 #pip-hold p { margin: 0 0 8px; }
@@ -430,7 +430,7 @@ html:has(.pip-mini) { scrollbar-gutter: stable; }
 .pip-mini #app { display: block; padding: 0; }
 .pip-mini #panel, .pip-mini #pip-hold, .pip-mini #topbar { display: none; }
 
-/* narrow window: the panel goes under the floors, which scale to the width (see fitFloors in app.js) */
+/* narrow window: the panel goes under the floors, which scale to the width (see fitFloors in app.mjs) */
 @media (max-width: 1099px) {
   #app { flex-direction: column; align-items: center; }
   #panel { width: 100%; max-width: 1024px; position: static; max-height: none; }
@@ -447,7 +447,7 @@ html:has(.pip-mini) { scrollbar-gutter: stable; }
 #logmeta { color: var(--muted); font-size: 11px; margin-bottom: 6px; }
 .logpage #log { min-height: 0; overflow: visible; }
 
-/* ---- whiteboard to-dos on the wall (the box is laid on the board's quad with one shear, app.js makeBoard) ---- */
+/* ---- whiteboard to-dos on the wall (the box is laid on the board's quad with one shear, app.mjs makeBoard) ---- */
 .wboard {
   position: absolute; z-index: 900; transform-origin: 0 0; box-sizing: border-box; padding: 2px 3px; overflow: hidden; cursor: pointer;
   background: #f7f6ef; color: #1f1d19; font-size: 8px; line-height: 9px; font-weight: 700;
@@ -571,7 +571,7 @@ body.paused .wx-a, body.paused .wx-b, body.paused .wx-f { animation-play-state: 
 #settings-panel .wx-credit { color: var(--credit); font-size: 11px; }
 #settings-panel #settings-close { margin-top: 8px; }
 
-/* ---- lobby (1F): the figures stand still, the screens of the back wall are the status wall (app.js "lobby") ---- */
+/* ---- lobby (1F): the figures stand still, the screens of the back wall are the status wall (app.mjs "lobby") ---- */
 .floor.lobby {
   --led-bg: #06122b; --led-dots: rgba(90, 150, 255, .07); --led-num: #7fd3ff; --led-ink: #eef4ff; --led-name: #ffa53d;
   --led-up: #ff4d3a; --led-down: #3d8bff; --led-flat: #b9c4d8; --led-bezel: #02060f;

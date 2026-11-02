@@ -15,8 +15,8 @@ const M = (id, o = {}) => ({
   agentId: id, agentType: 'worker', description: 'x', finished: false, transcriptPath: '', mtimeMs: 0, workflow: null, ...o,
 });
 const floorOf = (o, id) => o.snapshot().floors.find((f) => f.sessionId === id);
-const appSrc = readFileSync(new URL('../web/app.js', import.meta.url), 'utf8');
-/** Source of one top-level function of web/app.js. */
+const appSrc = readFileSync(new URL('../web/app.mjs', import.meta.url), 'utf8');
+/** Source of one top-level function of web/app.mjs. */
 const fnSrc = (name) => appSrc.match(new RegExp(`(?:async )?function ${name}[(].*?\n}\n`, 's'))[0];
 
 // ---- F14: main panel keeps rows newest-first when a merged entry gets a newer ts ----

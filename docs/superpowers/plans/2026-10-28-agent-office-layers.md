@@ -4,7 +4,7 @@
 
 **Goal:** 층 배경을 「그림 한 장」 에서 「빈 방 껍데기 + 오브젝트 레이어 + 장면 데이터」 로 바꿔 캐릭터가 가구와 앞뒤가 맞게 그려지고 가구를 돌아 걷게 하며, 자리에서는 앉아 일하고 가끔 몸짓을 하거나 방 안의 활동 지점에 다녀오게 한다.
 
-**Architecture:** 장면 데이터(`assets/scenes/<design>/scene.json`)를 서버가 시작할 때 형식 검사해 `/api/ui` 로 넘긴다. 브라우저·Node 시험·검증기가 **같은 순수 모듈**(`web/scene.mjs`·`web/nav.mjs`·`web/depth.mjs`·`web/ambient.mjs`)을 쓴다: 장면 풀기, 격자 굽기 + A* + 경로 다듬기 + 캐시, 깊이(z) 계산과 걷기 선분 자르기, 생활 움직임 결정. 화면(`web/app.js`, 모듈로 전환)은 오브젝트를 정적 노드로 한 번 그리고, 걷기는 선분마다 CSS `transform` 트랜지션을 이어 붙이며, 층마다 `setTimeout` 사슬 하나로 몸짓·나들이를 돌린다. 서버는 자리 배정만 장면에서 하고 길찾기는 하지 않는다. 장면이 없는 디자인은 옛 `layouts` + 직선 걷기로 계속 동작한다(방 단위 이전).
+**Architecture:** 장면 데이터(`assets/scenes/<design>/scene.json`)를 서버가 시작할 때 형식 검사해 `/api/ui` 로 넘긴다. 브라우저·Node 시험·검증기가 **같은 순수 모듈**(`web/scene.mjs`·`web/nav.mjs`·`web/depth.mjs`·`web/ambient.mjs`)을 쓴다: 장면 풀기, 격자 굽기 + A* + 경로 다듬기 + 캐시, 깊이(z) 계산과 걷기 선분 자르기, 생활 움직임 결정. 화면(`web/app.mjs`, 모듈로 전환)은 오브젝트를 정적 노드로 한 번 그리고, 걷기는 선분마다 CSS `transform` 트랜지션을 이어 붙이며, 층마다 `setTimeout` 사슬 하나로 몸짓·나들이를 돌린다. 서버는 자리 배정만 장면에서 하고 길찾기는 하지 않는다. 장면이 없는 디자인은 옛 `layouts` + 직선 걷기로 계속 동작한다(방 단위 이전).
 
 **Tech Stack:** Node.js v24 (npm 의존성 0, ES modules, `node:test`), 바닐라 HTML/CSS/JS, Python 3.12 + Pillow(그림 후처리·점검표), Codex CLI `codex exec` + 내장 imagegen(그림), 크롬 헤드리스 + CDP(화면 캡처·CPU 측정).
 
@@ -16,7 +16,7 @@
 
 - 저장소 `C:\Users\gustj\agent-office`(브랜치 `main`). 원격 `origin` 이 있으나 **push 금지**. 셸 명령은 `cd C:/Users/gustj/agent-office && …` 로 시작하고 경로는 절대경로.
 - npm 의존성 0. 순수 HTML/CSS/JS. `requestAnimationFrame`·캔버스·`element.animate()` 금지 — 움직임은 CSS `transform` 트랜지션·키프레임만. 탭이 가려지면 멈춤.
-- 기획 수치는 `config.json` 또는 코드가 참조하는 장면 데이터에. 연출값(걷는 속도·찌그러짐 시간)은 지금 관례대로 `app.js`/`style.css` 상수.
+- 기획 수치는 `config.json` 또는 코드가 참조하는 장면 데이터에. 연출값(걷는 속도·찌그러짐 시간)은 지금 관례대로 `app.mjs`/`style.css` 상수.
 - 사용자에게 보이는 글은 한국어. 코드 식별자·주석은 영어. UTF-8 BOM 없음, LF. 주변 코드 스타일을 따른다(2칸 들여쓰기, 작은따옴표, 세미콜론).
 - 화면을 띄우지 않는다: `--open`·`start <url>`·`cmd /c start`·`-WindowStyle Hidden` 없는 `Start-Process` 금지. 화면 확인은 헤드리스 크롬 CDP `Page.captureScreenshot` 만(복사해 쓸 도우미: `C:\Users\gustj\AppData\Local\Temp\claude\C--Project\6106276a-a6e5-4468-8650-198bebbf83af\scratchpad\t8b\persist\cdpcap.mjs`). PNG 는 Read 도구로 본다.
 - 포트 47800 사용 금지. 띄우는 서버는 **47869**, `AGENT_OFFICE_DATA_DIR` = `C:\Users\gustj\AppData\Local\Temp\claude\C--Project\6106276a-a6e5-4468-8650-198bebbf83af\scratchpad\layers\data-47869\<task>`, `AGENT_OFFICE_CLAUDE_HOME`·`AGENT_OFFICE_CODEX_HOME` 는 가짜 홈(`scripts/demo-feed.mjs`) — Task 7 의 CPU 측정만 실제 홈. 자기가 띄운 PID 만 끈다. **Task 3~6 은 서버를 띄우지 않는다**(병렬 실행 중 포트 충돌).
@@ -48,7 +48,7 @@ server/
   http.mjs                      /api/ui scenes·sitSprites, /scenes/ 정적 (Task 1)
 web/
   scene.mjs  nav.mjs  depth.mjs  ambient.mjs    새 순수 모듈 (Task 1)
-  app.js                        모듈 전환·오브젝트 그리기·경로 걷기·앉기·생활 움직임 (Task 1)
+  app.mjs                        모듈 전환·오브젝트 그리기·경로 걷기·앉기·생활 움직임 (Task 1)
   style.css  index.html         (Task 1)
 scripts/check-scenes.mjs        검증기 CLI (Task 1)
 tests/
@@ -120,11 +120,11 @@ assets/
 
 **Files:**
 - Create: `web/scene.mjs`, `web/nav.mjs`, `web/depth.mjs`, `web/ambient.mjs`, `server/scenes.mjs`, `server/scene-check.mjs`, `scripts/check-scenes.mjs`, `tests/helpers/png.mjs`, `tests/fixtures/scenes/studio2/{scene.json,shell.png,objects.png,front.png}`, `tests/scene.test.mjs`, `tests/nav.test.mjs`, `tests/depth.test.mjs`, `tests/ambient.test.mjs`, `tests/office-scene.test.mjs`, `tests/scenes-shipped.test.mjs`
-- Modify: `config.json`, `server/config.mjs`, `server/office.mjs`, `server/http.mjs`, `web/app.js`, `web/style.css`, `web/index.html`, `tests/server.test.mjs`(`/api/ui` 단언 추가만)
+- Modify: `config.json`, `server/config.mjs`, `server/office.mjs`, `server/http.mjs`, `web/app.mjs`, `web/style.css`, `web/index.html`, `tests/server.test.mjs`(`/api/ui` 단언 추가만)
 - 옛 배치에 묶인 시험(`tests/config.test.mjs`, `tests/office.test.mjs:101-130`, `tests/office-fixes.test.mjs:220`, `tests/round2-web.test.mjs:64-95`, `tests/web-fixes.test.mjs:46`)은 **고치지 않는다** — 옛 경로가 그대로이므로 통과해야 한다. 이들은 Task 7 이 장면 시험으로 옮긴다.
 
 **Interfaces:**
-- Consumes: 설계서 §4~§8, §10, §16, §17. 기존 `loadConfig`, `Office`, `createServer`, `app.js` 의 `createChar`·`walkTo`·`renderAgent`·`createFloor`·`pause`·`resume`.
+- Consumes: 설계서 §4~§8, §10, §16, §17. 기존 `loadConfig`, `Office`, `createServer`, `app.mjs` 의 `createChar`·`walkTo`·`renderAgent`·`createFloor`·`pause`·`resume`.
 - Produces (`web/scene.mjs`, DOM 없음):
   - `checkSceneFormat(raw: object, opts: {atlasSize: Pt|null, inflatePx: number, minSeats?: number}): string[]` — 설계서 §10.1 1단계 + `spots` 형식(4~8개, kind 목록, id 유일) + `seat.sitAt`/`visit`·`lead.sitAt` 형식. 빈 배열 = 통과. 오류 문자열은 `"<필드 경로>: <이유>"`. `minSeats` 기본 12(합성 고정물은 4 를 넘김).
   - `resolveScene(raw: object): Resolved` — 종류 펼치기, `flipX` 시 footprint·seat dx 뒤집기, 오브젝트 덮어쓰기, `sitAt` 없으면 `at`, `visit` 없으면 `null`, `pair` 없으면 `null`.
@@ -154,7 +154,7 @@ assets/
   - `server/office.mjs`: 장면이 있는 디자인의 `#allocSlot` → `SceneSlot`(`seats` → `idle` → `overflow`, 넘침 고리 `ring = floor(k / overflow.length)`, 붙이기는 화면 몫이므로 서버는 `overflowPoint` 의 붙이기 전 값). 장면 없는 디자인은 지금 코드 그대로 `LegacySlot`.
   - `server/http.mjs`: `uiConfig()` 에 `scenes`(raw + url), `sitSprites`(시작 때 `assets/sprites/*-sit.png` 에서 키 목록), `sitHeight`, `nav`, `depth` 추가. `layouts`·`ui`(→ `ui.ambient`) 는 그대로. 새 경로 `/scenes/<design>/<file>` = `cfg.scenesDir` 에서 지금 `sendStatic` 과 같은 경로 이탈 검사·그림 캐시 머리로 제공.
 - Produces (CLI): `node scripts/check-scenes.mjs [--dir <scenesDir>] [--json <design>] [design…]` — 디자인마다 `OK <design>` / `FAIL <design>: <단계> <내용>` / `WARN <design>: …` 출력, 하나라도 FAIL 이면 exit 1. `--json` 은 Task 2 점검표용으로 `{resolved, grid: {cols, rows, cellPx, open: "<0/1 문자열>"}, nodes, warnings}` 를 stdout 에 낸다.
-- Produces (화면, `web/app.js` — 모듈로 전환해 위 모듈을 import): `sceneOf(design)`, `walkPath(rec, frec, points: Pt[], onArrive?: () => void)`, `retarget(rec, frec, target)`, `setPose(rec, seated: boolean, animate: boolean)`, `startAmbient(frec)`, `stopAmbient(frec)`. URL `?debug=nav`(설계서 §8.2 겹침), `?debug=ambient`(생활 움직임 범위를 모두 0.1배 + `window.__ambient = { timers: () => <대기 중 층 타이머 수>, away: () => <나가 있는 캐릭터 수> }` — 캡처·측정용, 없으면 아무것도 만들지 않음).
+- Produces (화면, `web/app.mjs` — 모듈로 전환해 위 모듈을 import): `sceneOf(design)`, `walkPath(rec, frec, points: Pt[], onArrive?: () => void)`, `retarget(rec, frec, target)`, `setPose(rec, seated: boolean, animate: boolean)`, `startAmbient(frec)`, `stopAmbient(frec)`. URL `?debug=nav`(설계서 §8.2 겹침), `?debug=ambient`(생활 움직임 범위를 모두 0.1배 + `window.__ambient = { timers: () => <대기 중 층 타이머 수>, away: () => <나가 있는 캐릭터 수> }` — 캡처·측정용, 없으면 아무것도 만들지 않음).
 
 - [ ] **Step 1: 합성 장면 고정물** — `tests/helpers/png.mjs`: `writePng(file, w, h, pixel: (x, y) => [r, g, b, a])`(`zlib.deflateSync` + `zlib.crc32`, 의존성 0). 이것으로 `tests/fixtures/scenes/studio2/` 에 1024×512 껍데기(단색 바닥 + 벽 띠), 아틀라스(단색 사각형: 책상 80×56, 의자 32×44, 큰 화분 44×70, 대각선 장 120×60, 팀장 탁자 96×56), `front.png`(앞 가장자리 띠) 를 만들고 PNG 는 커밋한다(만드는 코드는 `tests/helpers/make-fixture.mjs`, 한 번 실행). `scene.json`: 바닥 다각형 1개, 책상 4개(줄 간격 ≥ 90px) + 의자 4개, 화분 1개, 대각선 장 1개(footprint 앞선이 좌→우 30px 내려감), 팀장 탁자 + 의자, 보고함 줄 12점, 대기점 6, 넘침 8, `spots` 4개(그중 1개 `pair`), `seat.visit`·`sitAt`, `lead.sitAt`. 이 고정물은 `minSeats: 4` 로 검사한다.
 - [ ] **Step 2: 실패하는 시험 작성** (모두 `node:test` + `assert/strict`)
@@ -207,7 +207,7 @@ assets/
 - [ ] **Step 3: 실패 확인** — Run: `cd C:/Users/gustj/agent-office && npm test` → Expected: 새 시험 FAIL(모듈 없음), 기존 시험 PASS.
 - [ ] **Step 4: 순수 모듈 구현** — `web/scene.mjs` → `web/nav.mjs` → `web/depth.mjs` → `web/ambient.mjs`. DOM·`process` 를 쓰지 않는다(브라우저·Node 공용). 숫자는 인자로 받은 `nav`/`depth`/`amb` 블록에서만.
 - [ ] **Step 5: 서버 구현** — `config.json` 블록 추가, `server/scenes.mjs`, `server/config.mjs`, `server/scene-check.mjs`, `scripts/check-scenes.mjs`, `server/office.mjs` 장면 분기, `server/http.mjs`. 서버 시작 때는 1단계(형식)만, 무거운 2~9단계는 검증기·시험만.
-- [ ] **Step 6: 화면 구현** (`web/index.html` 은 `<script type="module" src="/web/app.js">`; `logrow.js` 는 그대로 일반 스크립트)
+- [ ] **Step 6: 화면 구현** (`web/index.html` 은 `<script type="module" src="/web/app.mjs">`; `logrow.mjs` 는 그대로 일반 스크립트)
   - 그리기(설계서 §8.1): 장면 있는 층 = 껍데기 배경 + `objectNodes` 마다 `div.obj`(아틀라스 `background-position`, `image-rendering: pixelated`, `flipX` 는 `scaleX(-1)`) + `div.front`(z `frontZ`) + `.stage { contain: layout paint }`. 화이트보드·보고 배지·표지 좌표는 장면에서. 말풍선은 `.agt` 층(z 8000)으로 옮긴다(설계서 §5.4) — 옛 디자인도 같이.
   - 걷기(설계서 §6.4~6.6): `walkPath` = `splitWalk` 조각마다 트랜지션 하나, `transitionend` 에서 다음 조각, 조각 시작 때 z·뒤집기 설정, 세대 번호로 옛 이벤트 무시, 마지막 조각 끝에 `onArrive`. 자리에 붙은 점에서 떠날 때 `sitAt → at → approach` 직선 뒤 경로, 돌아올 때 `approach → at → sitAt`. 첫 그리기는 걷지 않고 놓는다(넘침 점이 있을 때만 격자 굽기). 길 없음 → 흐려졌다 나타나기 + `console.warn` 한 번.
   - 목표 바뀜: `retarget` 이 `getComputedStyle(el).transform` 을 한 번 읽어 지금 위치에서 새 경로. 탭 가림: 걷는 캐릭터·나가 있는 캐릭터를 모두 서버 목표로 바로 옮기고(앉을 자리면 앉힘) 이어 붙이기를 끊는다. 다시 보임: 남은 걷기를 되살리지 않는다.
@@ -314,7 +314,7 @@ assets/
 ### Task 7: 전환 마무리 · 문서 · 끝에서 끝 캡처 · CPU
 
 **Files:**
-- Modify: `config.json`(`layouts` 의 studio2·lounge·library·greenhouse 와 `ui.traySpreadPx`·`ui.trayRowPx`·`ui.overflowShifts`·`ui.overflowMarginPx` 삭제 — `layouts.studio` 는 사용자 결정 전까지 **그대로**), `server/scenes.mjs`·`server/office.mjs`·`server/http.mjs`·`web/app.js`·`web/logrow.js`(옛 배치 분기·`trayPos` 삭제; 장면 없는 디자인은 시작 거부), 옛 배치에 묶인 시험(`tests/config.test.mjs`, `tests/office.test.mjs`, `tests/office-fixes.test.mjs`, `tests/round2-web.test.mjs`, `tests/web-fixes.test.mjs`, `tests/server.test.mjs`)을 합성 고정물 기반 단언으로, `README.md`, 본 설계서 `docs/superpowers/specs/2026-10-28-agent-office-design.md`(§5.1·§5.2·§6.3·§12 에 「→ 보충 설계서 §n 으로 바뀜」 한 줄씩).
+- Modify: `config.json`(`layouts` 의 studio2·lounge·library·greenhouse 와 `ui.traySpreadPx`·`ui.trayRowPx`·`ui.overflowShifts`·`ui.overflowMarginPx` 삭제 — `layouts.studio` 는 사용자 결정 전까지 **그대로**), `server/scenes.mjs`·`server/office.mjs`·`server/http.mjs`·`web/app.mjs`·`web/logrow.mjs`(옛 배치 분기·`trayPos` 삭제; 장면 없는 디자인은 시작 거부), 옛 배치에 묶인 시험(`tests/config.test.mjs`, `tests/office.test.mjs`, `tests/office-fixes.test.mjs`, `tests/round2-web.test.mjs`, `tests/web-fixes.test.mjs`, `tests/server.test.mjs`)을 합성 고정물 기반 단언으로, `README.md`, 본 설계서 `docs/superpowers/specs/2026-10-28-agent-office-design.md`(§5.1·§5.2·§6.3·§12 에 「→ 보충 설계서 §n 으로 바뀜」 한 줄씩).
 - Create: 없음(캡처는 저장소 밖 `…\scratchpad\layers\task7\`).
 
 **Interfaces:**

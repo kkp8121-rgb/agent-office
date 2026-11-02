@@ -64,7 +64,7 @@ test('window view: style.css picks the picture by data-light and paints the view
   assert.match(css, /\.stage\.viewed\[data-light="sunset"\] \{[^}]*linear-gradient[^}]*var\(--view-day\)/);
   const view = css.match(/\.stage\.viewed[^{]*\{[^}]*\}/g).join('\n');
   assert.doesNotMatch(view, /filter|animation|transition|blend/, 'static layers only');
-  const app = readFileSync(join(ROOT, 'web', 'app.js'), 'utf8');
+  const app = readFileSync(join(ROOT, 'web', 'app.mjs'), 'utf8');
   assert.match(app, /'--view-day'/);
   assert.match(app, /'--view-night'/);
   assert.match(app, /classList\.add\('viewed'\)/);

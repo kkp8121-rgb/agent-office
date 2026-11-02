@@ -1,5 +1,5 @@
 'use strict';
-// Shared by the main page and the full log page (classic script: its top-level names are global to app.js / log.js).
+// Shared by the main page and the full log page (classic script: its top-level names are global to app.mjs / log.mjs).
 // All server strings are inserted with textContent only.
 
 function setText(el, text) {

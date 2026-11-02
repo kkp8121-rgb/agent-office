@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../server/config.mjs';
 import { Office } from '../server/office.mjs';
 import { createServer } from '../server/http.mjs';
+import { INDEX_HTML, LOG_HTML } from '../server/pages.mjs';
 import { loadSaved, saveSaved } from '../server/hidden.mjs';
 
 const EMPTY = { hidden: [], names: {} };
@@ -139,9 +140,7 @@ test('server: static path traversal is blocked', async (t) => {
   mkdirSync(join(root, 'web'));
   mkdirSync(join(root, 'assets'));
   writeFileSync(join(root, 'config.json'), '{"secret":1}');
-  writeFileSync(join(root, 'web', 'index.html'), '<h1>hi</h1>');
-  writeFileSync(join(root, 'web', 'log.html'), '<h1>log</h1>');
-  writeFileSync(join(root, 'web', 'app.js'), 'export {}');
+  writeFileSync(join(root, 'web', 'app.mjs'), 'export {}');
   writeFileSync(join(root, 'assets', 'a.png'), Buffer.from([0x89, 0x50]));
   const c = await start(t, { cfg: { ...loadConfig(), root } });
 
@@ -151,13 +150,7 @@ test('server: static path traversal is blocked', async (t) => {
     assert.ok(!r.body.includes('secret'), p);
   }
 
-  const index = await req(c, 'GET', '/');
-  assert.equal(index.status, 200);
-  assert.equal(index.body, '<h1>hi</h1>');
-  assert.match(index.headers['content-type'], /^text\/html/);
-  assert.equal(index.headers['cache-control'], undefined);
-  assert.equal((await req(c, 'GET', '/log')).body, '<h1>log</h1>');
-  const js = await req(c, 'GET', '/web/app.js');
+  const js = await req(c, 'GET', '/web/app.mjs');
   assert.match(js.headers['content-type'], /javascript/);
   assert.equal(js.headers['cache-control'], undefined);
   const png = await req(c, 'GET', '/assets/a.png');
@@ -165,12 +158,27 @@ test('server: static path traversal is blocked', async (t) => {
   assert.equal(png.headers['cache-control'], 'max-age=3600');
 });
 
-test('server: / and /log are 404 when the page files do not exist', async (t) => {
-  const root = mkdtempSync(join(tmpdir(), 'root-'));
+test('server: / and /log are answered from the pages module, not from files', async (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'root-')); // no web/ folder at all
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const c = await start(t, { cfg: { ...loadConfig(), root } });
-  assert.equal((await req(c, 'GET', '/')).status, 404);
-  assert.equal((await req(c, 'GET', '/log')).status, 404);
+  for (const [path, html] of [['/', INDEX_HTML], ['/log', LOG_HTML]]) {
+    const r = await req(c, 'GET', path);
+    assert.equal(r.status, 200, path);
+    assert.equal(r.body, html, path);
+    assert.equal(r.headers['content-type'], 'text/html; charset=utf-8', path);
+    assert.equal(r.headers['content-length'], String(Buffer.byteLength(html)), path);
+    assert.equal(r.headers['cache-control'], undefined, path);
+    assert.equal(r.headers['x-frame-options'], 'DENY', path);
+    assert.equal(r.headers['content-security-policy'], "frame-ancestors 'none'", path);
+  }
+  assert.match(INDEX_HTML, /<script type="module" src="\/web\/app\.mjs"><\/script>/);
+  assert.match(LOG_HTML, /<script src="\/web\/log\.mjs"><\/script>/);
+  for (const p of ['/index.html', '/log.html', '/web/index.html', '/web/log.html', '/log/', '/web/app.js', '/web/pages.mjs']) {
+    assert.equal((await req(c, 'GET', p)).status, 404, p);
+  }
+  assert.equal((await req(c, 'POST', '/', { origin: `http://127.0.0.1:${c.port}` })).status, 404);
+  assert.equal((await req(c, 'GET', '/', { host: 'evil.example' })).status, 403);
 });
 
 test('server: api/state and api/ui', async (t) => {

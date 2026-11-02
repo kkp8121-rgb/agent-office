@@ -140,7 +140,7 @@ test('lobby headline: 실패 counts the failures of the last window over all flo
 test('lobby headline: the window is a planning number in config.json and the label says it; the cell is red only above 0', () => {
   assert.equal(L.failMinutes, 10);
   assert.equal(L.head.fails.replace('{m}', L.failMinutes), '실패 (10분)');
-  const app = readFileSync(join(ROOT, 'web', 'app.js'), 'utf8');
+  const app = readFileSync(join(ROOT, 'web', 'app.mjs'), 'utf8');
   assert.match(app, /headline\(lb\.roster, lb\.floors, now, L\.failMinutes \* 60000\)/);
   assert.match(app, /data-alarm', hc\.fails > 0 \? 'on' : 'off'/);
   const css = readFileSync(join(ROOT, 'web', 'style.css'), 'utf8');
@@ -338,7 +338,7 @@ test('lobby view: follow never picks the lobby (the follow ids are the floors)',
 test('lobby view: session ids never equal the lobby id, and the lobby survives any floor change by design (reconcile skips it)', () => {
   assert.equal(LOBBY_ID, 'lobby');
   assert.equal(fallbackFloor(['a'], 'a', []), null, 'a session view with nothing left falls back to the stack');
-  const app = readFileSync(join(ROOT, 'web', 'app.js'), 'utf8');
+  const app = readFileSync(join(ROOT, 'web', 'app.mjs'), 'utf8');
   assert.match(app, /if \(shownId !== null && shownId !== LOBBY_ID\) \{/, 'reconcileView leaves the lobby alone');
 });
 
@@ -526,7 +526,7 @@ test('lobby scene: the wings are taller at the outer end (concave), every screen
     const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
     assert.ok([cr(tl, tr, br), cr(tr, br, bl), cr(br, bl, tl), cr(bl, tl, tr)].every((c) => c > 0), `${id} convex with area`);
   }
-  const app = readFileSync(join(ROOT, 'web', 'app.js'), 'utf8');
+  const app = readFileSync(join(ROOT, 'web', 'app.mjs'), 'utf8');
   const fn = app.slice(app.indexOf('function ledBox('), app.indexOf('/** A row of plain cells'));
   assert.match(fn, /quadFrame\(p\.quad\)/);
   assert.match(fn, /transform: f\.matrix3d/);
@@ -555,7 +555,7 @@ test('lobby scene: 40 straight desks, every seat stands behind its desk facing t
 });
 
 test('lobby figure: the lobby never uses the seated picture (standing front view behind the desk)', () => {
-  const app = readFileSync(join(ROOT, 'web', 'app.js'), 'utf8');
+  const app = readFileSync(join(ROOT, 'web', 'app.mjs'), 'utf8');
   const fn = app.slice(app.indexOf('function lobbyFigure('), app.indexOf('/** Roster -> seats -> figures'));
   assert.doesNotMatch(fn, /sitSet|sitAt|setPose/);
   assert.match(fn, /p = s\.at;/);
@@ -564,7 +564,7 @@ test('lobby figure: the lobby never uses the seated picture (standing front view
 // ---- name tags: floor number chip and lead marker ----
 
 test('lobby tags: the floor number rides a chip in the team colour, a 팀장 gets a small ★, the title is written only on change', () => {
-  const app = readFileSync(join(ROOT, 'web', 'app.js'), 'utf8');
+  const app = readFileSync(join(ROOT, 'web', 'app.mjs'), 'utf8');
   const css = readFileSync(join(ROOT, 'web', 'style.css'), 'utf8');
   const fn = app.slice(app.indexOf('function lobbyFigure('), app.indexOf('/** Roster -> seats -> figures'));
   assert.match(fn, /rec\.tagFl = el\('i', 'fl'\)/);

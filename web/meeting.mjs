@@ -1,5 +1,5 @@
 // Workflow meetings and failure faces (pure): who stands where, which mood a failure shows, when the boss comes to pat.
-// Numbers come from `ui.meeting` and `ui.fail`. DOM, walking and timers live in app.js.
+// Numbers come from `ui.meeting` and `ui.fail`. DOM, walking and timers live in app.mjs.
 
 /**
  * Gives each character a meeting spot: the closest (character, spot) pair first, then the next closest of those left.

@@ -1,4 +1,7 @@
-<!doctype html>
+// The two HTML documents the server answers for "/" and "/log". They live in a module (not .html files) so that
+// no file in the project carries an extension that upload filters refuse. Served by server/http.mjs byte for byte.
+// The inline <script> in <head> applies the saved light/dark theme before first paint (no CSP script-src is sent, so it needs no hash).
+export const INDEX_HTML = String.raw`<!doctype html>
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -54,7 +57,36 @@
   </aside>
 </main>
 <div id="conn" role="status" hidden></div>
-<script src="/web/logrow.js"></script>
-<script type="module" src="/web/app.js"></script>
+<script src="/web/logrow.mjs"></script>
+<script type="module" src="/web/app.mjs"></script>
 </body>
 </html>
+`;
+
+export const LOG_HTML = String.raw`<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>전체 업무 일지 · 에이전트 사무실</title>
+<link rel="icon" href="data:,">
+<script>try{var t=localStorage.getItem("agent-office.theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="stylesheet" href="/web/style.css">
+</head>
+<body class="logpage">
+<main id="logmain">
+  <header id="logbar">
+    <h1>전체 업무 일지</h1>
+    <label>층 <select id="fsession"><option value="">전체</option></select></label>
+    <label>이름 <select id="fname"><option value="">전체</option></select></label>
+    <button id="refresh" type="button" class="mini">새로 고침</button>
+    <a href="/" class="back">← 사무실</a>
+  </header>
+  <div id="logmeta"></div>
+  <div id="log"></div>
+</main>
+<script src="/web/logrow.mjs"></script>
+<script src="/web/log.mjs"></script>
+</body>
+</html>
+`;

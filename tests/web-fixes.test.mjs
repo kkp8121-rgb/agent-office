@@ -5,10 +5,10 @@ import { readFileSync } from 'node:fs';
 import { loadConfig } from '../server/config.mjs';
 import { resolveScene, trayPoint } from '../web/scene.mjs';
 
-// logrow.js is a classic script: load it into a fresh context (its DOM helpers are only touched inside functions).
+// logrow.mjs is a classic script: load it into a fresh context (its DOM helpers are only touched inside functions).
 function loadLogrow() {
   const ctx = vm.createContext({});
-  vm.runInContext(readFileSync(new URL('../web/logrow.js', import.meta.url), 'utf8'), ctx);
+  vm.runInContext(readFileSync(new URL('../web/logrow.mjs', import.meta.url), 'utf8'), ctx);
   return (expr) => vm.runInContext(expr, ctx);
 }
 

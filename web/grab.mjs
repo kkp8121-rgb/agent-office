@@ -1,5 +1,5 @@
 // Picking a character up (pure): the grab-vs-click rule, where a dropped character lands, which rest spot it is near.
-// Numbers come from `ui.grab`. Pointer and DOM handling live in app.js.
+// Numbers come from `ui.grab`. Pointer and DOM handling live in app.mjs.
 import { isOpen, snapOpen } from './nav.mjs';
 
 /** A press becomes a grab once the pointer moved `movePx` or was held `holdMs`; shorter and stiller it is a plain click. */
