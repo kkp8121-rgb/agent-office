@@ -12,7 +12,7 @@ import { daypart, nextPoke, openBox, pickLine, playPartner, throwPath, throwVelo
 import { between, chooseFidget, chooseSpot, createFloorClock, rngFor, tripRange } from './ambient.mjs';
 import { chooseCatAct, openPoint, otherFloor } from './cat.mjs';
 import { legVars } from './walk.mjs';
-import { boardCapacity, boardFrame, boardSheet, itemWindow, sheetKey } from './board.mjs';
+import { boardCapacity, boardFrame, boardSheet, itemWindow, quadFrame, sheetKey } from './board.mjs';
 import { assignSpots, clipPhase, moodKind, patDue } from './meeting.mjs';
 import { lightAt, msToNextChange, placeSeason, seasonOn } from './season.mjs';
 import { pickAt, snackOutcome } from './snack.mjs';
@@ -2046,7 +2046,7 @@ function renderFloor(fv, elm) {
 
 // ---------- lobby (1F): every agent of every floor, and the status wall ----------
 // A synthetic floor built from the same snapshot the floors use (not a session, so it is not in floorRecs). Its figures are placed once
-// and never walk or play; the wall is real text laid on the screens of the room with one shear each (boardFrame), so it stays crisp
+// and never walk or play; the wall is real text laid on the screens of the room with one homography each (quadFrame: the wings are taller at the outer end), so it stays crisp
 // under the CSS zoom. It draws only while it is shown; hidden, a state frame just stores the floors and marks it dirty.
 
 const lobbyBtn = $('tab-lobby');
@@ -2063,9 +2063,9 @@ function put(node, text) {
 }
 
 function ledBox(stage, p, cls) {
-  const f = boardFrame(p.quad);
+  const f = quadFrame(p.quad);
   const box = el('div', `led ${cls}`);
-  Object.assign(box.style, { left: `${f.x}px`, top: `${f.y}px`, width: `${f.w}px`, height: `${f.h}px`, transform: `matrix(1, ${f.slope}, 0, 1, 0, 0)`, zIndex: String(LED_Z) });
+  Object.assign(box.style, { left: `${f.x}px`, top: `${f.y}px`, width: `${f.w}px`, height: `${f.h}px`, transform: f.matrix3d, zIndex: String(LED_Z) });
   stage.append(box);
   return { el: box, frame: f };
 }
@@ -2237,13 +2237,12 @@ function readableOn(hex) {
 function lobbyFigure(e, slot) {
   const lb = lobby;
   const { r } = lb.scene;
-  let seated = false;
+  // the lobby always shows the standing picture (front view) behind a straight desk, so the face is seen: the figure is never switched to the seated one
   let p;
   let face;
   if (slot.kind === 'seat') {
     const s = r.seats[slot.i];
-    seated = sitSet.has(e.sprite);
-    p = seated ? s.sitAt : s.at;
+    p = s.at;
     face = s.face;
   } else {
     const o = r.overflow[slot.i];
@@ -2268,7 +2267,6 @@ function lobbyFigure(e, slot) {
   rec.sid = e.sid;
   if (rec.x !== p[0] || rec.y !== p[1]) placeAt(rec, p, false);
   setFacing(rec, face);
-  setPose(rec, seated, false);
   setText(rec.tagFl, String(e.floorNo));
   if (rec.tagLead.hidden !== (e.rank !== 'lead')) rec.tagLead.hidden = e.rank !== 'lead';
   setText(rec.tagName, e.name);

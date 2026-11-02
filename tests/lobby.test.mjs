@@ -11,6 +11,7 @@ import {
   assignLobbySeats, changeOf, changeText, clip, clockParts, employeeRows, fmtDuration, headline, indexRows, lobbyRoster, msToNextMinute,
   newsText, officeScore, pageCount, pageRows, pushSample, stateLabel, tableCapacity,
 } from '../web/lobby.mjs';
+import { quadFrame } from '../web/board.mjs';
 import { LOBBY_ID, busiestFloor, chooseFollow, fallbackFloor, nextFloor, viewOrder } from '../web/view.mjs';
 import { ROOT, cfg as rawCfg } from './helpers/fixture.mjs';
 
@@ -451,6 +452,113 @@ test('lobby scene: a slanted screen side and a seat under a screen are rejected'
   const dup = lobbyRaw();
   dup.ledWall.panels[1].id = dup.ledWall.panels[0].id;
   assert.ok(stage10(check(dup)).some((e) => /겹칩니다/.test(e)), 'duplicate id');
+});
+
+// ---- concave wings: the homography of the screens and the straight front-facing desks ----
+
+/** Applies a matrix3d(...) string to the point (x, y) of the box: the projected point. */
+function project(matrix3d, [x, y]) {
+  const m = matrix3d.slice('matrix3d('.length, -1).split(',').map(Number); // column-major 4x4
+  const w = m[3] * x + m[7] * y + m[15];
+  return [(m[0] * x + m[4] * y + m[12]) / w, (m[1] * x + m[5] * y + m[13]) / w];
+}
+const WINGS = () => Object.fromEntries(lobbyRaw().ledWall.panels.map((p) => [p.id, p.quad]));
+
+test('quadFrame: the four corners of the box land on the quad corners (real wing quads, both sides)', () => {
+  for (const id of ['left', 'right', 'tickerLeft', 'tickerRight', 'center']) {
+    const quad = WINGS()[id];
+    const f = quadFrame(quad);
+    const [tl, tr, br, bl] = quad;
+    assert.equal(f.x, tl[0]);
+    assert.equal(f.y, tl[1]);
+    assert.equal(f.w, Math.max(tr[0] - tl[0], br[0] - bl[0]));
+    assert.equal(f.h, Math.min(bl[1] - tl[1], br[1] - tr[1]), 'the shorter vertical edge');
+    const want = quad.map(([x, y]) => [x - tl[0], y - tl[1]]);
+    [[0, 0], [f.w, 0], [f.w, f.h], [0, f.h]].forEach((corner, i) => {
+      const got = project(f.matrix3d, corner);
+      assert.ok(Math.abs(got[0] - want[i][0]) < 0.01 && Math.abs(got[1] - want[i][1]) < 0.01, `${id} corner ${i}: ${got} vs ${want[i]}`);
+    });
+  }
+});
+
+test('quadFrame: a rectangle is a pure translation-free identity, a parallelogram stays affine, a wing is projective', () => {
+  const rect = quadFrame([[10, 20], [110, 20], [110, 60], [10, 60]]);
+  assert.equal(rect.matrix3d, 'matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)');
+  const shear = project(quadFrame([[0, 0], [100, 20], [100, 60], [0, 40]]).matrix3d, [100, 0]);
+  assert.ok(Math.abs(shear[0] - 100) < 1e-6 && Math.abs(shear[1] - 20) < 1e-6);
+  const m = quadFrame(WINGS().left).matrix3d.slice(9, -1).split(',').map(Number);
+  assert.ok(Math.abs(m[3]) > 1e-5 || Math.abs(m[7]) > 1e-5, 'perspective terms g/h are not zero for the wing');
+});
+
+test('quadFrame: the text grows toward the taller end (concave) and an inverse mapping round-trips', () => {
+  const f = quadFrame(WINGS().left);
+  const mid = (x) => { const a = project(f.matrix3d, [x, 0]); const b = project(f.matrix3d, [x, f.h]); return b[1] - a[1]; }; // drawn height of a box column
+  assert.ok(mid(0) > mid(f.w) * 1.1, 'left wing: outer (x=0) end drawn at least 10 % taller than the inner end');
+  const g = quadFrame(WINGS().right);
+  const col = (x) => { const a = project(g.matrix3d, [x, 0]); const b = project(g.matrix3d, [x, g.h]); return b[1] - a[1]; };
+  assert.ok(col(g.w) > col(0) * 1.1, 'right wing mirrors it');
+  // inverse sanity: the quad centre maps back to the box centre under the inverse of the 3x3
+  const m = f.matrix3d.slice(9, -1).split(',').map(Number);
+  const H = [[m[0], m[4], m[12]], [m[1], m[5], m[13]], [m[3], m[7], m[15]]];
+  const det = H[0][0] * (H[1][1] * H[2][2] - H[1][2] * H[2][1]) - H[0][1] * (H[1][0] * H[2][2] - H[1][2] * H[2][0]) + H[0][2] * (H[1][0] * H[2][1] - H[1][1] * H[2][0]);
+  const inv = [
+    [H[1][1] * H[2][2] - H[1][2] * H[2][1], H[0][2] * H[2][1] - H[0][1] * H[2][2], H[0][1] * H[1][2] - H[0][2] * H[1][1]],
+    [H[1][2] * H[2][0] - H[1][0] * H[2][2], H[0][0] * H[2][2] - H[0][2] * H[2][0], H[0][2] * H[1][0] - H[0][0] * H[1][2]],
+    [H[1][0] * H[2][1] - H[1][1] * H[2][0], H[0][1] * H[2][0] - H[0][0] * H[2][1], H[0][0] * H[1][1] - H[0][1] * H[1][0]],
+  ].map((row) => row.map((v) => v / det));
+  const p = project(f.matrix3d, [f.w / 3, f.h / 4]);
+  const w = inv[2][0] * p[0] + inv[2][1] * p[1] + inv[2][2];
+  const back = [(inv[0][0] * p[0] + inv[0][1] * p[1] + inv[0][2]) / w, (inv[1][0] * p[0] + inv[1][1] * p[1] + inv[1][2]) / w];
+  assert.ok(Math.abs(back[0] - f.w / 3) < 1e-6 && Math.abs(back[1] - f.h / 4) < 1e-6, `round trip ${back}`);
+});
+
+test('quadFrame: a quad without area is refused', () => {
+  assert.throws(() => quadFrame([[5, 5], [5, 5], [5, 5], [5, 5]]));
+  assert.throws(() => quadFrame([[0, 0], [10, 0], [10, 0], [0, 0]]));
+});
+
+test('lobby scene: the wings are taller at the outer end (concave), every screen is a convex quad, the ledBox uses quadFrame', () => {
+  const q = WINGS();
+  const hAt = (quad, side) => (side === 'l' ? quad[3][1] - quad[0][1] : quad[2][1] - quad[1][1]);
+  assert.ok(hAt(q.left, 'l') >= 1.1 * hAt(q.left, 'r'), 'left: outer = left edge');
+  assert.ok(hAt(q.right, 'r') >= 1.1 * hAt(q.right, 'l'), 'right: outer = right edge');
+  for (const [id, [tl, tr, br, bl]] of Object.entries(q)) {
+    const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    assert.ok([cr(tl, tr, br), cr(tr, br, bl), cr(br, bl, tl), cr(bl, tl, tr)].every((c) => c > 0), `${id} convex with area`);
+  }
+  const app = readFileSync(join(ROOT, 'web', 'app.js'), 'utf8');
+  const fn = app.slice(app.indexOf('function ledBox('), app.indexOf('/** A row of plain cells'));
+  assert.match(fn, /quadFrame\(p\.quad\)/);
+  assert.match(fn, /transform: f\.matrix3d/);
+  assert.doesNotMatch(fn, /boardFrame/);
+});
+
+test('lobby scene: 40 straight desks, every seat stands behind its desk facing the viewer (at == sitAt, face right, no chair seat)', () => {
+  const raw = lobbyRaw();
+  assert.equal(raw.seats.length, 40);
+  const objs = new Map(raw.objects.map((o) => [o.id, o]));
+  const res = check(raw);
+  const seats = res.resolved.seats;
+  assert.equal(seats.length, 40);
+  for (const s of seats) {
+    assert.deepEqual(s.at, s.sitAt, `${s.i}: the standing picture is placed at the seat`);
+    assert.equal(s.face, 'right');
+    assert.ok(['desk', 'desk-b'].includes(objs.get(s.deskId)?.kind), `${s.i}: a straight desk kind`);
+  }
+  for (const [kind, k] of Object.entries(raw.kinds)) {
+    if (kind !== 'desk' && kind !== 'desk-b') continue;
+    const xs = k.footprint.map((p) => p[0]);
+    const ys = k.footprint.map((p) => p[1]);
+    assert.ok(Math.max(...xs) > 3 * (Math.max(...ys) - Math.min(...ys)), `${kind}: long side horizontal (footprint is a flat rectangle)`);
+    assert.deepEqual(k.seat.at, k.seat.sitAt);
+  }
+});
+
+test('lobby figure: the lobby never uses the seated picture (standing front view behind the desk)', () => {
+  const app = readFileSync(join(ROOT, 'web', 'app.js'), 'utf8');
+  const fn = app.slice(app.indexOf('function lobbyFigure('), app.indexOf('/** Roster -> seats -> figures'));
+  assert.doesNotMatch(fn, /sitSet|sitAt|setPose/);
+  assert.match(fn, /p = s\.at;/);
 });
 
 // ---- name tags: floor number chip and lead marker ----
