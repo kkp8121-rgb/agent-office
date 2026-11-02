@@ -27,6 +27,17 @@
           "fail": { "seconds": 6, "patStreak": 3, "patCooldownSeconds": 60 },
           "season": { "halloween": { "from": [10, 24], "to": [10, 31] }, "christmas": { "from": [12, 18], "to": [12, 26] }, "lunar": { "daysBefore": 2, "daysAfter": 2 } },
           "daylight": { "sunset": [17, 19], "night": [19, 6] },
+          "lobby": {
+            "tab": "1층 · 로비 (모든 팀장·직원)", "tabText": "1", "sign": "1F 로비", "signLine": "모든 층의 팀장·직원 {n}명", "wallLabel": "로비 현황판", "empty": "아직 출근한 직원이 없습니다",
+            "head": { "working": "근무 중", "waiting": "대기", "reports": "보고", "projects": "진행 중 프로젝트", "fails": "실패", "sleepy": "졸음" },
+            "state": { "working": "근무 중", "thinking": "생각 중", "idle": "대기", "enter": "대기", "stale": "졸음", "done": "보고 완료", "leaving": "퇴근 중" },
+            "rank": { "lead": "팀장", "staff": "직원", "project": "프로젝트 직원" },
+            "columns": ["이름", "층", "구분", "상태", "지금 하는 일", "근무 시간", "보고"],
+            "indexTitle": "층별 활동 지수", "officeIndex": "사무실 지수", "boardTitle": "직원 현황판", "newsTitle": "업무 일지",
+            "page": "{p}/{n}", "moreFloors": "…외 {n}층", "moreOnWall": "+{n}명은 현황판에서", "floorLabel": "{n}층", "minutes": "{m}분", "hours": "{h}시간 {m}분",
+            "days": ["일", "월", "화", "수", "목", "금", "토"],
+            "deltaSeconds": 60, "pageSeconds": 6, "titleMax": 10, "newsMax": 28, "newsCount": 3
+          },
           "origin": { "claudeApp": "Claude 앱", "codexWork": "Codex 앱 · Work", "codexApp": "Codex 앱" }, "untitled": "새 대화",
           "reportsTitle": "일을 끝내고 결과를 넘긴 직원 {n}명 (사무실이 켜진 뒤로)",
           "dark": { "label": "다크 모드", "title": "어두운 화면으로 바꾸기 (창밖도 밤이 됩니다)", "roomDim": 0.5, "nightWindows": true },
@@ -187,5 +198,6 @@
   "scenesDir": "assets/scenes",
   "nav": { "cellPx": 8, "inflatePx": 12, "snapRadiusCells": 6, "pathCache": 256, "overflowSearchPx": 200, "overflowMaxOverlap": 0.35, "spriteWidthPx": 44, "trayRowPx": 28, "arrivalGapPx": 24 },
   "depth": { "sliceTolerancePx": 6, "sliceWidthPx": 16, "sliceOverlapPx": 1, "pickMarginPx": 22, "zBase": 1000, "frontZ": 7000, "faceTopPx": 24, "seatShowPx": 28 },
-  "designOrder": ["studio2", "lounge", "library", "greenhouse"]
+  "designOrder": ["studio2", "lounge", "library", "greenhouse"],
+  "lobby": { "enabled": true, "design": "lobby" }
 }

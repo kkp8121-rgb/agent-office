@@ -191,6 +191,7 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
     return {
       spriteHeight: cfg.spriteHeight, ui: cfg.ui, bubbleShowMs: cfg.agent.bubbleShowMs, nameMaxChars: cfg.floor.nameMaxChars, roles, leads: cfg.leads.map((l) => l.key),
       scenes, sitSprites, sitHeight: cfg.sitHeight, nav: cfg.nav, depth: cfg.depth,
+      lobby: cfg.lobby?.enabled ? { design: cfg.lobby.design } : null,
       weather: { enabled: Boolean(weather?.enabled), city: cfg.weather?.city ?? '' },
     };
   }

@@ -5,7 +5,8 @@ import { resolveScene, trayPoint } from './scene.mjs';
 import { createNav } from './nav.mjs';
 import { charZ, objectNodes, splitWalk } from './depth.mjs';
 import { fitZoom } from './pip.mjs';
-import { orderFloors, nextFloor, fallbackFloor, fitBox, pruneEvents, activityScore, busiestFloor, chooseFollow } from './view.mjs';
+import { LOBBY_ID, orderFloors, nextFloor, fallbackFloor, fitBox, pruneEvents, activityScore, busiestFloor, chooseFollow, viewOrder } from './view.mjs';
+import { assignLobbySeats, changeOf, clockParts, employeeRows, headline, indexRows, lobbyRoster, msToNextMinute, newsText, officeScore, pageCount, pageRows, pushSample, tableCapacity } from './lobby.mjs';
 import { dropPoint, restSpotNear, shouldLift } from './grab.mjs';
 import { daypart, nextPoke, openBox, pickLine, playPartner, throwPath, throwVelocity } from './play.mjs';
 import { between, chooseFidget, chooseSpot, createFloorClock, rngFor, tripRange } from './ambient.mjs';
@@ -42,6 +43,11 @@ const WX_Z = 1; // the weather in the windows: the same layer as the glass tint,
 const WX_KEY = 'agent-office.weather'; // localStorage: the weather choice of this viewer
 const WALL_Z_BELOW = 2; // wall decorations draw this far under the lowest floor object (zBase), above the glass tint
 const SPARKLE_SPOTS = [[-14, -10], [12, -26], [-6, -40]]; // where the three sparkles hover, from the character's feet (the tag layer origin)
+const LED_Z = 7600; // the lobby status wall: above the dark-mode veil (7500) and backdrop cover (7501) so it keeps glowing, below the name tags (8000)
+const LED_ROW_PX = 10; // line height of the wall's tables (.led .lr in style.css)
+const LED_PAD_PX = 2; // padding of a wall panel (the same)
+const LED_INDEX_MIN_ROWS = 3; // the 층별 활동 지수 board always shows at least this many floors
+const LOBBY_COLOR = '#c9a227'; // the lobby's own neutral gold (its tab and plaque), not a session colour
 const SNACK_PIP_TIP = '작은 창에서는 간식을 줄 수 없습니다 (창 사이로는 끌 수 없어요)';
 
 const QUERY = new URLSearchParams(location.search);
@@ -101,9 +107,10 @@ function fitFloors() {
       - (sideBySide && panelEl.offsetWidth ? panelEl.offsetWidth + parseFloat(cs.columnGap) : 0);
     availH = window.innerHeight - topbarEl.offsetHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   }
-  const shown = shownId === null ? null : floorRecs.get(shownId);
+  const shown = shownId === null ? null : shownId === LOBBY_ID ? lobby : floorRecs.get(shownId);
   if (shown) {
-    floorsEl.style.zoom = String(fitBox(availW, availH, ...shown.scene.r.size, SINGLE_MAX_ZOOM));
+    const size = shown === lobby ? lobbyBox(mini) : shown.scene.r.size;
+    floorsEl.style.zoom = String(fitBox(availW, availH, ...size, SINGLE_MAX_ZOOM));
     return;
   }
   const widest = Math.max(0, ...[...floorRecs.values()].map((r) => r.scene.r.size[0]));
@@ -179,6 +186,7 @@ function setupScenes() {
   amb = DEBUG_AMBIENT ? scaleAmbient(ui.ui.ambient, 0.1) : ui.ui.ambient;
   catC = DEBUG_AMBIENT ? scaleCat(ui.ui.cat, 0.1) : ui.ui.cat;
   document.documentElement.style.setProperty('--sit-h', `${ui.sitHeight}px`);
+  if (ui.lobby) createLobby();
   if (DEBUG === 'follow') { // ?debug=follow: what the follow mode sees, for checking it from outside
     window.__follow = { state: () => ({ on: following, rotating, shown: shownId, timer: followTimer !== 0, timers: liveTimers.size, scores: [...followScores(Date.now())] }) };
   }
@@ -240,7 +248,8 @@ function setLegVars(spr, key) {
   spr.style.setProperty('--sp', v.sp);
 }
 
-function createChar(av, stage, startAt, sc, isCat = false) {
+/** `still`: a lobby figure: no walking legs, no grabbing, no walk listeners (it is placed, never moves). */
+function createChar(av, stage, startAt, sc, isCat = false, still = false) {
   const root = el('div', 'ag');
   const bubTxt = el('div', 'bub txt empty');
   const bubDot = el('div', 'bub dot empty', '…');
@@ -254,7 +263,7 @@ function createChar(av, stage, startAt, sc, isCat = false) {
   const img = makeSprite(av.sprite);
   img.classList.add('stand');
   spr.append(img);
-  const legs = isCat ? [] : makeLegs(spr, av.sprite);
+  const legs = isCat || still ? [] : makeLegs(spr, av.sprite);
   if (isCat) {
     // the cat is five pictures, a class on its root picks the one that shows (style.css "office cat")
     root.classList.add('cat');
@@ -282,6 +291,10 @@ function createChar(av, stage, startAt, sc, isCat = false) {
     spr.append(rec.sitImg);
   }
   recOf.set(root, rec);
+  if (still) {
+    stage.append(root, tagRoot);
+    return rec;
+  }
   bindGrab(rec);
   // A walk is a chain of pieces; only a piece's own end moves it on.
   root.addEventListener('transitionend', (e) => {
@@ -1522,6 +1535,7 @@ function catSync() {
   if (cat && !floorRecs.has(cat.frec.sid)) catRemove();
   if (!floorRecs.size) return;
   const shown = [...floorRecs.values()].filter((f) => !f.off);
+  if (!shown.length) return catHalt(); // the lobby is on show: no room to wander in
   if (!cat) return catSpawn(shown[Math.floor(Math.random() * shown.length)]);
   if (cat.frec.off) { // its floor is not shown: it stops where it is and comes out of another floor's door
     catSettle();
@@ -1532,8 +1546,8 @@ function catSync() {
   if (!cat.timer && !rec.walk && !rec.grab && !rec.press) catAt(between(Math.random, catC.firstDelayMs), catNext);
 }
 
-/** The hidden tab: the cat stops where it is, nothing of it keeps running. */
-function catSettle() {
+/** The cat stops where it is: no timer, no grab, no walk. */
+function catHalt() {
   if (!cat) return;
   const { rec } = cat;
   if (cat.timer) clockTimers.clearTimeout(cat.timer);
@@ -1545,7 +1559,13 @@ function catSettle() {
     rec.el.classList.remove('walking');
     placeAt(rec, [rec.x, rec.y], false);
   }
-  if (rec.el.classList.contains('gone')) catRelocate();
+}
+
+/** The hidden tab: the cat stops where it is, nothing of it keeps running; one that was leaving comes out of another door. */
+function catSettle() {
+  if (!cat) return;
+  catHalt();
+  if (cat.rec.el.classList.contains('gone')) catRelocate();
 }
 
 function setCatPose(pose) {
@@ -1868,15 +1888,9 @@ function buildNavDebug(frec, sc) {
   };
 }
 
-function createFloor(fv) {
-  const sc = sceneOf(fv.design);
+/** The room of a scene: its picture, objects, front overlay and the dark-mode backdrop cover (shared by a session floor and the lobby). */
+function buildStage(sc) {
   const { r } = sc;
-  const root = el('section', 'floor');
-  root.dataset.sid = fv.sessionId;
-  root.hidden = shownId !== null && fv.sessionId !== shownId; // see "floor switcher"
-  root.style.setProperty('--c', colorOf(fv.sessionId));
-  root.style.width = `${r.size[0]}px`;
-  root.style.height = `${r.size[1]}px`;
   const stage = el('div', 'stage');
   stage.classList.add('scened');
   const shellUrl = `url(${sc.url}${encodeURIComponent(r.shell)})`;
@@ -1902,9 +1916,22 @@ function createFloor(fv) {
     front.style.zIndex = String(ui.depth.frontZ);
     stage.append(front);
   }
-  const reportsAt = [r.tray.at[0] + r.reports[0], r.tray.at[1] + r.reports[1]];
   // dark mode backdrop cover: the whole scene minus the room outline (evenodd hole), see .stage::before
   if (r.outline) stage.style.setProperty('--bd-clip', `path(evenodd, "M0 0H${r.size[0]}V${r.size[1]}H0Z M${r.outline.map((p) => p.join(' ')).join(' L')}Z")`);
+  return stage;
+}
+
+function createFloor(fv) {
+  const sc = sceneOf(fv.design);
+  const { r } = sc;
+  const root = el('section', 'floor');
+  root.dataset.sid = fv.sessionId;
+  root.hidden = shownId !== null && fv.sessionId !== shownId; // see "floor switcher"
+  root.style.setProperty('--c', colorOf(fv.sessionId));
+  root.style.width = `${r.size[0]}px`;
+  root.style.height = `${r.size[1]}px`;
+  const stage = buildStage(sc);
+  const reportsAt = [r.tray.at[0] + r.reports[0], r.tray.at[1] + r.reports[1]];
 
   const board = el('div', 'board');
   const [bx, by, bw] = r.board; // the plaque's height is its text (style.css .board)
@@ -2017,6 +2044,421 @@ function renderFloor(fv, elm) {
   else startAmbient(rec);
 }
 
+// ---------- lobby (1F): every agent of every floor, and the status wall ----------
+// A synthetic floor built from the same snapshot the floors use (not a session, so it is not in floorRecs). Its figures are placed once
+// and never walk or play; the wall is real text laid on the screens of the room with one shear each (boardFrame), so it stays crisp
+// under the CSS zoom. It draws only while it is shown; hidden, a state frame just stores the floors and marks it dirty.
+
+const lobbyBtn = $('tab-lobby');
+const lobbyRecOf = new WeakMap(); // a figure's body layer or tag layer -> its rec
+let lobby = null; // {el, stage, scene, off, dirty, floors, roster, seatMap, chars, populated, news, hist, page, pages, pageAt, timer, wall, crop, writes, ...}
+
+const lobbyFill = (template, vars) => template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
+
+/** Sets a wall text when it changed (and counts the write: ?debug=lobby shows how little a state frame touches). */
+function put(node, text) {
+  if (node.textContent === text) return;
+  node.textContent = text;
+  lobby.writes++;
+}
+
+function ledBox(stage, p, cls) {
+  const f = boardFrame(p.quad);
+  const box = el('div', `led ${cls}`);
+  Object.assign(box.style, { left: `${f.x}px`, top: `${f.y}px`, width: `${f.w}px`, height: `${f.h}px`, transform: `matrix(1, ${f.slope}, 0, 1, 0, 0)`, zIndex: String(LED_Z) });
+  stage.append(box);
+  return { el: box, frame: f };
+}
+
+/** A row of plain cells, one span per class string. */
+function ledRow(cls, cells) {
+  const row = el('div', cls);
+  row.append(...cells.map((c) => el('span', c)));
+  return row;
+}
+
+const EMPLOYEE_COLS = ['c-name', 'c-floor', 'c-rank', 'c-state', 'c-task', 'c-time c-num', 'c-rep c-num'];
+
+/** The six screens of the wall: employee board (centre), headline numbers (left wing), per-floor index (right wing) and three news strips. */
+function buildWall(stage, raw) {
+  const L = ui.ui.lobby;
+  const boxes = new Map((raw.ledWall?.panels ?? []).map((p) => [p.id, ledBox(stage, p, `led-${p.id}`)]));
+  const wall = { boxes };
+  const center = boxes.get('center');
+  if (center) {
+    const hd = el('div', 'led-hd');
+    const clk = el('span', 'clk');
+    wall.page = el('span', 'pg');
+    wall.date = el('i', 'dt');
+    wall.time = el('i', 'tm num');
+    clk.append(wall.date, wall.time);
+    hd.append(el('b', '', L.boardTitle), wall.page, clk);
+    const cap = Math.max(1, tableCapacity(center.frame.h, LED_ROW_PX, LED_PAD_PX) - 1); // the title line and the column line
+    wall.rows = Array.from({ length: cap }, () => {
+      const row = ledRow('lr', EMPLOYEE_COLS);
+      row.tabIndex = 0;
+      row.setAttribute('role', 'button');
+      row.hidden = true;
+      return row;
+    });
+    wall.empty = el('div', 'led-empty', L.empty);
+    const cols = ledRow('lr lh', EMPLOYEE_COLS);
+    [...cols.children].forEach((c, i) => { c.textContent = L.columns[i]; });
+    center.el.append(hd, cols, ...wall.rows, wall.empty);
+  }
+  const left = boxes.get('left');
+  if (left) {
+    const idx = el('div', 'led-idx');
+    wall.idxVal = el('b', 'val num');
+    wall.idxChg = el('span', 'chg');
+    idx.append(el('span', 'lbl', L.officeIndex), wall.idxVal, wall.idxChg);
+    const grid = el('div', 'led-cells');
+    wall.cells = {};
+    for (const key of ['working', 'waiting', 'reports', 'projects', 'fails', 'sleepy']) {
+      const cell = el('div', 'cell');
+      wall.cells[key] = el('b', 'val num');
+      cell.append(el('span', 'lbl', L.head[key]), wall.cells[key]);
+      grid.append(cell);
+    }
+    left.el.append(idx, grid);
+  }
+  const right = boxes.get('right');
+  if (right) {
+    const hd = el('div', 'led-hd');
+    wall.more = el('span', 'pg');
+    hd.append(el('b', '', L.indexTitle), wall.more);
+    const cap = Math.max(LED_INDEX_MIN_ROWS, tableCapacity(right.frame.h, LED_ROW_PX, LED_PAD_PX));
+    wall.idxRows = Array.from({ length: cap }, () => {
+      const row = ledRow('lf', ['chip', 'fl', 'ft', 'fs num', 'fc']);
+      row.tabIndex = 0;
+      row.setAttribute('role', 'button');
+      row.hidden = true;
+      return row;
+    });
+    right.el.append(hd, ...wall.idxRows);
+  }
+  wall.tickers = ['tickerLeft', 'tickerCenter', 'tickerRight'].map((id) => {
+    const t = boxes.get(id);
+    if (!t) return null;
+    const text = el('span', 'tk-t');
+    if (id === 'tickerCenter') t.el.append(el('span', 'tk-l', L.newsTitle));
+    t.el.append(text);
+    return text;
+  });
+  return wall;
+}
+
+function createLobby() {
+  const sc = sceneOf(ui.lobby?.design);
+  if (!sc) return;
+  const L = ui.ui.lobby;
+  const { r } = sc;
+  const root = el('section', 'floor lobby');
+  root.dataset.sid = LOBBY_ID;
+  root.hidden = true;
+  root.style.setProperty('--c', LOBBY_COLOR);
+  root.style.width = `${r.size[0]}px`;
+  root.style.height = `${r.size[1]}px`;
+  root.setAttribute('aria-label', L.wallLabel);
+  const stage = buildStage(sc);
+  stage.style.width = `${r.size[0]}px`; // fixed, so the small window can crop the floor to the wall without squeezing the room
+  stage.style.height = `${r.size[1]}px`;
+  const board = el('div', 'board');
+  const [bx, by, bw] = r.board;
+  Object.assign(board.style, { left: `${bx}px`, top: `${by}px`, width: `${bw}px` });
+  const boardLine = el('p');
+  board.append(el('b', '', L.sign), boardLine);
+  const more = el('div', 'reports lobby-more');
+  more.hidden = true;
+  Object.assign(more.style, { left: `${r.door.at[0] - 150}px`, top: `${r.door.at[1] - 120}px` }); // beside the door, above the standing crowd
+  stage.append(board, more);
+  const wall = buildWall(stage, sc.raw);
+  const quads = (sc.raw.ledWall?.panels ?? []).flatMap((p) => p.quad);
+  const xs = quads.map((p) => p[0]);
+  const ys = quads.map((p) => p[1]);
+  const crop = quads.length
+    ? { x: Math.min(...xs) - 4, y: Math.min(...ys) - 4, w: Math.max(...xs) - Math.min(...xs) + 8, h: Math.max(...ys) - Math.min(...ys) + 8 }
+    : { x: 0, y: 0, w: r.size[0], h: r.size[1] };
+  stage.addEventListener('click', (e) => {
+    const row = e.target.closest('.lr[data-sid], .lf[data-sid]');
+    const sid = row ? row.dataset.sid : lobbyRecOf.get(e.target.closest('.ag, .agt'))?.sid;
+    if (sid) pickFloor(sid);
+  });
+  stage.addEventListener('keydown', (e) => {
+    const row = e.target.closest?.('.lr[data-sid], .lf[data-sid]');
+    if (!row || (e.key !== 'Enter' && e.key !== ' ')) return;
+    e.preventDefault();
+    pickFloor(row.dataset.sid);
+  });
+  root.append(stage);
+  floorsEl.append(root);
+  lobby = {
+    el: root, stage, scene: sc, off: true, dirty: false, floors: [], roster: [], seatMap: new Map(), chars: new Map(), populated: false, news: [],
+    hist: new Map(), page: 0, pages: 1, pageAt: 0, timer: 0, wall, crop, cropped: false, writes: 0, boardLine, more,
+  };
+  setText(lobbyBtn, L.tabText);
+  setAttr(lobbyBtn, 'title', L.tab);
+  setAttr(lobbyBtn, 'aria-label', L.tab);
+  lobbyBtn.style.setProperty('--c', LOBBY_COLOR);
+  lobbyBtn.hidden = false;
+  lobbyBtn.addEventListener('click', () => pickFloor(LOBBY_ID));
+  if (DEBUG === 'lobby') {
+    window.__lobby = {
+      writes: () => lobby.writes,
+      timer: () => lobby.timer !== 0,
+      state: () => ({ off: lobby.off, dirty: lobby.dirty, chars: lobby.chars.size, roster: lobby.roster.length, page: lobby.page, pages: lobby.pages, timers: liveTimers.size, cropped: lobby.cropped }),
+    };
+  }
+}
+
+/** The small window shows only the wall (the crop of its screens); a normal window shows the whole room. Returns the size to fit. */
+function lobbyBox(mini) {
+  const lb = lobby;
+  if (lb.cropped !== mini) {
+    lb.cropped = mini;
+    const { x, y, w, h } = lb.crop;
+    const [fw, fh] = lb.scene.r.size;
+    lb.el.classList.toggle('crop', mini);
+    lb.el.style.width = `${mini ? w : fw}px`;
+    lb.el.style.height = `${mini ? h : fh}px`;
+    lb.stage.style.marginLeft = mini ? `${-x}px` : '';
+    lb.stage.style.marginTop = mini ? `${-y}px` : '';
+  }
+  return mini ? [lb.crop.w, lb.crop.h] : lb.scene.r.size;
+}
+
+/** One figure of the lobby: created on first sight, then only repainted. `slot` = {kind: 'seat'|'overflow', i}. */
+function lobbyFigure(e, slot) {
+  const lb = lobby;
+  const { r } = lb.scene;
+  let seated = false;
+  let p;
+  let face;
+  if (slot.kind === 'seat') {
+    const s = r.seats[slot.i];
+    seated = sitSet.has(e.sprite);
+    p = seated ? s.sitAt : s.at;
+    face = s.face;
+  } else {
+    const o = r.overflow[slot.i];
+    p = o.at;
+    face = o.face;
+  }
+  let rec = lb.chars.get(e.key);
+  if (!rec) {
+    if (e.state === 'done') return; // it reported before it was ever drawn here
+    rec = createChar({ sprite: e.sprite, slot: null }, lb.stage, { x: p[0], y: p[1] }, lb.scene, false, true);
+    rec.sid = e.sid;
+    lobbyRecOf.set(rec.el, rec);
+    lobbyRecOf.set(rec.tagRoot, rec);
+    lb.chars.set(e.key, rec);
+    if (lb.populated) for (const n of [rec.el, rec.tagRoot]) n.classList.add('enter-in');
+  }
+  rec.sid = e.sid;
+  if (rec.x !== p[0] || rec.y !== p[1]) placeAt(rec, p, false);
+  setFacing(rec, face);
+  setPose(rec, seated, false);
+  setText(rec.tag, e.name);
+  rec.tag.title = `${lobbyFill(ui.ui.lobby.floorLabel, { n: e.floorNo })} · ${e.role}`;
+  const color = colorOf(e.sid);
+  if (rec.tag.style.getPropertyValue('--c') !== color) rec.tag.style.setProperty('--c', color);
+  const odd = slot.i % 2 === 1;
+  rec.el.classList.toggle('odd', odd);
+  rec.tagRoot.classList.toggle('odd', odd);
+  const leaving = e.floorStatus === 'leaving';
+  rec.el.classList.toggle('leaving', leaving);
+  rec.tagRoot.classList.toggle('leaving', leaving);
+  if (rec.state !== e.state) {
+    if (rec.state) for (const n of [rec.el, rec.tagRoot]) n.classList.remove(`st-${rec.state}`);
+    rec.state = e.state;
+    for (const n of [rec.el, rec.tagRoot]) n.classList.add(`st-${e.state}`);
+    rec.tagRoot.classList.toggle('done', e.state === 'done');
+    if (e.state === 'done') rec.el.classList.add('arrived');
+  }
+  setBubble(rec, e.bubble, e.since);
+}
+
+/** Roster -> seats -> figures; then the wall. Only called while the lobby is shown. */
+function drawLobby() {
+  const lb = lobby;
+  lb.dirty = false;
+  const L = ui.ui.lobby;
+  const { r } = lb.scene;
+  const leadSince = new Map([...floorRecs].map(([sid, f]) => [sid, f.leadSince ?? 0]));
+  lb.roster = lobbyRoster(lb.floors, leadSince);
+  lb.seatMap = assignLobbySeats(lb.seatMap, lb.roster, r.seats.length, r.overflow.length);
+  const keep = new Set();
+  let unseated = 0;
+  for (const e of lb.roster) {
+    const slot = lb.seatMap.get(e.key);
+    if (!slot) {
+      unseated++;
+      continue;
+    }
+    keep.add(e.key);
+    lobbyFigure(e, slot);
+  }
+  for (const [key, rec] of [...lb.chars]) {
+    if (keep.has(key)) continue;
+    rec.el.remove();
+    rec.tagRoot.remove();
+    lb.chars.delete(key);
+  }
+  limitBubbles(lb.chars.values(), ui.ui.bubbleFullMax);
+  lb.populated = true;
+  put(lb.boardLine, lobbyFill(L.signLine, { n: lb.roster.length }));
+  lb.more.hidden = unseated === 0;
+  setText(lb.more, unseated ? lobbyFill(L.moreOnWall, { n: unseated }) : '');
+  drawWall(Date.now());
+  armLobby();
+}
+
+/** Repaints a table row only when its content changed. */
+function paintRow(row, r) {
+  const sig = `${r.text}|${r.sid}|${r.state}|${r.floorStatus}`;
+  if (row.sig === sig) return;
+  row.sig = sig;
+  r.cells.forEach((c, i) => put(row.children[i], c));
+  setAttr(row, 'data-sid', r.sid);
+  setAttr(row, 'data-st', r.floorStatus === 'leaving' ? 'leaving' : r.state);
+  const color = colorOf(r.sid);
+  if (row.style.getPropertyValue('--c') !== color) row.style.setProperty('--c', color);
+}
+
+/** The whole wall at `now`: numbers, clock, employee page, floor index, news. Cells that did not change are not touched. */
+function drawWall(now) {
+  const lb = lobby;
+  const w = lb.wall;
+  const L = ui.ui.lobby;
+  const windowMs = L.deltaSeconds * 1000;
+  const hc = headline(lb.roster, lb.floors);
+  if (w.cells) for (const [key, node] of Object.entries(w.cells)) put(node, String(hc[key]));
+  const scores = followScores(now);
+  const sample = (id, v) => {
+    const s = lb.hist.get(id) ?? lb.hist.set(id, []).get(id);
+    pushSample(s, now, v, windowMs);
+    return changeOf(s, windowMs);
+  };
+  const changes = new Map([...scores].map(([id, v]) => [id, sample(id, v)]));
+  for (const id of [...lb.hist.keys()]) if (id !== '*' && !scores.has(id)) lb.hist.delete(id);
+  const total = officeScore(scores);
+  const tch = sample('*', total);
+  if (w.idxVal) {
+    put(w.idxVal, String(total));
+    put(w.idxChg, tch.dir === 'flat' ? '-' : `${tch.dir === 'up' ? '▲' : '▼'} ${Math.abs(tch.pct).toFixed(1)}%`);
+    setAttr(w.idxChg, 'data-dir', tch.dir);
+  }
+  if (w.rows) {
+    const clk = clockParts(now, L.days);
+    put(w.date, clk.date);
+    put(w.time, clk.time);
+    const rows = employeeRows(lb.roster, now, L, ui.ui.bubbleMaxChars);
+    lb.pages = pageCount(rows.length, w.rows.length);
+    lb.page %= lb.pages;
+    if (lb.pages > 1 && lb.pageAt === 0) lb.pageAt = now + L.pageSeconds * 1000;
+    if (lb.pages === 1) lb.pageAt = 0;
+    put(w.page, lb.pages > 1 ? lobbyFill(L.page, { p: lb.page + 1, n: lb.pages }) : '');
+    const shown = pageRows(rows, w.rows.length, lb.page);
+    w.rows.forEach((row, i) => {
+      row.hidden = i >= shown.length;
+      if (i < shown.length) paintRow(row, shown[i]);
+    });
+    w.empty.hidden = rows.length > 0;
+  }
+  if (w.idxRows) {
+    const { rows, more } = indexRows(lb.floors, scores, changes, L, w.idxRows.length);
+    put(w.more, more > 0 ? lobbyFill(L.moreFloors, { n: more }) : '');
+    w.idxRows.forEach((row, i) => {
+      row.hidden = i >= rows.length;
+      if (i >= rows.length) return;
+      const r = rows[i];
+      const [chip, fl, ft, fs, fc] = row.children;
+      put(fl, r.floor);
+      put(ft, r.title);
+      put(fs, String(r.score));
+      put(fc, r.changeText);
+      setAttr(fc, 'data-dir', r.change.dir);
+      setAttr(row, 'data-sid', r.sid);
+      const color = colorOf(r.sid);
+      if (chip.style.background !== color) chip.style.background = color;
+    });
+  }
+  drawNews();
+}
+
+/** The newest 업무 일지 entries on the three strips (centre = newest). */
+function drawNews() {
+  const lb = lobby;
+  const L = ui.ui.lobby;
+  const line = (e) => (e ? newsText(e, lastFloors.get(e.sessionId)?.floorNo, L) : '');
+  const [a, b, c] = lb.news;
+  const [tl, tc, tr] = lb.wall.tickers;
+  if (tc) put(tc, line(a));
+  if (tl) put(tl, line(b));
+  if (tr) put(tr, line(c));
+}
+
+/** A log entry arrived (or was merged): keep the newest few for the strips. */
+function lobbyNote(e) {
+  const lb = lobby;
+  if (!lb) return;
+  const i = lb.news.findIndex((n) => n.id === e.id);
+  if (i >= 0) lb.news.splice(i, 1);
+  lb.news.push(e);
+  lb.news.sort((x, y) => y.ts - x.ts);
+  lb.news.length = Math.min(lb.news.length, ui.ui.lobby.newsCount);
+}
+
+/** The floors of the latest state: stored while the lobby is hidden, drawn at once while it is shown. */
+function lobbySync(list) {
+  const lb = lobby;
+  if (!lb) return;
+  lb.floors = list;
+  lb.dirty = true;
+  if (!lb.off) drawLobby();
+}
+
+function clearLobbyTimer() {
+  if (!lobby) return;
+  if (lobby.timer) clockTimers.clearTimeout(lobby.timer);
+  lobby.timer = 0;
+}
+
+/** The one slow timer, only while the lobby is shown: at the next minute (clock, 근무 시간) or the next page flip. */
+function armLobby() {
+  clearLobbyTimer();
+  const lb = lobby;
+  if (!lb || lb.off || paused()) return;
+  const now = Date.now();
+  let ms = msToNextMinute(now);
+  if (lb.pages > 1) ms = Math.min(ms, Math.max(500, lb.pageAt - now));
+  lb.timer = clockTimers.setTimeout(() => {
+    lb.timer = 0;
+    const t = Date.now();
+    if (lb.pages > 1 && t >= lb.pageAt - 100) {
+      lb.page++;
+      lb.pageAt = t + ui.ui.lobby.pageSeconds * 1000;
+    }
+    drawWall(t);
+    armLobby();
+  }, ms);
+}
+
+/** Shown: draw what came while it was hidden and start its timer. Hidden: stop the timer and forget the short history (it would be stale). */
+function setLobbyOff(off) {
+  const lb = lobby;
+  if (!lb || lb.off === off) return;
+  lb.off = off;
+  lb.el.hidden = off;
+  if (off) {
+    clearLobbyTimer();
+    lb.hist.clear();
+    lb.page = 0;
+    lb.pageAt = 0;
+    lb.populated = false; // the next time it is shown its figures stand there, nobody fades in
+  } else drawLobby();
+}
+
 // ---------- session list ----------
 
 function createRow(fv) {
@@ -2104,6 +2546,11 @@ function startRename(sessionId, host, titleEl) {
 
 let lastFloors = new Map();
 
+/** The notice for no sessions: not while the lobby is shown (its wall says 0 and stands on its own). */
+function syncEmpty() {
+  emptyEl.hidden = floorRecs.size > 0 || shownId === LOBBY_ID;
+}
+
 function removeSession(sessionId, withLog = true) {
   const f = floorRecs.get(sessionId);
   if (f) {
@@ -2120,6 +2567,7 @@ function removeSession(sessionId, withLog = true) {
     rowRecs.delete(sessionId);
   }
   if (withLog) {
+    if (lobby) lobby.news = lobby.news.filter((n) => n.sessionId !== sessionId);
     for (const [id, row] of [...logRows]) {
       if (row.dataset.sid === sessionId) {
         row.remove();
@@ -2128,7 +2576,7 @@ function removeSession(sessionId, withLog = true) {
     }
   }
   lastFloors.delete(sessionId);
-  emptyEl.hidden = floorRecs.size > 0;
+  syncEmpty();
   fitFloors();
 }
 
@@ -2168,7 +2616,7 @@ function render(state) {
   }
   syncOrder(floorsEl, floorEls);
   syncOrder(sessionsEl, rowEls);
-  emptyEl.hidden = list.length > 0;
+  syncEmpty();
   syncTabs();
   if (viewMoved) {
     applyView();
@@ -2176,6 +2624,7 @@ function render(state) {
   } else fitFloors();
   catSync();
   followPoke();
+  lobbySync(list);
 }
 
 async function refreshState() {
@@ -2241,6 +2690,7 @@ async function learnColors(sessionIds) {
 function appendLog(entries) {
   for (const e of entries) {
     if (forcedHidden.has(e.sessionId)) continue;
+    lobbyNote(e);
     let row = logRows.get(e.id);
     if (!row) {
       row = createLogRow(e);
@@ -2257,6 +2707,7 @@ function appendLog(entries) {
     logEl.insertBefore(row, before);
     fillLogRow(row, e);
   }
+  if (lobby && !lobby.off) drawNews();
   learnColors(new Set(entries.map((e) => e.sessionId)));
   while (logEl.childElementCount > ui.ui.logDomCap) {
     const last = logEl.lastElementChild;
@@ -2289,6 +2740,7 @@ function pause() {
   clearTimeout(retryTimer);
   clearRotate();
   clearFollowTimer();
+  clearLobbyTimer();
   if (skyTimer) clockTimers.clearTimeout(skyTimer);
   skyTimer = 0;
   if (es) es.close();
@@ -2312,6 +2764,7 @@ async function resume() {
   for (const f of floorRecs.values()) startAmbient(f, true);
   catSync();
   armRotate();
+  armLobby();
   connect();
 }
 
@@ -2422,7 +2875,7 @@ function toast(text) {
 function reconcileView(list) {
   const ids = orderFloors(list);
   let moved = false;
-  if (shownId !== null) {
+  if (shownId !== null && shownId !== LOBBY_ID) { // the lobby stays whatever floors come and go
     const keep = fallbackFloor(viewIds, shownId, ids);
     moved = keep !== shownId;
     shownId = keep;
@@ -2473,7 +2926,10 @@ function applyView() {
   }
   document.body.classList.toggle('single', shownId !== null);
   for (const [id, f] of floorRecs) setOff(f, shownId !== null && id !== shownId);
+  setLobbyOff(shownId !== LOBBY_ID);
   for (const [id, b] of tabRecs) setAttr(b, 'aria-pressed', String(id === shownId));
+  setAttr(lobbyBtn, 'aria-pressed', String(shownId === LOBBY_ID));
+  syncEmpty();
   setAttr(allBtn, 'aria-pressed', String(shownId === null));
   markFollow();
   fitFloors();
@@ -2498,6 +2954,7 @@ function setOff(f, off) {
 }
 
 function pickFloor(id) {
+  if (id === LOBBY_ID && !lobby) return;
   setRotate(false);
   setFollow(false);
   shownId = shownId === id ? null : id;
@@ -2524,7 +2981,7 @@ function armRotate() {
 
 function rotateStep() {
   rotateTimer = 0;
-  shownId = nextFloor(viewIds, shownId);
+  shownId = nextFloor(viewOrder(viewIds, lobby !== null), shownId);
   if (shownId === null) return setRotate(false);
   applyView();
   armRotate();
@@ -2533,11 +2990,11 @@ function rotateStep() {
 /** Rotation on: the single-floor view from the current floor (or the first), then the next floor every ui.rotate.seconds. */
 function setRotate(on) {
   clearRotate();
-  rotating = on && (shownId !== null || viewIds.length > 0);
+  rotating = on && (shownId !== null || viewIds.length > 0 || lobby !== null);
   setAttr(rotateBtn, 'aria-pressed', String(rotating));
   if (!rotating) return;
   setFollow(false);
-  shownId ??= viewIds[0];
+  shownId ??= lobby ? LOBBY_ID : viewIds[0]; // from the whole stack it starts at 1F
   applyView();
   armRotate();
 }
@@ -2639,7 +3096,8 @@ function setFollow(on) {
   setAttr(followBtn, 'aria-pressed', String(following));
   if (following) {
     setRotate(false);
-    shownId = busiestFloor(viewIds, followScores(Date.now()), shownId, ui.ui.follow.minScore) ?? shownId ?? viewIds[0];
+    const here = shownId === LOBBY_ID ? null : shownId; // follow never stays in the lobby
+    shownId = busiestFloor(viewIds, followScores(Date.now()), here, ui.ui.follow.minScore) ?? here ?? viewIds[0];
     followLast = Date.now();
     applyView();
   } else markFollow();
@@ -2770,6 +3228,7 @@ async function openPip() {
   syncSnacks();
   for (const f of floorRecs.values()) f.clock.kick(); // move the one clock timer to the small window
   armRotate(); // and the rotation timer
+  armLobby(); // and the lobby's one timer
   if (followTimer) armFollow(Math.max(0, followDue - Date.now())); // and the pending follow check
   fitFloors();
 }

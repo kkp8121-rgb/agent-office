@@ -5,6 +5,12 @@ export function orderFloors(views) {
   return [...views].sort((a, b) => a.floorNo - b.floorNo).map((v) => v.sessionId);
 }
 
+/** View id of the lobby (1F): it stands where a session id does in `shownId`; session ids are never this string. */
+export const LOBBY_ID = 'lobby';
+
+/** The ids rotation walks through: the lobby first when it is on, then the floors in order. Follow and the whole stack never use it. */
+export const viewOrder = (ids, lobbyOn) => (lobbyOn ? [LOBBY_ID, ...ids] : ids);
+
 /** The floor after `current` in `ids`, wrapping around; the first one when `current` is not there. Null with no floors. */
 export function nextFloor(ids, current) {
   if (!ids.length) return null;

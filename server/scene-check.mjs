@@ -229,6 +229,32 @@ export function checkScene(raw, { atlasSize, cfg, minSeats }) {
       for (const [other, p] of loose) if (near(s.at, p) < gap / 2) bad(`meeting.${label}`, `가 ${other} 위에 놓였습니다 (${Math.round(near(s.at, p))}px)`);
     }
   }
+  if (raw.ledWall !== undefined) { // the lobby's status wall: screens laid on the back wall, kept clear of every head
+    const panels = Array.isArray(raw.ledWall?.panels) ? raw.ledWall.panels : [];
+    if (!panels.length) bad('ledWall.panels', '는 화면 목록이어야 합니다');
+    const ids = new Set();
+    const good = [];
+    panels.forEach((p, i) => {
+      const label = `ledWall.panels[${i}]${p?.id ? `(${p.id})` : ''}`;
+      if (typeof p?.id !== 'string' || !p.id || ids.has(p.id)) return bad(label, 'id 가 없거나 겹칩니다');
+      ids.add(p.id);
+      const q = p.quad;
+      if (!Array.isArray(q) || q.length !== 4 || !q.every(inside)) return bad(label, '의 quad 는 장면 안의 점 4개 [왼위, 오른위, 오른아래, 왼아래] 여야 합니다');
+      const [tl, tr, br, bl] = q;
+      if (!(tr[0] > tl[0] && br[0] > bl[0] && bl[1] > tl[1] && br[1] > tr[1])) return bad(label, '의 점 순서가 왼위, 오른위, 오른아래, 왼아래 가 아닙니다');
+      if (Math.abs(tl[0] - bl[0]) > 0.5 || Math.abs(tr[0] - br[0]) > 0.5) return bad(label, '의 좌우 변은 수직이어야 합니다 (화면은 한 번의 기울이기로 얹힙니다)');
+      good.push({ label, tl, tr, bl, br });
+    });
+    // a head (the top of the standing picture) must not stand under a screen: the screens draw above the figures (name tags draw above the screens)
+    const heads = [...r.seats.map((s) => [`seats[${s.i}]`, s.sitAt]), ...r.overflow.map((o, i) => [`overflow[${i}]`, o.at]), ['door', r.door.at]];
+    for (const g of good) {
+      for (const [what, p] of heads) {
+        if (p[0] < g.bl[0] || p[0] > g.br[0]) continue;
+        const bottom = g.bl[1] + ((g.br[1] - g.bl[1]) * (p[0] - g.bl[0])) / (g.br[0] - g.bl[0]);
+        if (p[1] - cfg.spriteHeight < bottom) bad(g.label, `${what} ${fmt(p)} 의 머리가 화면 아래에 가려집니다`);
+      }
+    }
+  }
   if (raw.seasonal !== undefined) {
     const list = Array.isArray(raw.seasonal) ? raw.seasonal : [];
     const need = { floor: 3, wall: 2, desk: 3 };

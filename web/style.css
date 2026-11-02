@@ -570,3 +570,77 @@ body.paused .wx-a, body.paused .wx-b, body.paused .wx-f { animation-play-state: 
 #settings-panel p { margin: 8px 0 0; }
 #settings-panel .wx-credit { color: var(--credit); font-size: 11px; }
 #settings-panel #settings-close { margin-top: 8px; }
+
+/* ---- lobby (1F): the figures stand still, the screens of the back wall are the status wall (app.js "lobby") ---- */
+.floor.lobby {
+  --led-bg: #06122b; --led-dots: rgba(90, 150, 255, .07); --led-num: #7fd3ff; --led-ink: #eef4ff; --led-name: #ffa53d;
+  --led-up: #ff4d3a; --led-down: #3d8bff; --led-flat: #b9c4d8; --led-bezel: #02060f;
+}
+.floor.lobby.crop { overflow: hidden; border-radius: 8px; }
+/* no figure keeps an animation running: breathing, working and the zZ are off, only the finite ones (a newcomer's fade, a report's jump) play */
+.floor.lobby .st-idle .spr, .floor.lobby .st-enter .spr, .floor.lobby .st-thinking .spr, .floor.lobby .st-working .spr, .floor.lobby .zz { animation: none; }
+.floor.lobby .body { cursor: pointer; touch-action: auto; }
+.floor.lobby .ag.leaving, .floor.lobby .agt.leaving .tag { opacity: .55; }
+/* a still LED dot on each name tag says what the figure is doing */
+.floor.lobby .tag::before { content: ""; display: inline-block; width: 5px; height: 5px; margin-right: 3px; vertical-align: 1px; border-radius: 50%; background: #9a9080; }
+.floor.lobby .agt.st-working .tag::before { background: #2e9e5b; }
+.floor.lobby .agt.st-thinking .tag::before { background: #d98a1e; }
+.floor.lobby .agt.st-stale .tag::before { background: #8e7ad0; }
+.lobby-more { padding: 1px 6px; font-size: 10px; }
+#topbar .tab.lobby { border-bottom-color: var(--c); }
+
+/* the screens: a dark navy box laid on each screen quad (one shear, like the whiteboard), dot-matrix background, KRX-like colours */
+.led {
+  position: absolute; transform-origin: 0 0; box-sizing: border-box; overflow: hidden; padding: 2px 3px; white-space: nowrap;
+  background: radial-gradient(circle at 50% 50%, var(--led-dots) 0 .7px, transparent 1.1px) 0 0 / 3px 3px, var(--led-bg);
+  color: var(--led-ink); font: 9px/10px system-ui, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; box-shadow: inset 0 0 0 1px var(--led-bezel);
+}
+.led .num { font-family: Consolas, "D2Coding", monospace; font-variant-numeric: tabular-nums; color: var(--led-num); text-shadow: 0 0 2px currentColor, 0 0 5px color-mix(in srgb, currentColor 45%, transparent); }
+.led [data-dir="up"] { color: var(--led-up); }
+.led [data-dir="down"] { color: var(--led-down); }
+.led [data-dir="flat"] { color: var(--led-flat); }
+.led-hd { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; height: 10px; }
+.led-hd b { color: var(--led-name); font-weight: 800; }
+.led-hd .pg { margin-left: auto; color: var(--led-flat); }
+.led-hd .clk { display: flex; gap: 4px; align-items: baseline; color: var(--led-flat); }
+.led-hd .tm { font-style: normal; font-weight: 700; font-size: 10px; }
+.led-hd .dt { font-style: normal; }
+.led .lr, .led .lf { display: grid; align-items: center; height: 10px; column-gap: 3px; cursor: pointer; }
+.led .lr { grid-template-columns: 30px 24px 56px 32px minmax(0, 1fr) 50px 18px; }
+.led .lr span, .led .lf span { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.led .lr.lh { color: var(--led-flat); font-size: 8px; cursor: default; border-bottom: 1px solid rgba(127, 211, 255, .25); }
+.led .lr.lh .c-name { color: var(--led-flat); }
+.led .lr[hidden], .led .lf[hidden] { display: none; }
+.led .lr:not(.lh):hover, .led .lf:hover { background: rgba(127, 211, 255, .14); }
+.led .lr:focus-visible, .led .lf:focus-visible { outline: 1px solid var(--led-num); outline-offset: -1px; }
+.led .c-name { color: var(--led-name); font-weight: 700; }
+.led .c-floor { box-shadow: inset 2px 0 0 var(--c, #8a6a42); padding-left: 4px; }
+.led .c-rank, .led .c-time, .led .c-rep { color: var(--led-flat); }
+.led .c-time, .led .c-rep { text-align: right; }
+.led .c-task { color: var(--led-ink); }
+.led .lr[data-st="working"] .c-state { color: var(--led-num); }
+.led .lr[data-st="thinking"] .c-state { color: var(--led-ink); }
+.led .lr[data-st="idle"] .c-state, .led .lr[data-st="enter"] .c-state { color: var(--led-flat); }
+.led .lr[data-st="stale"] { opacity: .6; }
+.led .lr[data-st="done"] .c-state { color: var(--led-name); }
+.led .lr[data-st="leaving"] .c-state { color: var(--led-down); }
+.led-empty { position: absolute; left: 0; right: 0; top: 40%; text-align: center; color: var(--led-flat); }
+.led-idx { display: flex; align-items: baseline; gap: 5px; height: 24px; }
+.led-idx .lbl { color: var(--led-name); font-weight: 800; }
+.led-idx .val { font-size: 21px; line-height: 24px; font-weight: 700; }
+.led-idx .chg { margin-left: auto; font-size: 9px; }
+.led-cells { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8px; }
+.led-cells .cell { display: flex; align-items: baseline; justify-content: space-between; gap: 3px; height: 16px; }
+.led-cells .lbl { font-size: 8px; color: var(--led-ink); overflow: hidden; text-overflow: ellipsis; }
+.led-cells .val { font-size: 13px; line-height: 16px; font-weight: 700; }
+.led .lf { grid-template-columns: 4px 20px minmax(0, 1fr) 20px 26px; }
+.led .lf .chip { height: 7px; }
+.led .lf .fs { text-align: right; }
+.led .lf .fc { text-align: right; font-size: 8px; }
+.led .lf .fl { color: var(--led-ink); }
+.led .lf .ft { color: var(--led-name); }
+.led-tickerLeft, .led-tickerCenter, .led-tickerRight { display: flex; align-items: center; padding: 0 4px; }
+.led .tk-l { flex: none; margin-right: 6px; color: var(--led-name); font-weight: 800; }
+.led .tk-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--led-ink); font-size: 9px; }
+/* the small window crops to the wall: figures that peek over the crop edge stay out of it */
+.floor.lobby.crop .ag, .floor.lobby.crop .agt, .floor.lobby.crop .lobby-more { display: none; }

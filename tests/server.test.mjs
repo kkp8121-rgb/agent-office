@@ -180,7 +180,8 @@ test('server: api/state and api/ui', async (t) => {
   assert.equal(state.floors[0].sessionId, 's1');
   const ui = JSON.parse((await req(c, 'GET', '/api/ui')).body);
   assert.equal(ui.spriteHeight, c.cfg.spriteHeight);
-  assert.deepEqual(Object.keys(ui.scenes), c.cfg.designOrder);
+  assert.deepEqual(Object.keys(ui.scenes), [...c.cfg.designOrder, 'lobby']); // the lobby's scene comes last
+  assert.deepEqual(ui.lobby, { design: 'lobby' });
   assert.ok(Array.isArray(ui.sitSprites));
   assert.deepEqual(ui.ui, c.cfg.ui);
   assert.equal(ui.bubbleShowMs, c.cfg.agent.bubbleShowMs);

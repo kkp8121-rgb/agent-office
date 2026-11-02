@@ -26,7 +26,7 @@ function setup(live = [S('s1')], now = 1000) {
 test('office: new session becomes a floor with lead 유나·팀장', () => {
   const o = setup([S('s1', { cwd: 'C:\\Project\\app' })]);
   const f = floorOf(o, 's1');
-  assert.equal(f.floorNo, 1);
+  assert.equal(f.floorNo, 2); // 1F is the lobby
   assert.equal(f.provider, 'claude');
   assert.equal(f.status, 'busy');
   assert.equal(f.folder, 'app');
@@ -42,9 +42,9 @@ test('office: new session becomes a floor with lead 유나·팀장', () => {
 
 test('office: floors ordered newest first with stable floorNo', () => {
   const o = setup([S('a', { startedAt: 3000 }), S('b', { startedAt: 1000 }), S('c', { startedAt: 2000 })]);
-  assert.deepEqual(o.snapshot().floors.map((f) => [f.sessionId, f.floorNo]), [['a', 3], ['c', 2], ['b', 1]]);
+  assert.deepEqual(o.snapshot().floors.map((f) => [f.sessionId, f.floorNo]), [['a', 4], ['c', 3], ['b', 2]]);
   o.syncSessions([S('a', { startedAt: 3000 }), S('b', { startedAt: 1000 }), S('c', { startedAt: 2000 }), S('d', { startedAt: 4000 })], 2000);
-  assert.deepEqual(o.snapshot().floors.map((f) => [f.sessionId, f.floorNo]), [['d', 4], ['a', 3], ['c', 2], ['b', 1]]);
+  assert.deepEqual(o.snapshot().floors.map((f) => [f.sessionId, f.floorNo]), [['d', 5], ['a', 4], ['c', 3], ['b', 2]]);
 });
 
 test('office: floor leaves then disappears', () => {
@@ -55,7 +55,7 @@ test('office: floor leaves then disappears', () => {
   assert.ok(floorOf(o, 's1'));
   assert.equal(o.tick(5000 + cfg.floor.leaveMs), true);
   assert.equal(floorOf(o, 's1'), undefined);
-  assert.equal(o.snapshot().floors[0].floorNo, 1);
+  assert.equal(o.snapshot().floors[0].floorNo, 2);
 });
 
 test('office: status busy stays busy, anything else is waiting', () => {
@@ -209,7 +209,7 @@ test('office: hidden session is absent from snapshot and log', () => {
   o.syncAgents('s1', [M('before')], 1000);
   o.syncAgents('s2', [M('x')], 1000);
   assert.equal(o.hide('s1'), true);
-  assert.deepEqual(o.snapshot().floors.map((f) => [f.sessionId, f.floorNo]), [['s3', 2], ['s2', 1]]);
+  assert.deepEqual(o.snapshot().floors.map((f) => [f.sessionId, f.floorNo]), [['s3', 3], ['s2', 2]]);
   o.syncAgents('s1', [M('before'), M('after')], 2000);
   o.applySessionEvents('s1', [tool(2100, 'secret-lead-action')], 2100);
   o.applyAgentEvents('s1', 'after', [tool(2200, 'secret-agent-action')], 2200);

@@ -1,0 +1,368 @@
+// The lobby (1F): roster, team seating, every wall formula, the view order, the server fields and the scene checks.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { loadConfig } from '../server/config.mjs';
+import { Office } from '../server/office.mjs';
+import { checkScene } from '../server/scene-check.mjs';
+import { readPngSize } from '../server/scenes.mjs';
+import {
+  assignLobbySeats, changeOf, changeText, clip, clockParts, employeeRows, fmtDuration, headline, indexRows, lobbyRoster, msToNextMinute,
+  newsText, officeScore, pageCount, pageRows, pushSample, stateLabel, tableCapacity,
+} from '../web/lobby.mjs';
+import { LOBBY_ID, busiestFloor, chooseFollow, fallbackFloor, nextFloor, viewOrder } from '../web/view.mjs';
+import { ROOT, cfg as rawCfg } from './helpers/fixture.mjs';
+
+const cfg = loadConfig();
+const L = cfg.ui.lobby;
+const EMPTY = { hidden: [], names: {} };
+
+const agent = (key, o = {}) => ({ key, name: key, role: '개발', sprite: 'worker', state: 'working', bubble: '', since: 0, enteredAt: 0, wf: false, ...o });
+const floor = (sid, floorNo, agents = [], o = {}) => ({
+  sessionId: sid, floorNo, colorIndex: floorNo, title: `층 ${floorNo}`, status: 'busy', startedAt: 1000, reports: 0, workflows: 0, fails: 0,
+  lead: { name: `팀장${floorNo}`, role: '팀장', sprite: 'lead', state: 'idle', bubble: '' }, agents, ...o,
+});
+
+// ---- roster ----
+
+test('lobby roster: floor order, 팀장 first, then 직원 by arrival; Workflow agents are 프로젝트 직원', () => {
+  const f2 = floor('b', 3, [agent('b:2', { enteredAt: 20 }), agent('b:1', { enteredAt: 10, wf: true })]);
+  const f1 = floor('a', 2, [agent('a:1', { enteredAt: 5, state: 'done' })], { reports: 4 });
+  const roster = lobbyRoster([f2, f1], new Map([['a', 777]]));
+  assert.deepEqual(roster.map((e) => [e.key, e.rank]), [['a:lead', 'lead'], ['a:1', 'staff'], ['b:lead', 'lead'], ['b:1', 'project'], ['b:2', 'staff']]);
+  assert.equal(roster[0].since, 777);
+  assert.equal(roster[0].reports, 4, '팀장 reports = its floor reports');
+  assert.equal(roster[1].reports, 1, 'a done 직원 has reported once');
+  assert.equal(roster[3].reports, 0);
+  assert.equal(roster[0].sid, 'a');
+  assert.equal(lobbyRoster([]).length, 0);
+});
+
+test('lobby roster: a leaving floor is carried on every entry', () => {
+  const r = lobbyRoster([floor('a', 2, [agent('a:1')], { status: 'leaving' })]);
+  assert.ok(r.every((e) => e.floorStatus === 'leaving'));
+});
+
+// ---- seats ----
+
+const R = (sid, n) => Array.from({ length: n }, (_, i) => ({ key: `${sid}:${i}`, sid }));
+const seatIdx = (m, key) => m.get(key)?.i;
+
+test('lobby seats: newcomers of one floor sit together and keep their seat when others come and go', () => {
+  const a = R('a', 4);
+  let m = assignLobbySeats(new Map(), a, 40, 12);
+  assert.deepEqual(a.map((e) => seatIdx(m, e.key)), [0, 1, 2, 3]);
+  const b = R('b', 3);
+  m = assignLobbySeats(m, [...a, ...b], 40, 12);
+  assert.deepEqual(b.map((e) => seatIdx(m, e.key)), [4, 5, 6], 'a new floor starts at the longest free run');
+  const before = new Map(m);
+  m = assignLobbySeats(m, [...a.slice(0, 2), ...b], 40, 12); // two of a leave
+  for (const e of [...a.slice(0, 2), ...b]) assert.deepEqual(m.get(e.key), before.get(e.key), 'nobody is reshuffled');
+  m = assignLobbySeats(m, [...a.slice(0, 2), { key: 'a:new', sid: 'a' }, ...b], 40, 12);
+  assert.equal(seatIdx(m, 'a:new'), 2, 'a newcomer takes the free seat nearest its own floor');
+});
+
+test('lobby seats: a second floor starts at the longest free run, ties at the lowest index', () => {
+  const a = R('a', 2);
+  let m = assignLobbySeats(new Map(), a, 10, 2);
+  // a holds 0 and 1; seats 2.. are one free run of 8
+  m = assignLobbySeats(m, [...a, ...R('b', 1)], 10, 2);
+  assert.equal(seatIdx(m, 'b:0'), 2);
+  // free the middle: a at 0, c at 5 -> the longest run is 6..9 (4) vs 1..4 (4): lowest index wins
+  const prev = new Map([['a:0', { kind: 'seat', i: 0 }], ['c:0', { kind: 'seat', i: 5 }]]);
+  const m2 = assignLobbySeats(prev, [{ key: 'a:0', sid: 'a' }, { key: 'c:0', sid: 'c' }, { key: 'd:0', sid: 'd' }], 10, 2);
+  assert.equal(seatIdx(m2, 'd:0'), 1);
+});
+
+test('lobby seats: full seats overflow to standing spots, then nothing; an overflow member is promoted when a seat frees up', () => {
+  const all = [...R('a', 3), ...R('b', 3), ...R('c', 2)];
+  let m = assignLobbySeats(new Map(), all, 4, 2);
+  const kinds = all.map((e) => m.get(e.key)?.kind ?? null);
+  assert.equal(kinds.filter((k) => k === 'seat').length, 4);
+  assert.equal(kinds.filter((k) => k === 'overflow').length, 2);
+  assert.equal(kinds.filter((k) => k === null).length, 2, 'beyond the capacity: listed on the wall only');
+  const standing = all.filter((e) => m.get(e.key)?.kind === 'overflow').map((e) => e.key);
+  const seated = all.filter((e) => m.get(e.key)?.kind === 'seat');
+  m = assignLobbySeats(m, all.filter((e) => e !== seated[0]), 4, 2); // one seated agent leaves
+  assert.equal(m.get(standing[0]).kind, 'seat', 'the first one standing takes the free seat');
+  assert.equal([...m.values()].filter((v) => v === null).length, 1, '8 - 1 left = 7 for 6 places');
+});
+
+test('lobby seats: 60 agents fill 40 seats + 12 spots, the other 8 are null, and no slot is used twice', () => {
+  const roster = [...R('a', 25), ...R('b', 20), ...R('c', 15)];
+  const m = assignLobbySeats(new Map(), roster, 40, 12);
+  const used = [...m.values()].filter(Boolean).map((v) => `${v.kind}${v.i}`);
+  assert.equal(used.length, 52);
+  assert.equal(new Set(used).size, 52);
+  assert.equal([...m.values()].filter((v) => v === null).length, 8);
+  assert.equal(m.size, 60);
+});
+
+// ---- headline numbers ----
+
+test('lobby headline: 근무 중 / 대기 / 졸음 from states, 보고 / 프로젝트 / 실패 summed over floors; done counts nowhere', () => {
+  const roster = lobbyRoster([
+    floor('a', 2, [agent('a:1', { state: 'working' }), agent('a:2', { state: 'thinking' }), agent('a:3', { state: 'stale' }), agent('a:4', { state: 'done' }), agent('a:5', { state: 'enter' })], { reports: 2, workflows: 1, fails: 3 }),
+    floor('b', 3, [], { reports: 5, workflows: 2, fails: 0, lead: { name: 'x', role: '팀장', sprite: 'lead', state: 'working', bubble: '' } }),
+  ]);
+  const floors = [{ reports: 2, workflows: 1, fails: 3 }, { reports: 5, workflows: 2, fails: 0 }];
+  assert.deepEqual(headline(roster, floors), { working: 3, waiting: 3, sleepy: 1, reports: 7, projects: 3, fails: 3 });
+  assert.deepEqual(headline([], []), { working: 0, waiting: 0, sleepy: 0, reports: 0, projects: 0, fails: 0 });
+});
+
+// ---- 사무실 지수 ----
+
+test('lobby index: the office score is the sum of the floor scores', () => {
+  assert.equal(officeScore(new Map([['a', 12], ['b', 30], ['c', 0]])), 42);
+  assert.equal(officeScore(new Map()), 0);
+});
+
+test('lobby index: change against the sample at least a window old, else the oldest; direction, percent, prev 0', () => {
+  const W = 60000;
+  const s = [];
+  pushSample(s, 0, 40, W);
+  assert.deepEqual(changeOf(s, W), { delta: 0, pct: 0, dir: 'flat' }, 'a lone sample has no change');
+  pushSample(s, 20000, 50, W);
+  assert.deepEqual(changeOf(s, W), { delta: 10, pct: 25, dir: 'up' }, 'younger than the window: against the oldest');
+  pushSample(s, 61000, 30, W);
+  assert.deepEqual(changeOf(s, W), { delta: -10, pct: -25, dir: 'down' }, 'against the newest sample at least a window old (t=0)');
+  pushSample(s, 90000, 30, W); // base moves on to t=20000 (v 50)
+  assert.equal(changeOf(s, W).delta, -20);
+  assert.ok(s.length <= 4);
+  const z = [];
+  pushSample(z, 0, 0, W);
+  pushSample(z, 70000, 5, W);
+  assert.deepEqual(changeOf(z, W), { delta: 5, pct: 500, dir: 'up' }, 'a base of 0 counts as 1');
+  const flat = [];
+  pushSample(flat, 0, 7, W);
+  pushSample(flat, 61000, 7, W);
+  assert.equal(changeOf(flat, W).dir, 'flat');
+});
+
+test('lobby index: the sample list is pruned to one base sample plus the window', () => {
+  const s = [];
+  for (let t = 0; t <= 300000; t += 1500) pushSample(s, t, t / 1500, 60000);
+  assert.ok(s.length <= 60000 / 1500 + 2, `kept ${s.length}`);
+  assert.ok(s[0].t <= 300000 - 60000, 'the oldest kept sample is the base');
+});
+
+test('lobby index: change text with and without percent', () => {
+  assert.equal(changeText({ delta: 3, pct: 12.5, dir: 'up' }), '▲ 3 (12.5%)');
+  assert.equal(changeText({ delta: -2, pct: -4, dir: 'down' }), '▼ 2 (4.0%)');
+  assert.equal(changeText({ delta: 0, pct: 0, dir: 'flat' }), '-');
+  assert.equal(changeText({ delta: 3, pct: 12.5, dir: 'up' }, false), '▲3');
+});
+
+test('lobby index rows: floor order, clipped title, capped rows and the rest counted', () => {
+  const floors = [floor('c', 4), floor('a', 2, [], { title: '아주아주아주아주 긴 층 이름입니다' }), floor('b', 3)];
+  const scores = new Map([['a', 9], ['b', 0], ['c', 4]]);
+  const changes = new Map([['a', { delta: 2, pct: 28.6, dir: 'up' }]]);
+  const { rows, more } = indexRows(floors, scores, changes, L, 2);
+  assert.deepEqual(rows.map((r) => [r.floor, r.score, r.changeText]), [['2층', 9, '▲2'], ['3층', 0, '-']]);
+  assert.equal(Array.from(rows[0].title).length, L.titleMax);
+  assert.ok(rows[0].title.endsWith('…'));
+  assert.equal(more, 1);
+  assert.equal(rows[0].lead, '팀장2');
+});
+
+// ---- employee board ----
+
+test('lobby board: duration under an hour in minutes, over an hour with hours', () => {
+  assert.equal(fmtDuration(0, L), '0분');
+  assert.equal(fmtDuration(59000, L), '0분');
+  assert.equal(fmtDuration(59 * 60000, L), '59분');
+  assert.equal(fmtDuration(65 * 60000, L), '1시간 5분');
+  assert.equal(fmtDuration(120 * 60000, L), '2시간 0분');
+  assert.equal(fmtDuration(-5000, L), '0분');
+});
+
+test('lobby board: state words, with the leaving floor overriding every state', () => {
+  const e = { state: 'working', floorStatus: 'busy' };
+  assert.equal(stateLabel(e, L), '근무 중');
+  assert.equal(stateLabel({ ...e, state: 'thinking' }, L), '생각 중');
+  assert.equal(stateLabel({ ...e, state: 'idle' }, L), '대기');
+  assert.equal(stateLabel({ ...e, state: 'enter' }, L), '대기');
+  assert.equal(stateLabel({ ...e, state: 'stale' }, L), '졸음');
+  assert.equal(stateLabel({ ...e, state: 'done' }, L), '보고 완료');
+  assert.equal(stateLabel({ ...e, floorStatus: 'leaving' }, L), '퇴근 중');
+});
+
+test('lobby board: one row per roster entry with every column; the task is the bubble clipped like the bubble', () => {
+  const now = 10 * 60000 + 5000;
+  const roster = lobbyRoster([floor('a', 2, [agent('a:1', { name: '서진', bubble: '아주아주 긴 말풍선 내용을 적어 봅니다 열여섯자넘음', enteredAt: 60000, wf: true, state: 'done' })], { reports: 3, startedAt: 5000 })]);
+  const rows = employeeRows(roster, now, L, cfg.ui.bubbleMaxChars);
+  assert.deepEqual(rows[0].cells, ['팀장2', '2층', '팀장', '대기', '-', '10분', '3']);
+  assert.equal(rows[1].cells[0], '서진');
+  assert.equal(rows[1].cells[2], '프로젝트 직원');
+  assert.equal(rows[1].cells[3], '보고 완료');
+  assert.equal(Array.from(rows[1].cells[4]).length, cfg.ui.bubbleMaxChars);
+  assert.equal(rows[1].cells[5], '9분');
+  assert.equal(rows[1].cells[6], '1');
+  assert.equal(rows[1].sid, 'a');
+  assert.equal(employeeRows([{ ...roster[0], startedAt: 0 }], now, L, 16)[0].cells[5], '-');
+});
+
+test('lobby board: capacity and pages', () => {
+  assert.equal(tableCapacity(102, 10, 2), 8);
+  assert.equal(tableCapacity(5, 10, 2), 1, 'at least one row');
+  assert.equal(pageCount(0, 7), 1);
+  assert.equal(pageCount(7, 7), 1);
+  assert.equal(pageCount(8, 7), 2);
+  assert.equal(pageCount(40, 7), 6);
+  const rows = Array.from({ length: 16 }, (_, i) => i);
+  assert.deepEqual(pageRows(rows, 7, 0), [0, 1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(pageRows(rows, 7, 2), [14, 15]);
+  assert.deepEqual(pageRows(rows, 7, 3), [0, 1, 2, 3, 4, 5, 6], 'a page past the end wraps');
+  assert.deepEqual(pageRows([], 7, 4), []);
+});
+
+// ---- news line, clock, clipping ----
+
+test('lobby news: HH:MM, floor, name and the log text clipped to newsMax; no floor part when the floor is gone', () => {
+  const ts = new Date(2026, 9, 29, 14, 5, 9).getTime();
+  const e = { ts, name: '서진', text: '파일 4개 살펴봄' };
+  assert.equal(newsText(e, 3, L), '14:05 3층 서진 · 파일 4개 살펴봄');
+  assert.equal(newsText(e, undefined, L), '14:05 서진 · 파일 4개 살펴봄');
+  assert.equal(newsText({ ...e, head: '검토 · ctx' }, 3, L), '14:05 3층 서진 · 검토 · ctx · 파일 4개 살펴봄');
+  const long = newsText({ ...e, text: 'x'.repeat(80) }, 3, L);
+  assert.equal(Array.from(long.split(' · ')[1]).length, L.newsMax);
+});
+
+test('lobby clock: date with weekday and HH:MM; the timer targets the next minute', () => {
+  const d = new Date(2026, 10, 2, 9, 7, 30); // 2026-11-02 is a Monday
+  assert.deepEqual(clockParts(d.getTime(), L.days), { date: '11.02 (월)', time: '09:07' });
+  assert.equal(msToNextMinute(60000 * 5 + 10000), 50000);
+  assert.equal(msToNextMinute(60000 * 5), 60000);
+  assert.equal(msToNextMinute(60000 * 5 - 200), 1000, 'never sooner than a second');
+});
+
+test('lobby clip: by characters, with an ellipsis', () => {
+  assert.equal(clip('abc', 5), 'abc');
+  assert.equal(clip('abcdef', 4), 'abc…');
+  assert.equal(clip('한글입니다', 3), '한글…');
+  assert.equal(clip(undefined, 3), '');
+});
+
+// ---- view ----
+
+test('lobby view: rotation walks 1F, then each floor, then back to 1F; without a lobby it is the floors only', () => {
+  const order = viewOrder(['a', 'b'], true);
+  assert.deepEqual(order, [LOBBY_ID, 'a', 'b']);
+  assert.equal(nextFloor(order, LOBBY_ID), 'a');
+  assert.equal(nextFloor(order, 'b'), LOBBY_ID);
+  assert.deepEqual(viewOrder(['a', 'b'], false), ['a', 'b']);
+  assert.equal(nextFloor(viewOrder([], true), LOBBY_ID), LOBBY_ID, 'a lobby alone stays');
+});
+
+test('lobby view: follow never picks the lobby (the follow ids are the floors)', () => {
+  const ids = ['a', 'b'];
+  const scores = new Map([['a', 3], ['b', 9]]);
+  assert.equal(busiestFloor(ids, scores, LOBBY_ID, 2), 'b');
+  const pick = chooseFollow({ ids, scores, current: LOBBY_ID, now: 0, shownSince: 0 }, cfg.ui.follow);
+  assert.equal(pick.id, 'b');
+  assert.equal(chooseFollow({ ids: [], scores: new Map(), current: LOBBY_ID, now: 0, shownSince: 0 }, cfg.ui.follow).id, null);
+  assert.notEqual(pick.id, LOBBY_ID);
+});
+
+test('lobby view: session ids never equal the lobby id, and the lobby survives any floor change by design (reconcile skips it)', () => {
+  assert.equal(LOBBY_ID, 'lobby');
+  assert.equal(fallbackFloor(['a'], 'a', []), null, 'a session view with nothing left falls back to the stack');
+  const app = readFileSync(join(ROOT, 'web', 'app.js'), 'utf8');
+  assert.match(app, /if \(shownId !== null && shownId !== LOBBY_ID\) \{/, 'reconcileView leaves the lobby alone');
+});
+
+// ---- server ----
+
+const S = (id, o = {}) => ({ provider: 'claude', pid: 100, sessionId: id, cwd: 'C:\\Project', status: 'busy', name: '', startedAt: 1000, ...o });
+const M = (id, o = {}) => ({ agentId: id, agentType: 'worker', description: '조사', finished: false, transcriptPath: '', mtimeMs: 0, workflow: null, ...o });
+const floorOf = (o, id) => o.snapshot().floors.find((f) => f.sessionId === id);
+
+test('lobby server: floors are numbered from 2 while the lobby is on, from 1 when it is off', () => {
+  const on = new Office(cfg, EMPTY);
+  on.syncSessions([S('a', { startedAt: 1 }), S('b', { startedAt: 2 })], 1000);
+  assert.deepEqual(on.snapshot().floors.map((f) => f.floorNo), [3, 2]);
+  const off = new Office(loadConfig({ lobby: { enabled: false } }), EMPTY);
+  off.syncSessions([S('a', { startedAt: 1 }), S('b', { startedAt: 2 })], 1000);
+  assert.deepEqual(off.snapshot().floors.map((f) => f.floorNo), [2, 1]);
+  assert.equal(loadConfig({ lobby: { enabled: false } }).scenes.lobby, undefined);
+  assert.ok(cfg.scenes.lobby, 'the lobby scene is loaded when it is on');
+});
+
+test('lobby server: the lobby is never a session room', () => {
+  const o = new Office(cfg, EMPTY);
+  for (let i = 0; i < 12; i++) o.syncSessions(Array.from({ length: i + 1 }, (_, k) => S(`s${k}`, { startedAt: k + 1 })), 1000 + i);
+  assert.ok(o.snapshot().floors.every((f) => f.design !== 'lobby'));
+});
+
+test('lobby server: startedAt, fails, enteredAt and wf are numbers and booleans only', () => {
+  const o = new Office(cfg, EMPTY);
+  o.syncSessions([S('s1', { startedAt: 4242 })], 100000);
+  o.syncAgents('s1', [M('a1', { mtimeMs: 7777 }), M('w1', { workflow: { runId: 'r', phase: 'Review', label: 'ctx' } })], 100000);
+  const f = floorOf(o, 's1');
+  assert.equal(f.startedAt, 4242);
+  assert.equal(f.fails, 0);
+  const a1 = f.agents.find((a) => a.agentId === 'a1');
+  const w1 = f.agents.find((a) => a.agentId === 'w1');
+  assert.equal(a1.enteredAt, 7777);
+  assert.equal(a1.wf, false);
+  assert.equal(w1.wf, true);
+  assert.equal(w1.enteredAt, 100000, 'no meta time: when it was found');
+  for (const v of [f.startedAt, f.fails, a1.enteredAt, w1.enteredAt]) assert.equal(typeof v, 'number');
+});
+
+test('lobby server: fails counts live failed tool results only, never a hidden floor or backfill', () => {
+  const o = new Office(cfg, EMPTY);
+  o.syncSessions([S('s1')], 100000);
+  const fail = (ts) => ({ kind: 'toolDone', ts, toolUseId: `d${ts}`, error: true });
+  o.applySessionEvents('s1', [fail(50000)], 100001); // before the floor existed: backfill
+  assert.equal(floorOf(o, 's1').fails, 0);
+  o.applySessionEvents('s1', [fail(100100), fail(100200), { kind: 'toolDone', ts: 100300, toolUseId: 'ok' }], 100300);
+  assert.equal(floorOf(o, 's1').fails, 2);
+  o.syncSessions([S('s2')], 100000);
+  assert.equal(o.hide('s2'), true);
+  o.applySessionEvents('s2', [fail(100400)], 100400);
+  o.syncSessions([S('s2')], 100500); // visible again only after a re-run; nothing was counted while hidden
+  assert.equal(floorOf(o, 's2')?.fails ?? 0, 0);
+});
+
+test('lobby server: the snapshot adds no text field (privacy list unchanged)', () => {
+  const o = new Office(cfg, EMPTY);
+  o.syncSessions([S('s1')], 100000);
+  o.syncAgents('s1', [M('a1')], 100000);
+  const f = floorOf(o, 's1');
+  assert.deepEqual(Object.keys(f).sort(), ['agents', 'autoTitle', 'board', 'colorIndex', 'design', 'fails', 'floorNo', 'folder', 'lead', 'origin', 'provider', 'reports', 'sessionId', 'sheet', 'startedAt', 'status', 'title', 'todos', 'workflows']);
+  assert.deepEqual(Object.keys(f.agents[0]).sort(), ['agentId', 'bubble', 'enteredAt', 'key', 'name', 'role', 'since', 'slot', 'sprite', 'state', 'wf']);
+});
+
+// ---- scene ----
+
+const SHIPPED = join(ROOT, 'assets', 'scenes', 'lobby');
+const lobbyRaw = () => JSON.parse(readFileSync(join(SHIPPED, 'scene.json'), 'utf8'));
+const check = (raw) => checkScene(raw, { atlasSize: readPngSize(join(SHIPPED, raw.atlas)), cfg: rawCfg });
+const stage10 = (res) => res.errors.filter((e) => e.includes('ledWall'));
+
+test('lobby scene: the shipped scene passes, has 40 seats, 12 overflow spots and six screens with vertical sides', () => {
+  const raw = lobbyRaw();
+  const res = check(raw);
+  assert.deepEqual(res.errors, []);
+  assert.equal(raw.seats.length, 40);
+  assert.equal(raw.overflow.length, 12);
+  assert.deepEqual(raw.ledWall.panels.map((p) => p.id).sort(), ['center', 'left', 'right', 'tickerCenter', 'tickerLeft', 'tickerRight']);
+  assert.equal(raw.whiteboard, undefined);
+  assert.equal(raw.windows, undefined);
+});
+
+test('lobby scene: a slanted screen side and a seat under a screen are rejected', () => {
+  const slanted = lobbyRaw();
+  slanted.ledWall.panels[0].quad[1] = [slanted.ledWall.panels[0].quad[1][0] + 6, slanted.ledWall.panels[0].quad[1][1]];
+  assert.ok(stage10(check(slanted)).some((e) => /수직/.test(e)), 'slanted side');
+  const under = lobbyRaw();
+  const q = under.ledWall.panels.find((p) => p.id === 'center').quad;
+  q[2] = [q[2][0], 330]; // the centre screen reaches down over the first desk row's heads
+  q[3] = [q[3][0], 330];
+  assert.ok(stage10(check(under)).some((e) => /가려집니다/.test(e)), 'a head under the screen');
+  const dup = lobbyRaw();
+  dup.ledWall.panels[1].id = dup.ledWall.panels[0].id;
+  assert.ok(stage10(check(dup)).some((e) => /겹칩니다/.test(e)), 'duplicate id');
+});

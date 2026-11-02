@@ -33,5 +33,6 @@ export function loadConfig(overrides = {}) {
   if (process.env.AGENT_OFFICE_PORT) cfg.port = Number(process.env.AGENT_OFFICE_PORT);
   cfg.scenesDir = path.resolve(ROOT, overrides.scenesDir || process.env.AGENT_OFFICE_SCENES_DIR || cfg.scenesDir);
   cfg.scenes = loadScenes(cfg);
+  cfg.lobby = { ...cfg.lobby, enabled: Boolean(cfg.lobby?.enabled && cfg.scenes[cfg.lobby.design]) }; // on only when its scene is there
   return cfg;
 }

@@ -63,6 +63,7 @@ export class Office {
     this.grids = new Map(); // design -> baked walking grid (overflow spots are picked on open floor)
     this.floorsCreated = 0; // never decremented: breaks ties between equally used designs
     this.floorSeq = 0;
+    this.floorBase = cfg.lobby?.enabled ? 2 : 1; // floor number of the oldest session: 1F is the lobby when it is on
     this.pool = this.#buildPool();
     this.hiddenRecs = new Map(); // sessionId -> {sessionId, pid, startedAt}
     this.names = new Map(); // sessionId -> renamed title
@@ -230,6 +231,7 @@ export class Office {
       usedNames: new Set([lead.name]),
       usedSlots: new Set(),
       reports: 0,
+      fails: 0, // failed tool results seen live since this floor appeared (the lobby wall counts them)
       unknownSeq: this.floorSeq * 5, // start of the pool scan for agents that need a borrowed face; advances per pick, and floors start apart
     };
   }
@@ -372,6 +374,7 @@ export class Office {
       return;
     }
     actor.failStreak = (actor.failStreak ?? 0) + 1;
+    if (!f.hidden && this.#isLive(f, ev)) f.fails++;
     if (!f.hidden && this.#isLive(f, ev)) this.#signal({ type: 'fail', sessionId: f.sessionId, agent: isLead ? LEAD_KEY : actor.key, streak: actor.failStreak });
   }
 
@@ -467,8 +470,10 @@ export class Office {
       endLogged: false,
       lastRead: null,
     };
-    f.agents.set(m.agentId, a);
     const startTs = m.mtimeMs > 0 ? m.mtimeMs : now; // discovered at server start: when it really started
+    a.enteredAt = startTs;
+    a.wf = Boolean(wf);
+    f.agents.set(m.agentId, a);
     if (startTs >= this.logSince(f.sessionId, now)) this.#log(f, a, startTs, LOG_START);
   }
 
@@ -747,7 +752,7 @@ export class Office {
         sessionId: f.sessionId,
         provider: f.provider,
         origin: f.origin,
-        floorNo: i + 1,
+        floorNo: i + this.floorBase,
         design: f.design,
         colorIndex: f.colorIndex,
         title,
@@ -759,6 +764,8 @@ export class Office {
         todos,
         sheet: this.#sheetView(f, todos),
         reports: f.reports,
+        startedAt: f.startedAt,
+        fails: f.fails,
         workflows: [...f.workflows.keys()].filter((id) => !f.doneRuns.has(id)).length,
         agents: [...f.agents.values()].map((a) => ({
           key: a.key,
@@ -770,6 +777,8 @@ export class Office {
           state: a.state,
           bubble: a.bubble,
           since: a.since,
+          enteredAt: a.enteredAt,
+          wf: a.wf,
         })),
       };
     });

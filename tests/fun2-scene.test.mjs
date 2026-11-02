@@ -8,7 +8,7 @@ import { readPngSize } from '../server/scenes.mjs';
 import { ROOT, cfg } from './helpers/fixture.mjs';
 
 const SHIPPED = join(ROOT, 'assets', 'scenes');
-const DESIGNS = readdirSync(SHIPPED, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+const DESIGNS = readdirSync(SHIPPED, { withFileTypes: true }).filter((d) => d.isDirectory() && d.name !== 'lobby').map((d) => d.name); // the lobby is not a session room: no whiteboard, windows, meeting or seasonal anchors
 const load = (d) => JSON.parse(readFileSync(join(SHIPPED, d, 'scene.json'), 'utf8'));
 const check = (d, raw) => checkScene(raw, { atlasSize: readPngSize(join(SHIPPED, d, raw.atlas)), cfg });
 const stage10 = (res) => res.errors.filter((e) => e.startsWith('10단계'));
