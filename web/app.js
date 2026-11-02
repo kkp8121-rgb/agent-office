@@ -25,6 +25,7 @@ const HELD_Z = 7900; // a held character draws above every object and character 
 const HELD_FOLLOW_MS = 80; // a held character trails the pointer by this much, which also softens the lift
 const SINGLE_MAX_ZOOM = 3; // a single floor (or the stack with the panel hidden) is scaled up to fit, at most this much
 const PANEL_KEY = 'agent-office.panelOff'; // localStorage: the session panel was hidden by the person
+const THEME_KEY = 'agent-office.theme'; // localStorage: 'dark' or 'light' when the person chose; absent = follow the OS
 const LIFT_PX = 28; // the held character's height above its shadow (--lift in style.css)
 const BOARD_LINE_PX = 9; // line height of the text on the wall board (.wboard in style.css)
 const BOARD_PAD_PX = 2; // padding of the wall board (the same)
@@ -1349,13 +1350,18 @@ function syncDecor(frec) {
   frec.decor = box;
 }
 
+/** The light outside the windows: the query, else night while dark mode is on (ui.dark.nightWindows), else by the hour. */
+function currentLight(now) {
+  return lightQuery ?? (isDark() && ui.ui.dark.nightWindows ? 'night' : lightAt(now.getHours(), ui.ui.daylight));
+}
+
 /** Reads the date and the hour (or the query), updates every shown floor, and sets the one timer for the next change. */
 function applyTime() {
   if (skyTimer) clockTimers.clearTimeout(skyTimer);
   skyTimer = 0;
   const now = new Date();
   season = seasonQuery ?? seasonOn(now, ui.ui.season);
-  light = lightQuery ?? lightAt(now.getHours(), ui.ui.daylight);
+  light = currentLight(now);
   for (const f of floorRecs.values()) syncDecor(f);
   if (!paused()) skyTimer = clockTimers.setTimeout(applyTime, msToNextChange(now, ui.ui.daylight));
 }
@@ -1653,12 +1659,18 @@ function setBubble(rec, bubble, since) {
   rec.bubTxt.classList.toggle('empty', empty);
   rec.bubDot.classList.toggle('empty', empty);
   rec.bubbleText = '';
-  if (empty) return;
+  if (empty) {
+    rec.bubDot.removeAttribute('data-full');
+    rec.body.removeAttribute('title');
+    return;
+  }
   const chars = Array.from(bubble);
   const max = ui.ui.bubbleMaxChars;
   const text = chars.length > max ? `${chars.slice(0, max - 1).join('')}…` : bubble;
   rec.bubbleText = text; // the report to the boss says the same words
   setText(rec.bubTxt, text);
+  rec.bubDot.dataset.full = text; // the folded bubble shows these on hover (style.css .bub.dot)
+  rec.body.title = text; // and she shows them as her own tooltip
   const remain = Math.max(0, ui.bubbleShowMs - (lastNow - since));
   for (const b of [rec.bubTxt, rec.bubDot]) {
     b.classList.remove('fresh'); // restart the CSS collapse timer
@@ -1875,8 +1887,8 @@ function createFloor(fv) {
   stage.style.backgroundSize = `${r.size[0]}px ${r.size[1]}px`;
 
   const board = el('div', 'board');
-  const [bx, by, bw, bh] = r.board;
-  Object.assign(board.style, { left: `${bx}px`, top: `${by}px`, width: `${bw}px`, maxHeight: `${bh}px` });
+  const [bx, by, bw] = r.board; // the plaque's height is its text (style.css .board)
+  Object.assign(board.style, { left: `${bx}px`, top: `${by}px`, width: `${bw}px` });
   const bt = el('b');
   const bl = el('p');
   board.append(bt, bl);
@@ -2575,6 +2587,49 @@ try {
 }
 applyPanel();
 
+// ---------- dark mode ----------
+
+const themeBtn = $('theme');
+const osDark = window.matchMedia('(prefers-color-scheme: dark)');
+let themeChoice = null; // 'dark' | 'light' when the person chose (kept per browser), null = follow the OS
+try {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === 'dark' || saved === 'light') themeChoice = saved;
+} catch {
+  // storage blocked: the OS setting decides, a choice lasts for this page
+}
+const isDark = () => (themeChoice ?? (osDark.matches ? 'dark' : 'light')) === 'dark';
+
+/** Puts the theme on one document (this page or the small window): the attribute for an explicit choice, the room veil from the config. */
+function paintTheme(d) {
+  const root = d.documentElement;
+  if (themeChoice) root.dataset.theme = themeChoice;
+  else delete root.dataset.theme;
+  root.style.setProperty('--room-dim', isDark() ? String(ui.ui.dark.roomDim) : '0');
+}
+
+/** Dark or light on both windows, the windows' glass follows (night while dark). Attribute changes only: no timer, no layout. */
+function applyTheme() {
+  paintTheme(document);
+  if (pipWin) paintTheme(pipWin.document);
+  setAttr(themeBtn, 'aria-pressed', String(isDark()));
+  light = currentLight(new Date());
+  for (const f of floorRecs.values()) syncDecor(f);
+}
+
+themeBtn.addEventListener('click', () => {
+  themeChoice = isDark() ? 'light' : 'dark';
+  try {
+    localStorage.setItem(THEME_KEY, themeChoice);
+  } catch {
+    // private window or blocked storage: the choice only lasts for this page
+  }
+  applyTheme();
+});
+osDark.addEventListener('change', () => {
+  if (!themeChoice) applyTheme(); // no choice of their own: the OS switch moves the page
+});
+
 // ---------- picture-in-picture ----------
 
 /** Moves the live floor stack into a small always-on-top window; the page keeps updating it as before. */
@@ -2601,6 +2656,7 @@ async function openPip() {
   }
   d.documentElement.style.setProperty('--sit-h', `${ui.sitHeight}px`);
   d.body.classList.add('pip-mini');
+  paintTheme(d);
   landFlights(); // moving the floors cancels running animations
   closeBig(); // its listeners belong to this page's document
   pipWin = w;
@@ -2675,6 +2731,9 @@ async function init() {
   sessionPalette = ui.ui.sessionPalette;
   setText(followBtn, ui.ui.follow.label);
   followBtn.title = ui.ui.follow.title;
+  setText(themeBtn, ui.ui.dark.label);
+  themeBtn.title = ui.ui.dark.title;
+  applyTheme();
   try {
     decorItems = await (await fetch(ITEMS_URL)).json();
   } catch {

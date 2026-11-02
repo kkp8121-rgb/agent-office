@@ -26,6 +26,7 @@
           "fail": { "seconds": 6, "patStreak": 3, "patCooldownSeconds": 60 },
           "season": { "halloween": { "from": [10, 24], "to": [10, 31] }, "christmas": { "from": [12, 18], "to": [12, 26] }, "lunar": { "daysBefore": 2, "daysAfter": 2 } },
           "daylight": { "sunset": [17, 19], "night": [19, 6] },
+          "dark": { "label": "다크 모드", "title": "어두운 화면으로 바꾸기 (창밖도 밤이 됩니다)", "roomDim": 0.5, "nightWindows": true },
           "snack": { "cooldownSeconds": 10, "eatMs": 900, "sparkleMs": 2000, "dropMarginPx": 8, "refuseMs": 2200, "kinds": ["coffee", "donut", "cookie", "fish"] },
           "lines": {
             "lift": ["앗!", "으앗, 뭐죠?", "어어어?", "떴다 떴어!", "잠깐만요!", "저 들렸어요!", "어, 어, 어?", "하늘이 보여요!", "누가 절 들었어요?", "으헉!"],

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>에이전트 사무실</title>
 <link rel="icon" href="data:,">
+<script>try{var t=localStorage.getItem("agent-office.theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="stylesheet" href="/web/style.css">
 </head>
 <body>
@@ -20,6 +21,7 @@
       <button class="snack" type="button" data-snack="cookie" title="쿠키 — 끌어다 캐릭터에게 주세요"><img src="/assets/snacks/snack-cookie.png" alt="쿠키" draggable="false"></button>
       <button class="snack" type="button" data-snack="fish" title="생선 — 끌어다 캐릭터에게 주세요"><img src="/assets/snacks/snack-fish.png" alt="생선" draggable="false"></button>
     </div>
+    <button id="theme" type="button" aria-pressed="false"></button>
     <button id="follow" type="button" aria-pressed="false"></button>
     <button id="rotate" type="button" aria-pressed="false" title="전체 화면 세션을 차례로 돌려 보기">순환</button>
     <button id="fullscreen" type="button" title="전체 화면으로 보기">전체 화면</button>
