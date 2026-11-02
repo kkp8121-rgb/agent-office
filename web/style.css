@@ -4,6 +4,7 @@
   --ink: #3b2f22;
   --paper: #fffdf6;
   --muted: #8a7a60;
+  --credit: #7a6a4e;
   --line: #ddd2bb;
   --panel: #fbf8f1;
   --bg: #efe6d2;
@@ -37,6 +38,7 @@
   --ink: #efe6d2;
   --paper: #2d2519;
   --muted: #b8aa8f;
+  --credit: #b8aa8f;
   --line: #4a3e2d;
   --panel: #251e15;
   --bg: #17120c;
@@ -67,6 +69,7 @@
     --ink: #efe6d2;
     --paper: #2d2519;
     --muted: #b8aa8f;
+    --credit: #b8aa8f;
     --line: #4a3e2d;
     --panel: #251e15;
     --bg: #17120c;
@@ -556,5 +559,5 @@ body.paused .wx-a, body.paused .wx-b, body.paused .wx-f { animation-play-state: 
 #settings-panel .wx-opt { display: flex; align-items: center; gap: 5px; cursor: pointer; }
 #settings-panel .wx-opt:first-of-type { grid-column: 1 / -1; }
 #settings-panel p { margin: 8px 0 0; }
-#settings-panel .wx-credit { color: var(--muted); font-size: 11px; }
+#settings-panel .wx-credit { color: var(--credit); font-size: 11px; }
 #settings-panel #settings-close { margin-top: 8px; }
