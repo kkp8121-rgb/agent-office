@@ -22,5 +22,19 @@
     "lead-3": "mint seafoam green wavy bob hair, camel beige tailored blazer over a cream blouse with a brown ribbon tie and brown pencil skirt, holding a coffee mug, warm team-boss look",
     "lead-4": "rose gold dusty-rose long straight hair with side bangs, ivory white tailored blazer with gold buttons and black pencil skirt, holding a tablet, elegant team-boss look",
     "lead-5": "bright turquoise hair in a half-up bun with long ends, dark plum aubergine suit jacket over a white blouse and plum skirt, holding a pen and a folder, sharp team-boss look"
+  },
+  "extras": {
+    "extra-01": "dark auburn curly hair in two puffy buns with a yellow headband, tan skin, denim overalls over a red striped shirt, holding a paint palette and brush, cheerful painter",
+    "extra-02": "sunny yellow hair in two long braids, red polka-dot dress with a white apron and a chef hat, holding a baking tray of cookies, happy baker",
+    "extra-03": "black hair with a bright red streak in twin high buns, jade green qipao-style top with gold trim and black shorts, holding a folding fan, playful",
+    "extra-04": "cream white short messy hair with cat-ear headphones, sky-blue oversized sports jersey and white shorts, holding a game controller, gamer",
+    "extra-05": "long sunset-gradient hair fading from orange to pink, white sailor school uniform with a big red ribbon and pleated navy skirt, holding a megaphone, energetic cheerleader",
+    "extra-06": "ash blonde short bob with a hair clip, white and mint green medical scrubs with a stethoscope around the neck, holding a small first-aid box, kind medic",
+    "extra-07": "tan skin, long pale lilac-white hair in a low ponytail with a flower, orange sundress with sunflower print and sandals, holding a bouquet of flowers, sunny",
+    "extra-08": "dark brown skin, black curly short hair, gold hoop earrings, yellow and black sporty jacket with shorts and sneakers, holding a basketball, athletic",
+    "extra-09": "steel gray-blue messy short hair with a side shave look, black leather jacket with silver chains and studded choker, ripped tights and boots, holding a small electric guitar, rocker",
+    "extra-10": "peach pastel blonde long wavy hair with a huge red bow, black and white gothic lolita dress with frills, holding a teddy bear, doll-like",
+    "extra-11": "white twin-tails with blue tips, purple witch hat with a star, star-patterned navy cape over a dress, holding a star-topped magic wand, little witch",
+    "extra-12": "brown hair in one long side braid under a wide straw sun hat, bright yellow raincoat and red rubber boots, holding a green watering can, gardener"
   }
 }
