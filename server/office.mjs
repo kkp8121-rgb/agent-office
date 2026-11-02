@@ -456,9 +456,9 @@ export class Office {
   }
 
   /**
-   * The face of an arriving agent: its kind's own character when no one on the floor wears it, else the next unused pool
-   * character (rotation from the floor's own counter); when every pool character is worn, the least used one (names then get +N).
-   * The role label is always the real kind, so the tier stays readable on a borrowed face.
+   * The face of an arriving agent: its kind's own character when no one on the floor wears it, else the next unused new girl
+   * (extras, rotation from the floor's own counter), and only when all of them are worn the next unused role character; when every
+   * pool character is worn, the least used one (names then get +N). The role label is always the real kind, so the tier stays readable on a borrowed face.
    */
   #faceFor(f, agentType) {
     const own = this.#roleFor(f, agentType);
@@ -466,11 +466,19 @@ export class Office {
     for (const a of f.agents.values()) used.set(a.sprite, (used.get(a.sprite) ?? 0) + 1);
     if (own && !used.has(own.key)) return own;
     const { pool } = this;
-    const start = f.unknownSeq++ % pool.length;
-    let best = pool[start];
-    for (let k = 1; k < pool.length; k++) {
-      const c = pool[(start + k) % pool.length];
-      if ((used.get(c.key) ?? 0) < (used.get(best.key) ?? 0)) best = c;
+    const seq = f.unknownSeq++;
+    const wears = (c) => used.get(c.key) ?? 0;
+    const extras = (this.cfg.extras ?? []).length; // pool[0, extras) are the new girls, the rest are role characters
+    let best = null;
+    for (const [lo, hi] of [[0, extras], [extras, pool.length]]) { // the new girls win ties, so they are always taken before a role face
+      if (hi === lo) continue;
+      let pick = pool[lo + (seq % (hi - lo))];
+      for (let k = 1; k < hi - lo; k++) {
+        const c = pool[lo + ((seq + k) % (hi - lo))];
+        if (wears(c) < wears(pick)) pick = c;
+      }
+      if (!best || wears(pick) < wears(best)) best = pick;
+      if (wears(best) === 0) break;
     }
     return { key: best.key, name: f.provider === 'codex' ? best.codex : best.claude, role: own ? own.role : this.#kindLabel(agentType) };
   }

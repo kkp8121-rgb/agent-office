@@ -203,6 +203,52 @@ test('faces: 8 worker-high agents on one Claude floor get 8 different faces and 
   }
 });
 
+const isExtra = (a) => cfg.extras.some((x) => x.key === a.sprite);
+
+test('faces: borrowed faces are the new girls first, 10 worker-high get 하린 and 9 different new girls', () => {
+  const o = setup();
+  o.syncAgents('s1', HIGH(10), 1000);
+  const agents = floorOf(o, 's1').agents;
+  assert.deepEqual([agents[0].sprite, agents[0].name], ['worker-high', '하린']);
+  const borrowed = agents.slice(1);
+  assert.equal(borrowed.length, 9);
+  assert.ok(borrowed.every(isExtra), borrowed.map((a) => a.sprite).join());
+  assert.equal(new Set(borrowed.map((a) => a.sprite)).size, 9);
+});
+
+test('faces: 13 worker-high wear 하린 and all 12 new girls, the 14th is the first role face; no face repeats while any is free', () => {
+  const o = setup();
+  o.syncAgents('s1', HIGH(13), 1000);
+  const agents = floorOf(o, 's1').agents;
+  assert.equal(agents.slice(1).filter(isExtra).length, 12);
+  o.syncAgents('s1', HIGH(14), 1000);
+  const all = floorOf(o, 's1').agents;
+  assert.equal(all.filter(isExtra).length, 12);
+  assert.equal(isExtra(all[13]), false);
+  assert.notEqual(all[13].sprite, 'worker-high');
+  assert.equal(new Set(all.map((a) => a.sprite)).size, 14);
+  assert.ok(all.every((a) => !a.name.includes('+')));
+});
+
+test('faces: every floor starts on a different new girl', () => {
+  const o = setup([S('s1'), S('s2', { startedAt: 1001 }), S('s3', { startedAt: 1002 })]);
+  for (const id of ['s1', 's2', 's3']) o.syncAgents(id, HIGH(2), 1000);
+  const firsts = ['s1', 's2', 's3'].map((id) => floorOf(o, id).agents[1]);
+  assert.ok(firsts.every(isExtra));
+  assert.equal(new Set(firsts.map((a) => a.sprite)).size, 3);
+});
+
+test('faces: a new girl freed by a leaving agent is taken again before any role face', () => {
+  const o = setup();
+  o.syncAgents('s1', HIGH(14), 1000); // 하린 + 12 new girls + one role face
+  const gone = floorOf(o, 's1').agents.find((a) => a.agentId === 'h3');
+  assert.ok(isExtra(gone));
+  o.syncAgents('s1', HIGH(14).map((m) => (m.agentId === 'h3' ? { ...m, finished: true } : m)), 2000);
+  o.tick(2000 + cfg.agent.doneLingerMs);
+  o.syncAgents('s1', [...HIGH(14).filter((m) => m.agentId !== 'h3'), M('n1', { agentType: 'worker-high' })], 30000);
+  assert.equal(floorOf(o, 's1').agents.find((a) => a.agentId === 'n1').sprite, gone.sprite);
+});
+
 test('faces: the signature face goes to the first of its kind, the second borrows', () => {
   const o2 = setup();
   o2.syncAgents('s1', [M('w1', { agentType: 'worker' }), M('w2', { agentType: 'worker' })], 1000);
