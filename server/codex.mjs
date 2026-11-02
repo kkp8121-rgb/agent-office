@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { FileTail } from './tail.mjs';
 import { clip, cleanTodos, firstWord, MAX_LEN } from './sanitize.mjs';
 import { isSafeId } from './sessions.mjs';
+import { CodexIndex } from './codex-index.mjs';
 
 /** @typedef {import('./parse.mjs').Ev} Ev */
 /** @typedef {import('./sessions.mjs').Session} Session */
@@ -23,7 +24,7 @@ const folderOf = (cwd) => String(cwd ?? '').split(/[\\/]/).filter(Boolean).pop()
 /**
  * First line of a rollout. Returns only the fields below: the line also carries account ids and the full
  * instructions, which must never be kept.
- * @returns {null | {id:string, cwd:string, kind:'exec'|'interactive'|'subagent', parentId:string|null, agentRole:string|null, taskName:string, startedAt:number}}
+ * @returns {null | {id:string, cwd:string, kind:'exec'|'interactive'|'subagent', origin:''|'codexWork'|'codexApp', parentId:string|null, agentRole:string|null, taskName:string, startedAt:number}}
  */
 export function parseCodexMeta(text, cwdMax) {
   if (!Number.isInteger(cwdMax) || cwdMax <= 0) throw new TypeError('parseCodexMeta needs cwdMax (codex.cwdMaxChars)');
@@ -45,6 +46,7 @@ export function parseCodexMeta(text, cwdMax) {
     id: p.id,
     cwd: typeof p.cwd === 'string' ? clip(p.cwd, cwdMax) : '',
     kind: sub ? 'subagent' : exec ? 'exec' : 'interactive',
+    origin: p.originator === 'codex_work_desktop' ? 'codexWork' : p.originator === 'Codex Desktop' ? 'codexApp' : '',
     parentId: isSafeId(spawn.parent_thread_id) ? spawn.parent_thread_id : null,
     agentRole: typeof spawn.agent_role === 'string' && spawn.agent_role ? clip(spawn.agent_role, MAX_LEN) : null,
     taskName: clip(path.replace(/_/g, ' '), MAX_LEN),
@@ -276,9 +278,11 @@ export class CodexSource {
   #cfg;
   #tickNo = 0;
   #recs = new Map(); // path -> rollout record
+  #index;
 
   constructor(cfg) {
     this.#cfg = cfg;
+    this.#index = new CodexIndex(cfg.codexHome ? join(cfg.codexHome, 'session_index.jsonl') : '', cfg.codex?.indexMaxBytes);
   }
 
   /**
@@ -299,6 +303,7 @@ export class CodexSource {
         // half-written or locked file: retried on a later tick
       }
     }
+    if (this.#recs.size) await this.#index.poll(); // one stat; reads only what was appended
     return this.#assemble(now);
   }
 
@@ -327,7 +332,7 @@ export class CodexSource {
       if (!this.#recs.has(path)) {
         this.#recs.set(path, {
           path, size: -1, meta: null, ignored: false, tail: null, resumeAt: 0,
-          turn: 'none', lastTs: 0, activeFrom: null, batchFrom: null, titleSent: false, pending: [], hot: false, runs: null, busy: null,
+          turn: 'none', lastTs: 0, activeFrom: null, batchFrom: null, titleSent: '', pending: [], hot: false, runs: null, busy: null,
         });
       }
     }
@@ -474,7 +479,7 @@ export class CodexSource {
       const listed = own || now - lastTs <= keepMs || mine.some((k) => !finished(k));
       if (!listed) {
         rec.activeFrom = null; // the next activity starts a new period (and a new startedAt)
-        rec.titleSent = false;
+        rec.titleSent = '';
         continue;
       }
       // A period opened from silence began with the earliest line any rollout of the family wrote in this batch (the
@@ -483,14 +488,16 @@ export class CodexSource {
       listedRecs.add(rec);
       for (const k of mine) listedRecs.add(k);
       const id = rec.meta.id;
-      out.sessions.push({ provider: 'codex', pid: 0, sessionId: id, cwd: rec.meta.cwd, status: own ? 'busy' : 'waiting', name: '', startedAt: rec.activeFrom });
+      out.sessions.push({ provider: 'codex', origin: rec.meta.origin, pid: 0, sessionId: id, cwd: rec.meta.cwd, status: own ? 'busy' : 'waiting', name: '', startedAt: rec.activeFrom });
 
       const evs = [];
-      if (!rec.titleSent) {
-        rec.titleSent = true;
-        const folder = clip(folderOf(rec.meta.cwd), MAX_LEN);
-        const title = rec.meta.kind === 'exec' ? (folder ? `codex exec · ${folder}` : 'codex exec') : folder;
-        if (title) evs.push({ kind: 'title', ts: 0, title });
+      // The thread name from session_index.jsonl (set by the apps and by `codex resume`) wins over the folder; a rename is sent again.
+      const name = this.#index.names.get(id) ?? '';
+      const folder = clip(folderOf(rec.meta.cwd), MAX_LEN);
+      const title = name || (rec.meta.kind === 'exec' ? (folder ? `codex exec · ${folder}` : 'codex exec') : folder);
+      if (title && rec.titleSent !== title) {
+        rec.titleSent = title;
+        evs.push(name ? { kind: 'title', ts: 0, title, rank: 2 } : { kind: 'title', ts: 0, title });
       }
       evs.push(...rec.pending);
       if (evs.length) out.sessionEvents.set(id, evs);

@@ -40,6 +40,14 @@ function folderOf(cwd) {
   return String(cwd ?? '').split(/[\\/]/).filter(Boolean).pop() ?? '';
 }
 
+// The Claude desktop app runs chats without a project in a scratch folder of its own (...\Claude\Data\...\scratch-workspaces\<id>\scratch-YYYY-MM-DD-hex): its name says nothing about the work.
+const APP_SCRATCH_DIR = /[\\/]Claude[\\/]Data[\\/].*[\\/]scratch-workspaces[\\/]/i;
+const APP_SCRATCH_NAME = /^scratch-\d{4}-\d{2}-\d{2}-[0-9a-f]+$/i;
+function isAppScratch(cwd) {
+  const c = String(cwd ?? '');
+  return APP_SCRATCH_DIR.test(c) && APP_SCRATCH_NAME.test(folderOf(c));
+}
+
 export class Office {
   /**
    * @param {object} cfg
@@ -161,7 +169,9 @@ export class Office {
       f.pid = s.pid;
       f.startedAt = s.startedAt;
       f.provider = s.provider ?? 'claude';
-      f.folder = folderOf(s.cwd);
+      f.scratch = isAppScratch(s.cwd);
+      f.folder = f.scratch ? '' : folderOf(s.cwd);
+      if (s.origin !== undefined) f.origin = s.origin;
       f.status = s.status === 'busy' ? 'busy' : 'waiting';
       // The session file is the authority for waiting: a turn that ended without an end event must not leave the lead busy.
       if (f.status === 'waiting' && (f.lead.state === 'working' || f.lead.state === 'thinking')) this.#setState(f.lead, 'idle', '', now);
@@ -196,6 +206,7 @@ export class Office {
       pid: s.pid,
       startedAt: s.startedAt,
       folder: '',
+      scratch: false, // cwd is the desktop app's scratch workspace (no project)
       status: 'waiting',
       leavingAt: null,
       hidden: false,
@@ -203,6 +214,8 @@ export class Office {
       design,
       colorIndex,
       aiTitle: '',
+      titleRank: 0,
+      origin: '', // where the session was opened: '' (terminal), 'claudeApp', 'codexWork', 'codexApp'
       lead: { name: lead.name, role: lead.role, sprite: lead.key, head: '', state: 'idle', bubble: '', lastRead: null },
       createdAt: this.now, // events stamped before this are backfill: they drive state but raise no live signal
       todoItems: [], // [{text, status, gone?}] of the main session
@@ -311,7 +324,13 @@ export class Office {
     if (!f) return;
     for (const ev of evs) {
       if (ev.kind === 'title') {
-        if (ev.title) f.aiTitle = ev.title;
+        const rank = ev.rank ?? 1;
+        if (ev.title && rank >= f.titleRank) {
+          f.aiTitle = ev.title;
+          f.titleRank = rank;
+        }
+      } else if (ev.kind === 'origin') {
+        f.origin = ev.origin;
       } else if (ev.kind === 'workflowLaunch') {
         if (ev.runId) f.workflows.set(ev.runId, { name: ev.workflowName, scriptPath: ev.scriptPath });
         if (this.#isLive(f, ev)) f.liveRuns.add(ev.runId);
@@ -326,7 +345,7 @@ export class Office {
     const f = this.floors.get(sessionId);
     const a = f?.agents.get(agentId);
     if (!a) return;
-    for (const ev of evs) this.#actorEvent(f, a, ev, now, false, opts.logSince);
+    for (const ev of evs) if (ev.kind !== 'origin') this.#actorEvent(f, a, ev, now, false, opts.logSince);
     this.#reseat(f); // a stale agent that works again may find a free desk
   }
 
@@ -644,7 +663,7 @@ export class Office {
   // ---- views -------------------------------------------------------------------------------
 
   #titleOf(f) {
-    return this.names.get(f.sessionId) ?? (f.aiTitle || f.folder);
+    return this.names.get(f.sessionId) ?? (f.aiTitle || f.folder || (f.scratch ? this.cfg.ui.untitled : ''));
   }
 
   #pruneTitles() {
@@ -721,12 +740,13 @@ export class Office {
     const visible = [...this.floors.values()].filter((f) => !f.hidden);
     visible.sort((a, b) => a.startedAt - b.startedAt || a.seq - b.seq);
     const views = visible.map((f, i) => {
-      const autoTitle = f.aiTitle || f.folder;
+      const autoTitle = f.aiTitle || f.folder || (f.scratch ? this.cfg.ui.untitled : '');
       const title = this.#titleOf(f);
       const todos = this.#todoView(f);
       return {
         sessionId: f.sessionId,
         provider: f.provider,
+        origin: f.origin,
         floorNo: i + 1,
         design: f.design,
         colorIndex: f.colorIndex,

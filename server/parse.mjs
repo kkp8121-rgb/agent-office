@@ -6,6 +6,8 @@ import config from '../config.json' with { type: 'json' };
 const NAME_MAX = config.parse.nameMaxChars; // title, run id, workflow name
 const PATH_MAX = config.parse.pathMaxChars; // scriptPath is only read from, never shown: a longer one is dropped, not clipped
 
+const TITLE_RANK_CUSTOM = 2; // ai-title and the folder fallback rank 1 (the default)
+
 const isObj = (v) => typeof v === 'object' && v !== null;
 const str = (v, n) => (typeof v === 'string' ? clip(v, n) : '');
 
@@ -45,6 +47,11 @@ function parseObject(o) {
     const title = str(o.aiTitle, NAME_MAX);
     return title ? [{ kind: 'title', ts: 0, title }] : [];
   }
+  // Titles the Claude desktop app sets itself: it outranks the generated one.
+  if (o.type === 'custom-title') {
+    const title = str(o.customTitle, NAME_MAX);
+    return title ? [{ kind: 'title', ts: 0, title, rank: TITLE_RANK_CUSTOM }] : [];
+  }
 
   if (o.type === 'assistant') {
     for (const b of content) {
@@ -83,7 +90,10 @@ function parseObject(o) {
 export function parseLine(text) {
   try {
     const o = JSON.parse(text);
-    return isObj(o) ? parseObject(o) : [];
+    if (!isObj(o)) return [];
+    const evs = parseObject(o);
+    // Only the entrypoint name is read (never the line's other fields): lines of the desktop app say where the session was opened.
+    return o.entrypoint === 'claude-desktop' ? [{ kind: 'origin', ts: 0, origin: 'claudeApp' }, ...evs] : evs;
   } catch {
     return [];
   }

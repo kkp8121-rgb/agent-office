@@ -9,7 +9,7 @@
   "agent": { "doneLingerMs": 5400, "staleMs": 600000, "bubbleShowMs": 8000, "abandonMs": 1800000, "dirTrustMs": 2000, "roleMaxChars": 16 },
   "floor": { "leaveMs": 5000, "nameMaxChars": 30, "missTicks": 2, "transcriptRetryMs": 15000 },
   "workflow": { "scriptHeadBytes": 65536, "journalLineBytes": 8192, "doneQuietMs": 180000 },
-  "codex": { "enabled": true, "headBytes": 262144, "idleKeepMs": 1800000, "execKeepMs": 60000, "cwdMaxChars": 500 },
+  "codex": { "enabled": true, "headBytes": 262144, "idleKeepMs": 1800000, "execKeepMs": 60000, "cwdMaxChars": 500, "indexMaxBytes": 4194304 },
   "launch": { "healthTimeoutMs": 800 },
   "server": { "ssePingMs": 25000, "maxBodyBytes": 1024 },
   "ui": { "pip": { "width": 420, "height": 640 }, "rotate": { "seconds": 15 },
@@ -26,6 +26,8 @@
           "fail": { "seconds": 6, "patStreak": 3, "patCooldownSeconds": 60 },
           "season": { "halloween": { "from": [10, 24], "to": [10, 31] }, "christmas": { "from": [12, 18], "to": [12, 26] }, "lunar": { "daysBefore": 2, "daysAfter": 2 } },
           "daylight": { "sunset": [17, 19], "night": [19, 6] },
+          "origin": { "claudeApp": "Claude 앱", "codexWork": "Codex 앱 · Work", "codexApp": "Codex 앱" }, "untitled": "새 대화",
+          "reportsTitle": "일을 끝내고 결과를 넘긴 일꾼 {n}명 (사무실이 켜진 뒤로)",
           "dark": { "label": "다크 모드", "title": "어두운 화면으로 바꾸기 (창밖도 밤이 됩니다)", "roomDim": 0.5, "nightWindows": true },
           "snack": { "cooldownSeconds": 10, "eatMs": 900, "sparkleMs": 2000, "dropMarginPx": 8, "refuseMs": 2200, "kinds": ["coffee", "donut", "cookie", "fish"] },
           "lines": {

@@ -63,6 +63,8 @@ const pipBtn = $('pip');
 
 const STATUS_TEXT = { busy: '작업 중', waiting: '입력 대기', leaving: '퇴근 중' };
 const PROVIDER_TEXT = { claude: 'Claude', codex: 'Codex' };
+/** Chip text of a floor: where it was opened (desktop app) when known, else the provider. */
+const originText = (fv) => ui.ui.origin[fv.origin] ?? PROVIDER_TEXT[fv.provider] ?? fv.provider;
 
 let ui = null; // /api/ui
 let es = null; // EventSource (kept after close() so readyState stays inspectable)
@@ -1943,7 +1945,8 @@ function renderFloor(fv, elm) {
   setText(rec.fno, `${fv.floorNo}F`);
   setText(rec.ft, fv.title);
   setText(rec.ff, fv.folder);
-  setText(rec.prov, PROVIDER_TEXT[fv.provider] ?? fv.provider);
+  rec.ff.hidden = fv.folder === '';
+  setText(rec.prov, originText(fv));
   setText(rec.fs, STATUS_TEXT[fv.status] ?? fv.status);
   rec.fs.className = `fs ${fv.status}`;
   setText(rec.bt, fv.board.title);
@@ -1953,7 +1956,14 @@ function renderFloor(fv, elm) {
   rec.reports.hidden = fv.reports <= 0;
   rec.sheet = boardSheet(fv, ui.ui.board);
   renderBoard(rec);
-  if (fv.reports > 0) setText(rec.reports, `보고 ${fv.reports}`);
+  if (fv.reports > 0) {
+    setText(rec.reports, `보고 ${fv.reports}`);
+    const why = ui.ui.reportsTitle.replace('{n}', fv.reports);
+    if (rec.reports.title !== why) {
+      rec.reports.title = why;
+      rec.reports.setAttribute('aria-label', `보고 ${fv.reports}: ${why}`);
+    }
+  }
 
   const { lead } = rec.scene.r;
   const leadView = {
@@ -2020,7 +2030,7 @@ function renderRow(fv, rec) {
   rec.edit.setAttribute('aria-label', `${fv.title} 이름 바꾸기`);
   rec.eye.setAttribute('aria-label', `${fv.title} 숨기기`);
   const subs = fv.agents.filter((a) => a.state !== 'done').length;
-  setText(rec.meta, `${fv.floorNo}F · ${PROVIDER_TEXT[fv.provider] ?? fv.provider} · 서브 ${subs}${fv.workflows > 0 ? ` · 워크플로 ${fv.workflows}` : ''}`);
+  setText(rec.meta, `${fv.floorNo}F · ${originText(fv)} · 서브 ${subs}${fv.workflows > 0 ? ` · 워크플로 ${fv.workflows}` : ''}`);
 }
 
 // ---------- rename ----------
