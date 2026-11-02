@@ -27,6 +27,14 @@
     <button id="fullscreen" type="button" title="전체 화면으로 보기">전체 화면</button>
     <button id="panel-toggle" type="button" aria-controls="panel" aria-expanded="true">세션 창 숨기기</button>
     <button id="pip" type="button" hidden title="항상 위 작은 창으로 띄우기">작은 창</button>
+    <button id="settings" type="button" popovertarget="settings-panel" aria-haspopup="dialog" aria-expanded="false"></button>
+    <div id="settings-panel" popover role="dialog" aria-labelledby="settings-title">
+      <h2 id="settings-title"></h2>
+      <fieldset id="wx-choices"><legend></legend></fieldset>
+      <p id="wx-now" role="status"></p>
+      <p class="wx-credit" id="wx-credit"></p>
+      <button id="settings-close" type="button" popovertarget="settings-panel" popovertargetaction="hide"></button>
+    </div>
     <button id="quit" type="button">끄기</button>
   </div>
 </header>

@@ -6,6 +6,7 @@ import { Poller } from './poller.mjs';
 import { createServer } from './http.mjs';
 import { DETACHED_OPTIONS } from './launch.mjs';
 import { loadSaved, saveSaved } from './hidden.mjs';
+import { createWeather } from './weather.mjs';
 
 const EXIT_PORT_BUSY = 2;
 
@@ -13,6 +14,8 @@ const cfg = loadConfig();
 const dataDir = cfg.dataDir;
 const office = new Office(cfg, loadSaved(dataDir));
 const poller = new Poller(cfg, office);
+// The only outbound connection (see README: Weather). AGENT_OFFICE_WEATHER_URL points it at a local fake server for checks.
+const weather = createWeather(cfg.weather, { baseUrl: process.env.AGENT_OFFICE_WEATHER_URL || undefined });
 
 // ---- persistence: only when the saved part changed (hide/rename, or hide records dropped at session end) ----
 
@@ -54,7 +57,7 @@ function wake() {
   inflight = round();
 }
 
-const server = createServer(cfg, office, { onSavedChange: saveIfChanged, onShutdown: shutdown, onSseConnect: wake });
+const server = createServer(cfg, office, { onSavedChange: saveIfChanged, onShutdown: shutdown, onSseConnect: wake, weather });
 
 server.on('error', (e) => {
   if (e.code === 'EADDRINUSE') {

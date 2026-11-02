@@ -63,7 +63,7 @@ function readBody(req, max) {
   });
 }
 
-export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConnect } = {}) {
+export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConnect, weather } = {}) {
   const clients = new Set(); // open SSE responses
   let lastStateJson = null; // last floors JSON sent; null = send the next state in full
 
@@ -93,7 +93,14 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
     if (clients.size === 0) lastStateJson = JSON.stringify(snap.floors); // only client: in sync now; an older client's baseline is never overwritten
     res.write(frame('log', office.queryLog({ limit: cfg.log.sendCap }).reverse()));
     clients.add(res);
-    res.on('close', () => clients.delete(res));
+    res.on('close', () => {
+      clients.delete(res);
+      weather?.disconnect();
+    });
+    if (weather?.enabled) { // the weather source runs only while a page is connected
+      res.write(frame('weather', weather.current()));
+      weather.connect();
+    }
     onSseConnect?.();
   }
 
@@ -120,6 +127,10 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
     for (const res of clients) res.end();
     clients.clear();
   };
+
+  weather?.subscribe((field) => { // only when the kind changes: a small field, never the raw answer
+    for (const res of clients) res.write(frame('weather', field));
+  });
 
   Object.defineProperty(server, 'sseClients', { get: () => clients.size });
 
@@ -180,6 +191,7 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
     return {
       spriteHeight: cfg.spriteHeight, ui: cfg.ui, bubbleShowMs: cfg.agent.bubbleShowMs, nameMaxChars: cfg.floor.nameMaxChars, roles, leads: cfg.leads.map((l) => l.key),
       scenes, sitSprites, sitHeight: cfg.sitHeight, nav: cfg.nav, depth: cfg.depth,
+      weather: { enabled: Boolean(weather?.enabled), city: cfg.weather?.city ?? '' },
     };
   }
 

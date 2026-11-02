@@ -502,3 +502,59 @@ li.plain { font-weight: 700; }
 .sparkle i { position: absolute; width: 11px; height: 11px; margin: -5px 0 0 -5px; background-size: 100% 100%; image-rendering: pixelated; animation: glint .7s ease-in-out infinite; animation-delay: calc(var(--k) * -.23s); }
 @keyframes glint { 0%, 100% { transform: scale(.4); opacity: 0; } 50% { transform: scale(1.15); opacity: 1; } }
 #topbar button.snack[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
+
+/* ---- weather in the windows (web/weather.mjs): one clipped box per window polygon, above the glass tint (.sky) and below every object.
+   Motion is transform/opacity keyframes only, stepped (a few pictures per second: the compositor redraws only when a step lands, which costs a fraction of a smooth 60 fps), on displayed floors only (a hidden floor is display:none, so nothing runs there).
+   Rain and snow tiles repeat on both axes and move one tile width left per tile height down, which loops without a seam. ---- */
+.wx { position: absolute; inset: 0; pointer-events: none; }
+.wx-win { position: absolute; background: var(--wx-wash, transparent); }
+.wx-a, .wx-b, .wx-f { position: absolute; display: none; image-rendering: pixelated; }
+.wx[data-wx="cloudy"] { --wx-wash: rgba(176, 186, 200, .42); }
+.wx[data-wx="fog"] { --wx-wash: rgba(226, 230, 236, .62); }
+.wx[data-wx="rain"] { --wx-wash: rgba(112, 128, 150, .55); }
+.wx[data-wx="snow"] { --wx-wash: rgba(150, 168, 198, .4); }
+.wx[data-wx="storm"] { --wx-wash: rgba(52, 62, 86, .68); }
+.stage[data-light="night"] .wx[data-wx="cloudy"] { --wx-wash: rgba(22, 30, 58, .34); }
+.stage[data-light="night"] .wx[data-wx="fog"] { --wx-wash: rgba(84, 96, 126, .5); }
+.stage[data-light="night"] .wx[data-wx="rain"] { --wx-wash: rgba(16, 24, 50, .5); }
+.stage[data-light="night"] .wx[data-wx="snow"] { --wx-wash: rgba(52, 66, 104, .42); }
+.stage[data-light="night"] .wx[data-wx="storm"] { --wx-wash: rgba(8, 12, 30, .62); }
+
+.wx[data-wx="rain"] .wx-a, .wx[data-wx="storm"] .wx-a { display: block; left: 0; top: -144px; width: calc(100% + 48px); height: calc(100% + 144px); background: url(/assets/fx/wx-rain-a.png); animation: wx-rain-a 1.2s steps(10) infinite; }
+.wx[data-wx="rain"] .wx-b, .wx[data-wx="storm"] .wx-b { display: block; left: 0; top: -96px; width: calc(100% + 32px); height: calc(100% + 96px); background: url(/assets/fx/wx-rain-b.png); opacity: .75; animation: wx-rain-b 1.6s steps(10) infinite; }
+.wx[data-wx="storm"] .wx-a { animation: wx-rain-a .9s steps(9) infinite; }
+.wx[data-wx="storm"] .wx-b { animation: wx-rain-b 1.2s steps(8) infinite; }
+.wx[data-wx="snow"] .wx-a { display: block; left: 0; top: -144px; width: calc(100% + 48px); height: calc(100% + 144px); background: url(/assets/fx/wx-snow-a.png); animation: wx-snow-a 5.5s steps(24) infinite; }
+.wx[data-wx="snow"] .wx-b { display: block; left: 0; top: -100px; width: calc(100% + 40px); height: calc(100% + 100px); background: url(/assets/fx/wx-snow-b.png); opacity: .8; animation: wx-snow-b 7.5s steps(20) infinite; }
+.wx[data-wx="cloudy"] .wx-a { display: block; left: -144px; top: 4%; width: calc(100% + 144px); height: 32px; background: url(/assets/fx/wx-cloud-a-day.png) repeat-x; opacity: .92; animation: wx-drift-a 70s steps(144) infinite; }
+.wx[data-wx="cloudy"] .wx-b { display: block; left: -88px; top: 46%; width: calc(100% + 88px); height: 24px; background: url(/assets/fx/wx-cloud-b-day.png) repeat-x; opacity: .85; animation: wx-drift-b 95s steps(88) infinite; }
+.stage[data-light="night"] .wx[data-wx="cloudy"] .wx-a { background-image: url(/assets/fx/wx-cloud-a-night.png); }
+.stage[data-light="night"] .wx[data-wx="cloudy"] .wx-b { background-image: url(/assets/fx/wx-cloud-b-night.png); }
+.wx[data-wx="fog"] .wx-a { display: block; inset: 0; background: linear-gradient(to top, rgba(255, 255, 255, .42), rgba(255, 255, 255, .06) 75%); }
+.stage[data-light="night"] .wx[data-wx="fog"] .wx-a { background: linear-gradient(to top, rgba(150, 166, 204, .34), rgba(150, 166, 204, .05) 75%); }
+.wx[data-wx="storm"] .wx-f { display: block; inset: 0; background: #e4ebff; opacity: 0; animation: wx-flash 11s linear infinite; } /* one slow flash every 11 s, the same in every window */
+/* each window starts its moving layers at its own phase (the flash stays in step) */
+.wx[data-wx] .wx-a, .wx[data-wx] .wx-b { animation-delay: calc(var(--wx-p, 0) * -9s); }
+@keyframes wx-rain-a { to { transform: translate(-48px, 144px); } }
+@keyframes wx-rain-b { to { transform: translate(-32px, 96px); } }
+@keyframes wx-snow-a { to { transform: translate(-48px, 144px); } }
+@keyframes wx-snow-b { to { transform: translate(-40px, 100px); } }
+@keyframes wx-drift-a { to { transform: translateX(144px); } }
+@keyframes wx-drift-b { to { transform: translateX(88px); } }
+@keyframes wx-flash { 0%, 85% { opacity: 0; } 88% { opacity: .3; } 93%, 100% { opacity: 0; } }
+body.paused .wx-a, body.paused .wx-b, body.paused .wx-f { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .wx-a, .wx-b, .wx-f { animation: none !important; }
+  .wx .wx-f { display: none !important; }
+}
+
+/* settings panel (native popover under the 설정 button; the weather choice lives here) */
+#settings-panel { position: fixed; inset: auto; margin: 0; width: 252px; padding: 10px 12px; color: var(--ink); background: var(--panel); border: 1.5px solid var(--ink); box-shadow: 2px 2px 0 rgba(59, 47, 34, .3); font-size: 12px; }
+#settings-panel h2 { margin: 0 0 6px; font-size: 13px; }
+#settings-panel fieldset { margin: 0; padding: 0; border: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; }
+#settings-panel legend { padding: 0; margin-bottom: 4px; font-weight: 700; }
+#settings-panel .wx-opt { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+#settings-panel .wx-opt:first-of-type { grid-column: 1 / -1; }
+#settings-panel p { margin: 8px 0 0; }
+#settings-panel .wx-credit { color: var(--muted); font-size: 11px; }
+#settings-panel #settings-close { margin-top: 8px; }

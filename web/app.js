@@ -15,6 +15,7 @@ import { boardCapacity, boardFrame, boardSheet, itemWindow, sheetKey } from './b
 import { assignSpots, clipPhase, moodKind, patDue } from './meeting.mjs';
 import { lightAt, msToNextChange, placeSeason, seasonOn } from './season.mjs';
 import { pickAt, snackOutcome } from './snack.mjs';
+import { CHOICES as WX_CHOICES, buildWeather, effectKind, loadChoice, saveChoice, setWeatherKind, statusLine } from './weather.mjs';
 
 // Visual constants (how things look/move, not planning numbers; those come from /api/ui).
 const WALK_PX_PER_SEC = 150;
@@ -37,6 +38,8 @@ const FX_URL = '/assets/fx/'; // the failure faces (sweat-drop, rain-cloud-1/2) 
 const SNACK_URL = '/assets/snacks/snack-'; // + coffee|donut|cookie|fish + .png
 const ITEMS_URL = '/assets/seasonal/items.json'; // size and anchor of every decoration
 const SKY_Z = 1; // the window glass tint: above the room picture, below every object
+const WX_Z = 1; // the weather in the windows: the same layer as the glass tint, drawn after it (DOM order), below every object
+const WX_KEY = 'agent-office.weather'; // localStorage: the weather choice of this viewer
 const WALL_Z_BELOW = 2; // wall decorations draw this far under the lowest floor object (zBase), above the glass tint
 const SPARKLE_SPOTS = [[-14, -10], [12, -26], [-6, -40]]; // where the three sparkles hover, from the character's feet (the tag layer origin)
 const SNACK_PIP_TIP = '작은 창에서는 간식을 줄 수 없습니다 (창 사이로는 끌 수 없어요)';
@@ -1924,6 +1927,7 @@ function createFloor(fv) {
   makeBoard(rec);
   makeSky(rec);
   syncDecor(rec);
+  syncWeather(rec);
   if (DEBUG_NAV) {
     rec.dbg = buildNavDebug(rec, sc);
     stage.append(rec.dbg.svg);
@@ -2260,6 +2264,7 @@ function connect() {
   es.addEventListener('log', (ev) => appendLog(JSON.parse(ev.data)));
   es.addEventListener('phase', (ev) => onPhase(JSON.parse(ev.data)));
   es.addEventListener('fail', (ev) => onFail(JSON.parse(ev.data)));
+  es.addEventListener('weather', (ev) => onWeather(JSON.parse(ev.data)));
   es.addEventListener('error', () => {
     showConn('연결이 끊겼습니다. 다시 연결하는 중…');
     // The browser retries by itself unless the server refused the stream (then the state is CLOSED).
@@ -2295,6 +2300,78 @@ async function resume() {
   catSync();
   armRotate();
   connect();
+}
+
+// ---------- weather in the windows and the settings panel (web/weather.mjs; style.css "weather") ----------
+
+let wxChoice = 'auto'; // auto | clear | cloudy | fog | rain | snow | storm | off (kept per viewer)
+let wxReal = null; // the last `weather` event {kind, city, time}: the real weather, or null before the first one
+const wxStorage = () => localStorage; // a getter, so a blocked storage throws inside weather.mjs' try/catch
+
+/** Brings one floor's window overlay in step with the choice and the real weather. A floor that is not shown is left as it is and catches up when it is shown. */
+function syncWeather(frec) {
+  if (frec.off) return;
+  const kind = effectKind(wxChoice, wxReal?.kind);
+  if (!frec.wx) {
+    const windows = frec.scene.raw.windows;
+    if (kind === 'none' || kind === 'clear' || !windows?.length) return; // nothing to draw: nothing is built
+    frec.wx = buildWeather(document, windows, WX_Z);
+    const sky = frec.stage.querySelector(':scope > .sky');
+    if (sky) sky.after(frec.wx);
+    else frec.stage.prepend(frec.wx);
+  }
+  setWeatherKind(frec.wx, kind);
+}
+
+function applyWeather() {
+  for (const f of floorRecs.values()) syncWeather(f);
+}
+
+function onWeather(field) {
+  wxReal = field;
+  setText($('wx-now'), statusLine(ui.ui.weather, ui.weather.enabled, wxReal, ui.weather.city));
+  applyWeather(); // only when the kind changes does the server send one, and only the auto choice follows it
+}
+
+/** The 설정 button and its panel: a native popover (Esc and a click outside close it, focus returns to the button). */
+function initWeather() {
+  const S = ui.ui.weather;
+  wxChoice = loadChoice(wxStorage, WX_KEY);
+  const btn = $('settings');
+  const panel = $('settings-panel');
+  setText(btn, S.button);
+  btn.title = S.buttonTitle;
+  setText($('settings-title'), S.title);
+  setText($('settings-close'), S.close);
+  setText($('wx-credit'), S.credit);
+  const group = $('wx-choices');
+  setText(group.querySelector('legend'), S.group);
+  for (const value of WX_CHOICES) {
+    const label = el('label', 'wx-opt');
+    const radio = el('input');
+    radio.type = 'radio';
+    radio.name = 'wx';
+    radio.value = value;
+    radio.checked = value === wxChoice;
+    radio.addEventListener('change', () => {
+      wxChoice = value;
+      saveChoice(wxStorage, WX_KEY, value);
+      applyWeather();
+    });
+    label.append(radio, ` ${S.choices[value]}`);
+    group.append(label);
+  }
+  setText($('wx-now'), statusLine(S, ui.weather.enabled, wxReal, ui.weather.city));
+  panel.addEventListener('toggle', (ev) => {
+    const open = ev.newState === 'open';
+    setAttr(btn, 'aria-expanded', String(open));
+    if (!open) return;
+    const r = btn.getBoundingClientRect();
+    panel.style.top = `${r.bottom + 6}px`;
+    panel.style.right = `${Math.max(8, document.documentElement.clientWidth - r.right)}px`;
+    group.querySelector('input:checked')?.focus();
+  });
+  applyWeather();
 }
 
 // ---------- floor switcher: top bar, single-floor view, rotation, fullscreen, session panel ----------
@@ -2402,6 +2479,7 @@ function setOff(f, off) {
   } else {
     renderBoard(f);
     syncDecor(f);
+    syncWeather(f);
     startAmbient(f, true);
   }
 }
@@ -2753,6 +2831,7 @@ async function init() {
   }
   setupScenes();
   applyTime();
+  initWeather();
   connEl.hidden = true;
   if (document.hidden) document.body.classList.add('paused');
   else connect();

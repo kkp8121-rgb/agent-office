@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test --test-timeout=30000 tests/*.test.mjs"
+    "test": "node --import ./tests/helpers/no-outbound.mjs --test --test-timeout=30000 tests/*.test.mjs"
   }
 }
