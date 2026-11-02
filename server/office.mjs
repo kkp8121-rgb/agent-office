@@ -22,6 +22,7 @@ const UNSAFE_NAME_CHARS = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
 
 const TODO_VIEW_MAX = 12; // to-do items on the whiteboard; the in-progress one is always among them
 const PHASES_SEEN_MAX = 30; // phases kept for a run whose script lists none
+const FAIL_CAP = 500; // most failure times a floor keeps for the lobby wall (a storm of failures stops counting there)
 const SIGNAL_CAP = 100; // live events (phase, fail) waiting for the next broadcast; the oldest are dropped past this
 const LEAD_KEY = 'lead'; // agent key of the main session in fail events
 
@@ -231,7 +232,7 @@ export class Office {
       usedNames: new Set([lead.name]),
       usedSlots: new Set(),
       reports: 0,
-      fails: 0, // failed tool results seen live since this floor appeared (the lobby wall counts them)
+      failAt: [], // times (ms) of the live failed tool results of the last ui.lobby.failMinutes (the lobby wall counts them; at most FAIL_CAP kept)
       unknownSeq: this.floorSeq * 5, // start of the pool scan for agents that need a borrowed face; advances per pick, and floors start apart
     };
   }
@@ -374,8 +375,18 @@ export class Office {
       return;
     }
     actor.failStreak = (actor.failStreak ?? 0) + 1;
-    if (!f.hidden && this.#isLive(f, ev)) f.fails++;
+    if (!f.hidden && this.#isLive(f, ev)) {
+      this.#pruneFails(f, this.now);
+      f.failAt.push(ev.ts);
+      if (f.failAt.length > FAIL_CAP) f.failAt.shift();
+    }
     if (!f.hidden && this.#isLive(f, ev)) this.#signal({ type: 'fail', sessionId: f.sessionId, agent: isLead ? LEAD_KEY : actor.key, streak: actor.failStreak });
+  }
+
+  /** Drops the failure times older than the lobby's failure window. */
+  #pruneFails(f, now) {
+    const from = now - (this.cfg.ui?.lobby?.failMinutes ?? 10) * 60000;
+    if (f.failAt.some((t) => t < from)) f.failAt = f.failAt.filter((t) => t >= from);
   }
 
   #applyTodos(f, ev) {
@@ -650,6 +661,7 @@ export class Office {
         changed = true;
         continue;
       }
+      this.#pruneFails(f, now);
       for (const a of [...f.agents.values()]) {
         if (a.state === 'done') {
           if (now - a.doneAt >= agent.doneLingerMs) {
@@ -765,7 +777,7 @@ export class Office {
         sheet: this.#sheetView(f, todos),
         reports: f.reports,
         startedAt: f.startedAt,
-        fails: f.fails,
+        failAt: [...f.failAt],
         workflows: [...f.workflows.keys()].filter((id) => !f.doneRuns.has(id)).length,
         agents: [...f.agents.values()].map((a) => ({
           key: a.key,

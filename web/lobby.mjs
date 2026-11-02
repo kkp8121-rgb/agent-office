@@ -71,7 +71,8 @@ function pickSlot(free, mine) {
  * Where each roster entry sits: Map(key -> {kind: 'seat'|'overflow', i} | null). Entries keep the place they had in `prev`;
  * an overflow member moves to a free seat first, then newcomers are placed next to their own floor's seats (a floor with
  * none starts at the longest free run, so it has room to grow); a full lobby puts them on the standing spots, and beyond
- * those they get null (listed on the wall only).
+ * those they get null (listed on the wall only). A newcomer that is already `done` is left out of the map (no seat, no figure, not
+ * counted as unseated): it reported before the lobby ever drew it. One that already had a place keeps it.
  */
 export function assignLobbySeats(prev, roster, seatCount, overflowCount) {
   const seats = new Array(seatCount).fill(true);
@@ -93,7 +94,7 @@ export function assignLobbySeats(prev, roster, seatCount, overflowCount) {
     else if (p?.kind === 'overflow' && p.i < overflowCount && spots[p.i]) {
       take(e, 'overflow', p.i);
       promoting.push(e);
-    } else waiting.push(e);
+    } else if (e.state !== 'done') waiting.push(e);
   }
   const place = (e, kinds) => {
     for (const kind of kinds) {
@@ -115,8 +116,11 @@ export function assignLobbySeats(prev, roster, seatCount, overflowCount) {
   return out;
 }
 
-/** The numbers of the five big cells (+ the sleepy count), over the roster and the floors. */
-export function headline(roster, floors) {
+/**
+ * The numbers of the five big cells (+ the sleepy count), over the roster and the floors.
+ * 실패 = the failed tool results of every floor in the last `failMs` before `now` (the server sends their times in `failAt`), so it falls back to 0 when things calm down.
+ */
+export function headline(roster, floors, now, failMs) {
   let working = 0;
   let waiting = 0;
   let sleepy = 0;
@@ -131,7 +135,7 @@ export function headline(roster, floors) {
   for (const f of floors) {
     reports += f.reports ?? 0;
     projects += f.workflows ?? 0;
-    fails += f.fails ?? 0;
+    for (const t of f.failAt ?? []) if (t > now - failMs && t <= now + 1000) fails++;
   }
   return { working, waiting, sleepy, reports, projects, fails };
 }
@@ -185,15 +189,31 @@ export const stateLabel = (e, labels) => (e.floorStatus === 'leaving' ? labels.s
 
 /**
  * One table row per roster entry: cells in column order (이름, 층, 구분, 상태, 지금 하는 일, 근무 시간, 보고) and the full task text for the tooltip.
- * `labels` = ui.lobby, `bubbleMax` = ui.bubbleMaxChars, `now` in ms.
+ * `labels` = ui.lobby, `bubbleMax` = ui.bubbleMaxChars, `now` in ms, `statusWords` = ui.play.statusBubbles (the stock phrases of a quiet 직원).
+ * No column repeats another: see taskCell.
  */
-export function employeeRows(roster, now, labels, bubbleMax) {
+export function employeeRows(roster, now, labels, bubbleMax, statusWords = []) {
   return roster.map((e) => {
-    const task = e.bubble ? clip(e.bubble, bubbleMax) : '-';
+    const state = stateLabel(e, labels);
     const started = e.startedAt > 0 ? fmtDuration(now - e.startedAt, labels) : '-';
-    const cells = [e.name, fill(labels.floorLabel, { n: e.floorNo }), labels.rank[e.rank], stateLabel(e, labels), task, started, e.reports > 0 ? String(e.reports) : '-'];
+    const others = [e.name, fill(labels.floorLabel, { n: e.floorNo }), labels.rank[e.rank], state, started];
+    const cells = [others[0], others[1], others[2], state, taskCell(e.bubble, others, statusWords, bubbleMax), started, e.reports > 0 ? String(e.reports) : '-'];
     return { key: e.key, sid: e.sid, state: e.state, floorStatus: e.floorStatus, cells, text: cells.join('|') };
   });
+}
+
+/** A phrase without its trailing dots, ellipsis and spaces, so 「생각 중…」 and 「생각 중」 compare equal. */
+const stem = (t) => String(t ?? '').replace(/[\s.…·]+$/u, '').trim();
+
+/**
+ * 지금 하는 일 of a row. The cell carries what the other columns do not already say, so it is 「-」 when the bubble is empty, when it only
+ * repeats another cell of the row (the 상태 word 「생각 중」 as 「생각 중…」, a name, a floor, a rank), or when it is one of the stock phrases
+ * a quiet 직원 shows (`statusWords`: 생각 중 / 응답 없음 / 입력 대기 / 작업 중 / 퇴근 중), which only restate the 상태. Otherwise the clipped text.
+ */
+export function taskCell(bubble, others, statusWords, max) {
+  const t = stem(bubble);
+  if (!t || others.some((c) => stem(c) === t) || statusWords.some((w) => stem(w) === t)) return '-';
+  return clip(bubble, max);
 }
 
 /** Rows that fit a wall panel `h` px high: the header takes one line and the padding both sides (at least 1). */

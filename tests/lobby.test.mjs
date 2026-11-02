@@ -20,7 +20,7 @@ const EMPTY = { hidden: [], names: {} };
 
 const agent = (key, o = {}) => ({ key, name: key, role: '개발', sprite: 'worker', state: 'working', bubble: '', since: 0, enteredAt: 0, wf: false, ...o });
 const floor = (sid, floorNo, agents = [], o = {}) => ({
-  sessionId: sid, floorNo, colorIndex: floorNo, title: `층 ${floorNo}`, status: 'busy', startedAt: 1000, reports: 0, workflows: 0, fails: 0,
+  sessionId: sid, floorNo, colorIndex: floorNo, title: `층 ${floorNo}`, status: 'busy', startedAt: 1000, reports: 0, workflows: 0, failAt: [],
   lead: { name: `팀장${floorNo}`, role: '팀장', sprite: 'lead', state: 'idle', bubble: '' }, agents, ...o,
 });
 
@@ -89,6 +89,19 @@ test('lobby seats: full seats overflow to standing spots, then nothing; an overf
   assert.equal([...m.values()].filter((v) => v === null).length, 1, '8 - 1 left = 7 for 6 places');
 });
 
+test('lobby seats: a newcomer that is already done reserves no seat and is not counted as unseated; one that had a place keeps it', () => {
+  const a = [...R('a', 2), { key: 'a:d', sid: 'a', state: 'done' }, { key: 'a:w', sid: 'a', state: 'working' }];
+  let m = assignLobbySeats(new Map(), a, 10, 2);
+  assert.equal(m.has('a:d'), false, 'no entry at all (undefined), so the page draws nothing and counts nobody');
+  assert.equal(seatIdx(m, 'a:w'), 2, 'the next worker takes the seat the done one would have blocked');
+  assert.equal(new Set([...m.values()].map((v) => v.i)).size, 3);
+  const prev = new Map([['a:d', { kind: 'seat', i: 7 }]]);
+  m = assignLobbySeats(prev, [{ key: 'a:d', sid: 'a', state: 'done' }], 10, 2);
+  assert.deepEqual(m.get('a:d'), { kind: 'seat', i: 7 }, 'it was drawn before: it keeps its place until it leaves');
+  m = assignLobbySeats(new Map(), [{ key: 'x', sid: 'x', state: 'done' }], 0, 0);
+  assert.equal(m.size, 0, 'a full lobby: a done newcomer is not "unseated" either');
+});
+
 test('lobby seats: 60 agents fill 40 seats + 12 spots, the other 8 are null, and no slot is used twice', () => {
   const roster = [...R('a', 25), ...R('b', 20), ...R('c', 15)];
   const m = assignLobbySeats(new Map(), roster, 40, 12);
@@ -101,14 +114,36 @@ test('lobby seats: 60 agents fill 40 seats + 12 spots, the other 8 are null, and
 
 // ---- headline numbers ----
 
+const NOW = 1_000_000;
+const WIN = 10 * 60000;
+
 test('lobby headline: 근무 중 / 대기 / 졸음 from states, 보고 / 프로젝트 / 실패 summed over floors; done counts nowhere', () => {
   const roster = lobbyRoster([
-    floor('a', 2, [agent('a:1', { state: 'working' }), agent('a:2', { state: 'thinking' }), agent('a:3', { state: 'stale' }), agent('a:4', { state: 'done' }), agent('a:5', { state: 'enter' })], { reports: 2, workflows: 1, fails: 3 }),
-    floor('b', 3, [], { reports: 5, workflows: 2, fails: 0, lead: { name: 'x', role: '팀장', sprite: 'lead', state: 'working', bubble: '' } }),
+    floor('a', 2, [agent('a:1', { state: 'working' }), agent('a:2', { state: 'thinking' }), agent('a:3', { state: 'stale' }), agent('a:4', { state: 'done' }), agent('a:5', { state: 'enter' })], { reports: 2, workflows: 1 }),
+    floor('b', 3, [], { reports: 5, workflows: 2, lead: { name: 'x', role: '팀장', sprite: 'lead', state: 'working', bubble: '' } }),
   ]);
-  const floors = [{ reports: 2, workflows: 1, fails: 3 }, { reports: 5, workflows: 2, fails: 0 }];
-  assert.deepEqual(headline(roster, floors), { working: 3, waiting: 3, sleepy: 1, reports: 7, projects: 3, fails: 3 });
-  assert.deepEqual(headline([], []), { working: 0, waiting: 0, sleepy: 0, reports: 0, projects: 0, fails: 0 });
+  const floors = [{ reports: 2, workflows: 1, failAt: [NOW - 1000, NOW - 2000, NOW - 3000] }, { reports: 5, workflows: 2, failAt: [] }];
+  assert.deepEqual(headline(roster, floors, NOW, WIN), { working: 3, waiting: 3, sleepy: 1, reports: 7, projects: 3, fails: 3 });
+  assert.deepEqual(headline([], [], NOW, WIN), { working: 0, waiting: 0, sleepy: 0, reports: 0, projects: 0, fails: 0 });
+});
+
+test('lobby headline: 실패 counts the failures of the last window over all floors and ages out (no unbounded growth)', () => {
+  const floors = [{ failAt: [NOW - 11 * 60000, NOW - 9 * 60000, NOW - 1000] }, { failAt: [NOW - 5 * 60000, NOW - WIN - 1] }, {}];
+  assert.equal(headline([], floors, NOW, WIN).fails, 3, 'the two older than 10 minutes are gone');
+  assert.equal(headline([], floors, NOW + 6 * 60000, WIN).fails, 1, '6 minutes later only the newest is left');
+  assert.equal(headline([], floors, NOW + 11 * 60000, WIN).fails, 0, 'a quiet window is 0');
+  assert.equal(headline([], [{ failAt: [NOW - WIN] }], NOW, WIN).fails, 0, 'exactly a window old is out');
+  assert.equal(headline([], [{ failAt: [NOW + 60000] }], NOW, WIN).fails, 0, 'a time from the future (clock skew) is not counted');
+});
+
+test('lobby headline: the window is a planning number in config.json and the label says it; the cell is red only above 0', () => {
+  assert.equal(L.failMinutes, 10);
+  assert.equal(L.head.fails.replace('{m}', L.failMinutes), '실패 (10분)');
+  const app = readFileSync(join(ROOT, 'web', 'app.js'), 'utf8');
+  assert.match(app, /headline\(lb\.roster, lb\.floors, now, L\.failMinutes \* 60000\)/);
+  assert.match(app, /data-alarm', hc\.fails > 0 \? 'on' : 'off'/);
+  const css = readFileSync(join(ROOT, 'web', 'style.css'), 'utf8');
+  assert.match(css, /\.led-cells \.val\[data-alarm="on"\] \{ color: var\(--led-up\); \}/);
 });
 
 // ---- 사무실 지수 ----
@@ -201,6 +236,40 @@ test('lobby board: one row per roster entry with every column; the task is the b
   assert.equal(rows[1].cells[6], '1');
   assert.equal(rows[1].sid, 'a');
   assert.equal(employeeRows([{ ...roster[0], startedAt: 0 }], now, L, 16)[0].cells[5], '-');
+});
+
+test('lobby board: no column repeats another (생각 중 / 생각 중… in 상태 and 지금 하는 일 is shown once)', () => {
+  const now = 10 * 60000;
+  const words = cfg.ui.play.statusBubbles;
+  const e = (state, bubble, o = {}) => lobbyRoster([floor('a', 2, [agent('a:1', { name: '서진', state, bubble, enteredAt: 1000, ...o })])])[1];
+  const task = (state, bubble) => employeeRows([e(state, bubble)], now, L, 16, words)[0].cells[4];
+  assert.equal(task('thinking', '생각 중…'), '-', 'the bubble that says what 상태 says');
+  assert.equal(task('thinking', '생각 중'), '-');
+  assert.equal(task('thinking', '생각 중...'), '-');
+  assert.equal(task('working', '근무 중'), '-', 'equal to the 상태 word');
+  assert.equal(task('stale', '응답 없음'), '-', 'a stock phrase of a quiet 직원 only restates 상태');
+  assert.equal(task('idle', '입력 대기'), '-');
+  assert.equal(task('working', '작업 중'), '-');
+  assert.equal(task('working', '서진'), '-', 'equal to the name');
+  assert.equal(task('working', '2층'), '-', 'equal to the 층 cell');
+  assert.equal(task('working', 'npm test 실행'), 'npm test 실행', 'real work is kept');
+  assert.equal(task('thinking', '생각 중 입니다'), '생각 중 입니다', 'only a whole repeat is cut, not a text that contains the word');
+  assert.equal(task('working', ''), '-');
+  for (const [state, bubble] of [['thinking', '생각 중…'], ['working', '근무 중'], ['stale', '응답 없음'], ['working', 'npm test 실행'], ['idle', '']]) {
+    const cells = employeeRows([e(state, bubble)], now, L, 16, words)[0].cells;
+    const named = [0, 1, 2, 3, 4].map((i) => cells[i]).filter((c) => c !== '-');
+    assert.equal(new Set(named.map((c) => c.replace(/[\s.…]+$/u, ''))).size, named.length, `${state}/${bubble}: ${cells.join('|')}`);
+  }
+});
+
+test('lobby board: every wall string says N층, never NF (the plaque 「1F 로비」 keeps its style)', () => {
+  const walls = JSON.stringify({ ...L, sign: '', tab: '' });
+  assert.doesNotMatch(walls, /\d\s*F\b|\{n\}F/);
+  assert.equal(L.floorLabel, '{n}층');
+  assert.equal(L.sign, '1F 로비');
+  const rows = employeeRows(lobbyRoster([floor('a', 6, [agent('a:1', { name: '서진' })])]), 10 * 60000, L, 16, []);
+  assert.ok(rows.every((r) => r.cells[1] === '6층'));
+  assert.equal(newsText({ ts: 0, name: '서진', text: '일했다' }, 6, L).includes('6층'), true);
 });
 
 test('lobby board: capacity and pages', () => {
@@ -301,14 +370,14 @@ test('lobby server: startedAt, fails, enteredAt and wf are numbers and booleans 
   o.syncAgents('s1', [M('a1', { mtimeMs: 7777 }), M('w1', { workflow: { runId: 'r', phase: 'Review', label: 'ctx' } })], 100000);
   const f = floorOf(o, 's1');
   assert.equal(f.startedAt, 4242);
-  assert.equal(f.fails, 0);
+  assert.deepEqual(f.failAt, []);
   const a1 = f.agents.find((a) => a.agentId === 'a1');
   const w1 = f.agents.find((a) => a.agentId === 'w1');
   assert.equal(a1.enteredAt, 7777);
   assert.equal(a1.wf, false);
   assert.equal(w1.wf, true);
   assert.equal(w1.enteredAt, 100000, 'no meta time: when it was found');
-  for (const v of [f.startedAt, f.fails, a1.enteredAt, w1.enteredAt]) assert.equal(typeof v, 'number');
+  for (const v of [f.startedAt, ...f.failAt, a1.enteredAt, w1.enteredAt]) assert.equal(typeof v, 'number');
 });
 
 test('lobby server: fails counts live failed tool results only, never a hidden floor or backfill', () => {
@@ -316,14 +385,31 @@ test('lobby server: fails counts live failed tool results only, never a hidden f
   o.syncSessions([S('s1')], 100000);
   const fail = (ts) => ({ kind: 'toolDone', ts, toolUseId: `d${ts}`, error: true });
   o.applySessionEvents('s1', [fail(50000)], 100001); // before the floor existed: backfill
-  assert.equal(floorOf(o, 's1').fails, 0);
+  assert.deepEqual(floorOf(o, 's1').failAt, []);
   o.applySessionEvents('s1', [fail(100100), fail(100200), { kind: 'toolDone', ts: 100300, toolUseId: 'ok' }], 100300);
-  assert.equal(floorOf(o, 's1').fails, 2);
+  assert.deepEqual(floorOf(o, 's1').failAt, [100100, 100200]);
   o.syncSessions([S('s2')], 100000);
   assert.equal(o.hide('s2'), true);
   o.applySessionEvents('s2', [fail(100400)], 100400);
   o.syncSessions([S('s2')], 100500); // visible again only after a re-run; nothing was counted while hidden
-  assert.equal(floorOf(o, 's2')?.fails ?? 0, 0);
+  assert.deepEqual(floorOf(o, 's2')?.failAt ?? [], []);
+});
+
+test('lobby server: failure times older than the window are dropped, at most 500 are kept, and the window is config', () => {
+  const win = cfg.ui.lobby.failMinutes * 60000;
+  const o = new Office(cfg, EMPTY);
+  o.syncSessions([S('s1')], 100000);
+  const fail = (ts) => ({ kind: 'toolDone', ts, toolUseId: `d${ts}`, error: true });
+  o.applySessionEvents('s1', [fail(100100)], 100100);
+  const later = 100100 + win + 5000;
+  o.applySessionEvents('s1', [fail(later)], later); // pruned on the next failure
+  assert.deepEqual(floorOf(o, 's1').failAt, [later]);
+  o.applySessionEvents('s1', [fail(later + 1000)], later + 1000);
+  o.tick(later + 1000 + win + 1); // and by the clock tick
+  assert.deepEqual(floorOf(o, 's1').failAt, []);
+  const burst = Array.from({ length: 600 }, (_, i) => fail(later + 2000 + i));
+  o.applySessionEvents('s1', burst, later + 3000);
+  assert.equal(floorOf(o, 's1').failAt.length, 500);
 });
 
 test('lobby server: the snapshot adds no text field (privacy list unchanged)', () => {
@@ -331,7 +417,7 @@ test('lobby server: the snapshot adds no text field (privacy list unchanged)', (
   o.syncSessions([S('s1')], 100000);
   o.syncAgents('s1', [M('a1')], 100000);
   const f = floorOf(o, 's1');
-  assert.deepEqual(Object.keys(f).sort(), ['agents', 'autoTitle', 'board', 'colorIndex', 'design', 'fails', 'floorNo', 'folder', 'lead', 'origin', 'provider', 'reports', 'sessionId', 'sheet', 'startedAt', 'status', 'title', 'todos', 'workflows']);
+  assert.deepEqual(Object.keys(f).sort(), ['agents', 'autoTitle', 'board', 'colorIndex', 'design', 'failAt', 'floorNo', 'folder', 'lead', 'origin', 'provider', 'reports', 'sessionId', 'sheet', 'startedAt', 'status', 'title', 'todos', 'workflows']);
   assert.deepEqual(Object.keys(f.agents[0]).sort(), ['agentId', 'bubble', 'enteredAt', 'key', 'name', 'role', 'since', 'slot', 'sprite', 'state', 'wf']);
 });
 
@@ -365,4 +451,22 @@ test('lobby scene: a slanted screen side and a seat under a screen are rejected'
   const dup = lobbyRaw();
   dup.ledWall.panels[1].id = dup.ledWall.panels[0].id;
   assert.ok(stage10(check(dup)).some((e) => /겹칩니다/.test(e)), 'duplicate id');
+});
+
+// ---- name tags: floor number chip and lead marker ----
+
+test('lobby tags: the floor number rides a chip in the team colour, a 팀장 gets a small ★, the title is written only on change', () => {
+  const app = readFileSync(join(ROOT, 'web', 'app.js'), 'utf8');
+  const css = readFileSync(join(ROOT, 'web', 'style.css'), 'utf8');
+  const fn = app.slice(app.indexOf('function lobbyFigure('), app.indexOf('/** Roster -> seats -> figures'));
+  assert.match(fn, /rec\.tagFl = el\('i', 'fl'\)/);
+  assert.match(fn, /setText\(rec\.tagFl, String\(e\.floorNo\)\)/);
+  assert.match(fn, /el\('i', 'lead', '★'\)/);
+  assert.match(fn, /rec\.tagLead\.hidden !== \(e\.rank !== 'lead'\)/);
+  assert.match(fn, /setAttr\(rec\.tag, 'title'/);
+  assert.doesNotMatch(fn, /rec\.tag\.title =/, 'no unconditional write per frame');
+  assert.match(css, /\.floor\.lobby \.tag \.fl \{[^}]*background: var\(--c\)/);
+  assert.match(css, /\.floor\.lobby \.tag \.lead \{[^}]*color: var\(--c\)/);
+  assert.doesNotMatch(css, /\.floor\.lobby \.tag::before/, 'the plain dot is gone');
+  assert.doesNotMatch(css, /@media[^{]*dark[^{]*\{[^}]*\.tag \.lead/, 'same marker in light and dark');
 });

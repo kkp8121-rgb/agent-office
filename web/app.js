@@ -2117,7 +2117,7 @@ function buildWall(stage, raw) {
     for (const key of ['working', 'waiting', 'reports', 'projects', 'fails', 'sleepy']) {
       const cell = el('div', 'cell');
       wall.cells[key] = el('b', 'val num');
-      cell.append(el('span', 'lbl', L.head[key]), wall.cells[key]);
+      cell.append(el('span', 'lbl', lobbyFill(L.head[key], { m: L.failMinutes })), wall.cells[key]);
       grid.append(cell);
     }
     left.el.append(idx, grid);
@@ -2227,6 +2227,12 @@ function lobbyBox(mini) {
   return mini ? [lb.crop.w, lb.crop.h] : lb.scene.r.size;
 }
 
+/** The ink (white or dark) that reads on a #rrggbb colour: the floor number sits on a chip in the team colour. */
+function readableOn(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.3 ? '#1b1409' : '#ffffff';
+}
+
 /** One figure of the lobby: created on first sight, then only repainted. `slot` = {kind: 'seat'|'overflow', i}. */
 function lobbyFigure(e, slot) {
   const lb = lobby;
@@ -2246,9 +2252,14 @@ function lobbyFigure(e, slot) {
   }
   let rec = lb.chars.get(e.key);
   if (!rec) {
-    if (e.state === 'done') return; // it reported before it was ever drawn here
     rec = createChar({ sprite: e.sprite, slot: null }, lb.stage, { x: p[0], y: p[1] }, lb.scene, false, true);
     rec.sid = e.sid;
+    rec.tag.textContent = '';
+    rec.tagFl = el('i', 'fl'); // the floor number in the team colour
+    rec.tagLead = el('i', 'lead', '★');
+    rec.tagName = el('span');
+    rec.tagLead.hidden = true;
+    rec.tag.append(rec.tagFl, rec.tagLead, rec.tagName);
     lobbyRecOf.set(rec.el, rec);
     lobbyRecOf.set(rec.tagRoot, rec);
     lb.chars.set(e.key, rec);
@@ -2258,10 +2269,15 @@ function lobbyFigure(e, slot) {
   if (rec.x !== p[0] || rec.y !== p[1]) placeAt(rec, p, false);
   setFacing(rec, face);
   setPose(rec, seated, false);
-  setText(rec.tag, e.name);
-  rec.tag.title = `${lobbyFill(ui.ui.lobby.floorLabel, { n: e.floorNo })} · ${e.role}`;
+  setText(rec.tagFl, String(e.floorNo));
+  if (rec.tagLead.hidden !== (e.rank !== 'lead')) rec.tagLead.hidden = e.rank !== 'lead';
+  setText(rec.tagName, e.name);
+  setAttr(rec.tag, 'title', `${lobbyFill(ui.ui.lobby.floorLabel, { n: e.floorNo })} · ${e.role}`);
   const color = colorOf(e.sid);
-  if (rec.tag.style.getPropertyValue('--c') !== color) rec.tag.style.setProperty('--c', color);
+  if (rec.tag.style.getPropertyValue('--c') !== color) {
+    rec.tag.style.setProperty('--c', color);
+    rec.tag.style.setProperty('--on', readableOn(color));
+  }
   const odd = slot.i % 2 === 1;
   rec.el.classList.toggle('odd', odd);
   rec.tagRoot.classList.toggle('odd', odd);
@@ -2291,7 +2307,8 @@ function drawLobby() {
   let unseated = 0;
   for (const e of lb.roster) {
     const slot = lb.seatMap.get(e.key);
-    if (!slot) {
+    if (slot === undefined) continue; // reported before it was ever placed: no seat, no figure
+    if (slot === null) {
       unseated++;
       continue;
     }
@@ -2331,8 +2348,11 @@ function drawWall(now) {
   const w = lb.wall;
   const L = ui.ui.lobby;
   const windowMs = L.deltaSeconds * 1000;
-  const hc = headline(lb.roster, lb.floors);
-  if (w.cells) for (const [key, node] of Object.entries(w.cells)) put(node, String(hc[key]));
+  const hc = headline(lb.roster, lb.floors, now, L.failMinutes * 60000);
+  if (w.cells) {
+    for (const [key, node] of Object.entries(w.cells)) put(node, String(hc[key]));
+    setAttr(w.cells.fails, 'data-alarm', hc.fails > 0 ? 'on' : 'off'); // red only while something failed in the window
+  }
   const scores = followScores(now);
   const sample = (id, v) => {
     const s = lb.hist.get(id) ?? lb.hist.set(id, []).get(id);
@@ -2352,7 +2372,7 @@ function drawWall(now) {
     const clk = clockParts(now, L.days);
     put(w.date, clk.date);
     put(w.time, clk.time);
-    const rows = employeeRows(lb.roster, now, L, ui.ui.bubbleMaxChars);
+    const rows = employeeRows(lb.roster, now, L, ui.ui.bubbleMaxChars, ui.ui.play.statusBubbles);
     lb.pages = pageCount(rows.length, w.rows.length);
     lb.page %= lb.pages;
     if (lb.pages > 1 && lb.pageAt === 0) lb.pageAt = now + L.pageSeconds * 1000;

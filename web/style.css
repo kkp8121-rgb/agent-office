@@ -581,11 +581,10 @@ body.paused .wx-a, body.paused .wx-b, body.paused .wx-f { animation-play-state: 
 .floor.lobby .st-idle .spr, .floor.lobby .st-enter .spr, .floor.lobby .st-thinking .spr, .floor.lobby .st-working .spr, .floor.lobby .zz { animation: none; }
 .floor.lobby .body { cursor: pointer; touch-action: auto; }
 .floor.lobby .ag.leaving, .floor.lobby .agt.leaving .tag { opacity: .55; }
-/* a still LED dot on each name tag says what the figure is doing */
-.floor.lobby .tag::before { content: ""; display: inline-block; width: 5px; height: 5px; margin-right: 3px; vertical-align: 1px; border-radius: 50%; background: #9a9080; }
-.floor.lobby .agt.st-working .tag::before { background: #2e9e5b; }
-.floor.lobby .agt.st-thinking .tag::before { background: #d98a1e; }
-.floor.lobby .agt.st-stale .tag::before { background: #8e7ad0; }
+/* a lobby name tag: the floor number on a chip in the team colour (tells same-name 직원 of different floors apart), a small ★ for a 팀장 */
+.floor.lobby .tag .fl { display: inline-block; min-width: 9px; margin: 0 3px 0 -2px; padding: 0 2px; font-style: normal; font-size: 9px; line-height: 12px; text-align: center; vertical-align: 0; background: var(--c); color: var(--on, #fff); }
+.floor.lobby .tag .lead { margin-right: 2px; font-style: normal; font-size: 9px; color: var(--c); }
+.floor.lobby .tag .lead[hidden] { display: none; }
 .lobby-more { padding: 1px 6px; font-size: 10px; }
 #topbar .tab.lobby { border-bottom-color: var(--c); }
 
@@ -633,6 +632,7 @@ body.paused .wx-a, body.paused .wx-b, body.paused .wx-f { animation-play-state: 
 .led-cells .cell { display: flex; align-items: baseline; justify-content: space-between; gap: 3px; height: 16px; }
 .led-cells .lbl { font-size: 8px; color: var(--led-ink); overflow: hidden; text-overflow: ellipsis; }
 .led-cells .val { font-size: 13px; line-height: 16px; font-weight: 700; }
+.led-cells .val[data-alarm="on"] { color: var(--led-up); } /* 실패 above 0: red */
 .led .lf { grid-template-columns: 4px 20px minmax(0, 1fr) 20px 26px; }
 .led .lf .chip { height: 7px; }
 .led .lf .fs { text-align: right; }
