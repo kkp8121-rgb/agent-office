@@ -356,6 +356,10 @@ html:has(.pip-mini) { scrollbar-gutter: stable; }
 li.in_progress { background: #ffe38a; font-weight: 700; }
 li.completed { color: #6f695e; font-weight: 400; }
 li.completed .tx { text-decoration: line-through; }
+/* the session title on a board without a list: a bold text that wraps, no mark; an empty heading takes no line */
+.wboard b:empty, .wbig b:empty { display: none; }
+.wboard li.plain { height: auto; white-space: normal; overflow-wrap: anywhere; font-weight: 800; }
+li.plain { font-weight: 700; }
 .wboard:focus-visible { outline: 1px solid #2f80d0; }
 /* the enlarged list: readable at 1x, above everything on the floor */
 .wbig {

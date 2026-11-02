@@ -1,7 +1,7 @@
 // Pure office state: floors (sessions), characters (lead + subagents), desk slots and the activity log.
 // No I/O and no Date.now(): the server feeds every call with `now`. Only strings that already went
 // through sanitize.mjs (Ev.text) or local JSON clipped here (descriptions, workflow labels) are kept.
-import { clip } from './sanitize.mjs';
+import { clip, cleanLine, TODO_TEXT_MAX } from './sanitize.mjs';
 import { overflowPoint, resolveScene } from '../web/scene.mjs';
 import { bakeGrid, isOpen } from '../web/nav.mjs';
 
@@ -21,8 +21,18 @@ const isLogged = (name) => LOGGED_TOOLS.has(name) || name.startsWith('mcp__');
 const UNSAFE_NAME_CHARS = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
 
 const TODO_VIEW_MAX = 12; // to-do items on the whiteboard; the in-progress one is always among them
+const PHASES_SEEN_MAX = 30; // phases kept for a run whose script lists none
 const SIGNAL_CAP = 100; // live events (phase, fail) waiting for the next broadcast; the oldest are dropped past this
 const LEAD_KEY = 'lead'; // agent key of the main session in fail events
+
+/** At most TODO_VIEW_MAX of `all`: a window that keeps the in-progress (else first open) item. */
+function viewWindow(all) {
+  if (all.length <= TODO_VIEW_MAX) return all;
+  const cur = all.findIndex((t) => t.status === 'in_progress');
+  const at = cur >= 0 ? cur : Math.max(0, all.findIndex((t) => t.status === 'pending'));
+  const start = Math.max(0, Math.min(at - 3, all.length - TODO_VIEW_MAX));
+  return all.slice(start, start + TODO_VIEW_MAX);
+}
 
 const isFiniteNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
@@ -200,6 +210,7 @@ export class Office {
       runPhases: new Map(), // runId -> {phase, armed}: armed once a phase change may raise a signal
       boardLine: '',
       boardRun: '', // runId that owns boardLine
+      boardPhases: null, // {list: [name], at, known} of boardRun, for the whiteboard when the session keeps no to-do list
       workflows: new Map(), // runId -> {name, scriptPath}
       doneRuns: new Set(), // runIds the poller reported done
       agents: new Map(), // agentId -> agent
@@ -427,6 +438,7 @@ export class Office {
       role: entry.role,
       sprite: entry.key,
       head,
+      desc: cleanLine(m.description, TODO_TEXT_MAX) || entry.role, // the whiteboard's line for this agent
       slot,
       state: 'enter',
       bubble: '',
@@ -543,6 +555,7 @@ export class Office {
       if (f.boardRun === runId) {
         f.boardLine = '';
         f.boardRun = '';
+        f.boardPhases = null;
       }
       return;
     }
@@ -553,7 +566,7 @@ export class Office {
     // A phase change raises a signal only for a run seen starting live, or after its first phase was seen: a run that was
     // already under way when the office found it must not call a meeting for phases that are past.
     let seen = f.runPhases.get(runId);
-    if (!seen) f.runPhases.set(runId, (seen = { phase: '', armed: f.liveRuns.has(runId) }));
+    if (!seen) f.runPhases.set(runId, (seen = { phase: '', armed: f.liveRuns.has(runId), list: [] }));
     if (current && current !== seen.phase) {
       if (seen.armed && !f.hidden) this.#signal({ type: 'phase', sessionId, phase: current });
       seen.phase = current;
@@ -562,7 +575,26 @@ export class Office {
     const phases = Array.isArray(p.phases) ? p.phases : [];
     const idx = phases.indexOf(p.current);
     f.boardRun = runId;
+    f.boardPhases = this.#phaseList(seen, phases, current, Array.isArray(p.seen) ? p.seen : []);
     f.boardLine = !current ? name : phases.length && idx >= 0 ? `${name} · ${current} ${idx + 1}/${phases.length}` : `${name} · ${current}`;
+  }
+
+  /**
+   * The phases the whiteboard lists for a run: the script's full list when it has one (the current phase is appended if the journal
+   * names one the script does not), else the phases seen so far (`journalSeen`: the ones the journal has started, in order; the run's own record of earlier reports). `at` is the current phase (-1: none yet); texts are cleaned like to-do items.
+   */
+  #phaseList(seen, phases, current, journalSeen) {
+    const cur = cleanLine(current, TODO_TEXT_MAX);
+    const known = phases.map((x) => cleanLine(x, TODO_TEXT_MAX)).filter(Boolean);
+    if (!known.length) {
+      for (const name of [...journalSeen, current]) {
+        const n = cleanLine(name, TODO_TEXT_MAX);
+        if (n && !seen.list.includes(n) && seen.list.length < PHASES_SEEN_MAX) seen.list.push(n);
+      }
+    }
+    const list = known.length ? [...known] : [...seen.list];
+    if (known.length && cur && !list.includes(cur)) list.push(cur);
+    return { list, at: cur ? list.indexOf(cur) : -1, known: known.length > 0 };
   }
 
   /** Live events since the last call, oldest first: {type:'phase', sessionId, phase, at} and {type:'fail', sessionId, agent, streak, at}. */
@@ -651,17 +683,38 @@ export class Office {
   /** {items:[{text,status}], done, total}: at most TODO_VIEW_MAX items, a window that keeps the in-progress (else first open) item. */
   #todoView(f) {
     const all = f.todoItems.filter((t) => !t.gone);
-    let start = 0;
-    if (all.length > TODO_VIEW_MAX) {
-      const cur = all.findIndex((t) => t.status === 'in_progress');
-      const at = cur >= 0 ? cur : Math.max(0, all.findIndex((t) => t.status === 'pending'));
-      start = Math.max(0, Math.min(at - 3, all.length - TODO_VIEW_MAX));
-    }
     return {
-      items: all.slice(start, start + TODO_VIEW_MAX).map((t) => ({ text: t.text, status: t.status })),
+      items: viewWindow(all).map((t) => ({ text: t.text, status: t.status })),
       done: all.filter((t) => t.status === 'completed').length,
       total: all.length,
     };
+  }
+
+  /**
+   * What the whiteboard shows when the session keeps no to-do list, highest first: the phases of its running workflow
+   * ({kind:'phases', n: current position, total: 0 if the script lists none}), its sub-agents ({kind:'agents', total}), its title
+   * ({kind:'title', text}). null: the to-do list is the board, or there is nothing to show. Every text is cleaned and clipped like a to-do item.
+   */
+  #sheetView(f, todos) {
+    if (todos.total > 0) return null;
+    const rows = (all, extra) => {
+      const items = viewWindow(all);
+      return { items, more: all.length - items.length, ...extra };
+    };
+    if (f.boardPhases) {
+      const { list, at, known } = f.boardPhases;
+      const all = list.map((text, i) => ({ text, status: i < at ? 'completed' : i === at ? 'in_progress' : 'pending' }));
+      return rows(all, { kind: 'phases', n: at + 1, total: known ? list.length : 0 });
+    }
+    if (f.agents.size > 0) {
+      const all = [...f.agents.values()].map((a) => ({
+        text: a.desc,
+        status: a.state === 'working' || a.state === 'thinking' ? 'in_progress' : a.state === 'done' ? 'completed' : 'pending',
+      }));
+      return rows(all, { kind: 'agents', total: all.length });
+    }
+    const text = cleanLine(this.#titleOf(f), TODO_TEXT_MAX);
+    return text ? { kind: 'title', text } : null;
   }
 
   snapshot() {
@@ -670,6 +723,7 @@ export class Office {
     const views = visible.map((f, i) => {
       const autoTitle = f.aiTitle || f.folder;
       const title = this.#titleOf(f);
+      const todos = this.#todoView(f);
       return {
         sessionId: f.sessionId,
         provider: f.provider,
@@ -682,7 +736,8 @@ export class Office {
         status: f.status,
         lead: { name: f.lead.name, role: f.lead.role, sprite: f.lead.sprite, state: f.lead.state, bubble: f.lead.bubble },
         board: { title, line: f.boardLine },
-        todos: this.#todoView(f),
+        todos,
+        sheet: this.#sheetView(f, todos),
         reports: f.reports,
         workflows: [...f.workflows.keys()].filter((id) => !f.doneRuns.has(id)).length,
         agents: [...f.agents.values()].map((a) => ({

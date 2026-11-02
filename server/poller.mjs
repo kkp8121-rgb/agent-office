@@ -306,7 +306,8 @@ export class Poller {
       run.sig = sig;
       run.phases ??= run.scriptPath ? await readScriptPhases(run.scriptPath, this.#cfg.workflow.scriptHeadBytes) : [];
       const current = [...started.values()].at(-1)?.phase ?? '';
-      this.#office.setWorkflowProgress(id, run.runId, { name: run.name, phases: run.phases, current, done: run.done });
+      const seen = [...new Set([...started.values()].map((s) => s.phase).filter(Boolean))];
+      this.#office.setWorkflowProgress(id, run.runId, { name: run.name, phases: run.phases, current, seen, done: run.done });
     }
   }
 }

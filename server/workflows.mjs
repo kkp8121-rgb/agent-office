@@ -80,8 +80,133 @@ export class WorkflowJournal {
   }
 }
 
+// ---- meta.phases of a run script: the literal is scanned by hand, the script is never evaluated ----
+
+const QUOTES = '\'"`';
+const PHASES_MAX = 60;
+
+/** Index of the next token: whitespace and comments skipped. */
+function skipTrivia(s, i) {
+  while (i < s.length) {
+    if (/\s/.test(s[i])) i++;
+    else if (s.startsWith('//', i)) i = s.indexOf('\n', i) < 0 ? s.length : s.indexOf('\n', i);
+    else if (s.startsWith('/*', i)) i = s.indexOf('*/', i + 2) < 0 ? s.length : s.indexOf('*/', i + 2) + 2;
+    else break;
+  }
+  return i;
+}
+
+/** The string literal starting at s[i] (a quote): {value, end} with end after the closing quote; value is null for a template with ${}. */
+function readString(s, i) {
+  const q = s[i];
+  let value = '';
+  let j = i + 1;
+  while (j < s.length && s[j] !== q) {
+    if (s[j] === '\\') {
+      const c = s[j + 1] ?? '';
+      value += c === 'n' || c === 't' ? ' ' : c;
+      j += 2;
+    } else value += s[j++];
+  }
+  return { value: q === '`' && value.includes('${') ? null : value, end: Math.min(j + 1, s.length) };
+}
+
+/** A property key (name or quoted string) at s[i]: {name, end} or null. */
+function readKey(s, i) {
+  if (QUOTES.includes(s[i])) {
+    const r = readString(s, i);
+    return { name: r.value ?? '', end: r.end };
+  }
+  const m = /[A-Za-z_$][\w$]*/y;
+  m.lastIndex = i;
+  const r = m.exec(s);
+  return r ? { name: r[0], end: m.lastIndex } : null;
+}
+
+/** Index of the comma or closing bracket that ends the value starting at s[i] (not consumed). */
+function skipValue(s, i) {
+  let depth = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (QUOTES.includes(c)) i = readString(s, i).end;
+    else if (s.startsWith('//', i) || s.startsWith('/*', i)) i = skipTrivia(s, i);
+    else if ('([{'.includes(c)) {
+      depth++;
+      i++;
+    } else if (')]}'.includes(c)) {
+      if (depth === 0) return i;
+      depth--;
+      i++;
+    } else if (c === ',' && depth === 0) return i;
+    else i++;
+  }
+  return s.length;
+}
+
+/** Walks the properties of the object at s[i] ('{'): onValue(key, valueStart) returns where it stopped reading (0: it did not read); returns the index after '}'. */
+function eachProp(s, i, onValue) {
+  i++;
+  for (;;) {
+    i = skipTrivia(s, i);
+    if (i >= s.length) return s.length;
+    if (s[i] === '}') return i + 1;
+    if (s[i] === ',') {
+      i++;
+      continue;
+    }
+    const key = readKey(s, i);
+    if (!key) {
+      i = skipValue(s, i + 1);
+      continue;
+    }
+    i = skipTrivia(s, key.end);
+    if (s[i] !== ':') {
+      i = Math.max(i + 1, skipValue(s, i));
+      continue;
+    }
+    i = skipTrivia(s, i + 1);
+    const end = onValue(key.name, i);
+    i = end > i ? end : skipValue(s, i);
+  }
+}
+
+/** Titles from the phases array at s[i] ('['): strings, or objects with a string `title`. */
+function readPhaseTitles(s, i, out) {
+  i++;
+  for (;;) {
+    i = skipTrivia(s, i);
+    if (i >= s.length || s[i] === ']' || out.length >= PHASES_MAX) return;
+    if (s[i] === ',') {
+      i++;
+    } else if (QUOTES.includes(s[i])) {
+      const r = readString(s, i);
+      if (r.value) out.push(r.value);
+      i = r.end;
+    } else if (s[i] === '{') {
+      let title = null;
+      i = eachProp(s, i, (key, at) => {
+        if (key !== 'title' || !QUOTES.includes(s[at])) return 0;
+        const r = readString(s, at);
+        title = r.value;
+        return r.end;
+      });
+      if (title) out.push(title);
+    } else {
+      i = Math.max(i + 1, skipValue(s, i));
+    }
+  }
+}
+
+/** The `title`s of `export const meta = { phases: [...] }` in a run script, in order ([] if there are none). */
 export function phasesFromScript(scriptText) {
-  const m = /export\s+const\s+meta\s*=\s*\{[\s\S]*?\bphases\s*:\s*\[([\s\S]*?)\]\s*[,}]/.exec(String(scriptText));
-  if (!m) return [];
-  return [...m[1].matchAll(/\btitle\s*:\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/g)].map((t) => t[2]);
+  const s = String(scriptText);
+  const m = /export\s+const\s+meta\s*=\s*\{/.exec(s);
+  const out = [];
+  if (!m) return out;
+  eachProp(s, m.index + m[0].length - 1, (key, at) => {
+    if (key !== 'phases' || s[at] !== '[') return 0;
+    readPhaseTitles(s, at, out);
+    return skipValue(s, at);
+  });
+  return out;
 }

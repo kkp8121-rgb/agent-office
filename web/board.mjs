@@ -1,5 +1,5 @@
-// Whiteboard to-dos (pure): where the board sits on the wall, how many lines fit, which items of the list show.
-// The list itself comes from the server (floor.todos: {items: [{text, status}], done, total}, text already clipped).
+// Whiteboard (pure): where the board sits on the wall, how many lines fit, which items of the list show, what the board says.
+// What it says comes from the server (floor.todos: {items: [{text, status}], done, total}, or floor.sheet when there is no list; text already clipped).
 
 /**
  * The CSS frame of a board whose writing surface is the quad [top-left, top-right, bottom-right, bottom-left].
@@ -32,3 +32,25 @@ export function itemWindow(items, cap) {
 
 /** A string that changes exactly when what the board shows changes. */
 export const todoKey = (t) => `${t.done}/${t.total}|${t.items.map((i) => `${i.status[0]}${i.text}`).join('\n')}`;
+
+const fill = (template, vars) => template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
+
+/**
+ * What the wall board of a floor shows, from its snapshot view: {head, items: [{text, status}], more} or null when there is nothing.
+ * `more` counts the items the server left out. The to-do list wins; without one the server sends `sheet`
+ * (phases of the running workflow, sub-agents, or the session title) already cleaned and clipped. `labels` is ui.board.
+ */
+export function boardSheet(fv, labels) {
+  const s = fv.sheet;
+  if (!s) {
+    const t = fv.todos;
+    if (!t || t.total === 0) return null;
+    return { head: fill(labels.todos, { done: t.done, total: t.total }), items: t.items, more: t.total - t.items.length };
+  }
+  if (s.kind === 'title') return { head: '', items: [{ text: s.text, status: 'plain' }], more: 0 }; // no list: the title as one wrapped line
+  const head = s.kind === 'phases' ? fill(s.total > 0 ? labels.phases : labels.phasesOpen, s) : fill(labels.agents, s);
+  return { head, items: s.items, more: s.more };
+}
+
+/** A string that changes exactly when what the board shows changes ('' for nothing). */
+export const sheetKey = (b) => (b ? `${b.head}|${b.more}|${b.items.map((i) => `${i.status[0]}${i.text}`).join('\n')}` : '');

@@ -11,7 +11,7 @@ import { daypart, nextPoke, openBox, pickLine, playPartner, throwPath, throwVelo
 import { between, chooseFidget, chooseSpot, createFloorClock, rngFor, tripRange } from './ambient.mjs';
 import { chooseCatAct, openPoint, otherFloor } from './cat.mjs';
 import { legVars } from './walk.mjs';
-import { boardCapacity, boardFrame, itemWindow, todoKey } from './board.mjs';
+import { boardCapacity, boardFrame, boardSheet, itemWindow, sheetKey } from './board.mjs';
 import { assignSpots, clipPhase, moodKind, patDue } from './meeting.mjs';
 import { lightAt, msToNextChange, placeSeason, seasonOn } from './season.mjs';
 import { pickAt, snackOutcome } from './snack.mjs';
@@ -32,7 +32,6 @@ const BOARD_MIN_ITEMS = 3; // the wall board always shows at least this many ite
 const BIG_WIDTH_PX = 250; // width of the enlarged to-do list (.wbig)
 const BIG_GAP_PX = 6; // its distance from the floor edge and from the board
 const TODO_MARK = { in_progress: '▶', completed: '✓', pending: '☐' };
-const NO_TODOS = { items: [], done: 0, total: 0 };
 const FX_URL = '/assets/fx/'; // the failure faces (sweat-drop, rain-cloud-1/2) and the snack sparkle (sparkle-1/2)
 const SNACK_URL = '/assets/snacks/snack-'; // + coffee|donut|cookie|fish + .png
 const ITEMS_URL = '/assets/seasonal/items.json'; // size and anchor of every decoration
@@ -1075,7 +1074,7 @@ function endPlay(sc, except, home = true) {
 
 // ---------- whiteboard to-dos, workflow meetings, failure faces (screen play only: nothing is sent or saved) ----------
 
-/** The wall board of a floor: a box laid on scene.whiteboard.quad with one shear, showing the session's real to-do list. */
+/** The wall board of a floor: a box laid on scene.whiteboard.quad with one shear, showing the session's to-do list, else its workflow phases, sub-agents or title. */
 function makeBoard(frec) {
   const quad = frec.scene.raw.whiteboard?.quad;
   if (!quad) return;
@@ -1097,35 +1096,38 @@ function makeBoard(frec) {
   frec.wb = { el: box, title, list, cap: boardCapacity(f.h, BOARD_LINE_PX, BOARD_PAD_PX, BOARD_MIN_ITEMS), key: '', frame: f };
 }
 
-/** One line of a to-do list: a mark and the (server-clipped) text; the status is a class. */
+/** One line of a to-do list: a mark and the (server-clipped) text; the status is a class (`plain`: a text without a mark, the title). */
 function todoLine(item) {
   const li = el('li', item.status);
-  li.append(el('span', 'mk', TODO_MARK[item.status] ?? TODO_MARK.pending), el('span', 'tx', item.text));
+  if (item.status !== 'plain') li.append(el('span', 'mk', TODO_MARK[item.status] ?? TODO_MARK.pending));
+  li.append(el('span', 'tx', item.text));
   return li;
 }
 
-/** Redraws the wall board when this floor's list really changed. A floor that is not shown draws it when it comes back (setOff). */
+/** Redraws the wall board when what it shows really changed. A floor that is not shown draws it when it comes back (setOff). */
 function renderBoard(frec) {
   const wb = frec.wb;
   if (!wb || frec.off) return;
-  const key = todoKey(frec.todos);
+  const key = sheetKey(frec.sheet);
   if (key === wb.key) return;
   wb.key = key;
-  const t = frec.todos;
-  wb.el.classList.toggle('empty', t.total === 0);
-  setText(wb.title, t.total === 0 ? '' : `할 일 ${t.done}/${t.total}`);
-  wb.list.replaceChildren(...itemWindow(t.items, wb.cap).map(todoLine));
-  if (bigBoard?.frec === frec) fillBig();
+  const b = frec.sheet;
+  wb.el.classList.toggle('empty', !b);
+  setText(wb.title, b ? b.head : '');
+  wb.list.replaceChildren(...(b ? itemWindow(b.items, wb.cap).map(todoLine) : []));
+  if (bigBoard?.frec !== frec) return;
+  if (b) fillBig();
+  else closeBig();
 }
 
 let bigBoard = null; // the one enlarged list: {frec, el, title, list, close}
 
 function fillBig() {
   const { frec, title, list } = bigBoard;
-  const t = frec.todos;
-  setText(title, `할 일 ${t.done}/${t.total}`);
-  const rows = t.items.map(todoLine);
-  if (t.total > t.items.length) rows.push(el('li', 'more', `…외 ${t.total - t.items.length}개`));
+  const b = frec.sheet;
+  setText(title, b.head);
+  const rows = b.items.map(todoLine);
+  if (b.more > 0) rows.push(el('li', 'more', ui.ui.board.more.replace('{n}', b.more)));
   list.replaceChildren(...rows);
 }
 
@@ -1139,7 +1141,7 @@ function closeBig() {
 function toggleBig(frec) {
   const again = bigBoard?.frec === frec;
   closeBig();
-  if (again || !frec.wb || frec.todos.total === 0) return;
+  if (again || !frec.wb || !frec.sheet) return;
   const doc = frec.stage.ownerDocument;
   const pop = el('div', 'wbig');
   pop.setAttribute('role', 'dialog');
@@ -1902,7 +1904,7 @@ function createFloor(fv) {
     sid: fv.sessionId, off: root.hidden, design: fv.design, scene: sc, status: fv.status, dbg: null, clock: null, clockOn: false, warned: false,
   };
   rec.clock = makeClock(rec);
-  rec.todos = NO_TODOS;
+  rec.sheet = null;
   makeBoard(rec);
   makeSky(rec);
   syncDecor(rec);
@@ -1937,7 +1939,7 @@ function renderFloor(fv, elm) {
   rec.bl.hidden = fv.board.line === '';
   elm.classList.toggle('leaving', fv.status === 'leaving');
   rec.reports.hidden = fv.reports <= 0;
-  rec.todos = fv.todos ?? NO_TODOS;
+  rec.sheet = boardSheet(fv, ui.ui.board);
   renderBoard(rec);
   if (fv.reports > 0) setText(rec.reports, `보고 ${fv.reports}`);
 
