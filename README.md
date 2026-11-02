@@ -52,7 +52,7 @@
 ### 계절 장식 · 창밖 시간 · 간식 주기
 
 - 계절 장식: 날짜에 맞춰 방마다 장식이 놓입니다. 핼러윈(10월 24일~31일)은 호박과 박쥐, 크리스마스(12월 18일~26일)는 트리·선물·리스, 설날(음력 1월 1일 2일 전~2일 후, 한국 음력 달력으로 계산)은 복주머니·청사초롱입니다. 기간 밖에는 아무것도 없습니다. 장식은 `scene.json` 의 `seasonal` 자리(바닥 4 · 벽 3 · 책상 4)에만, `assets/seasonal/items.json` 의 그림 크기가 자리의 `max` 에 들어갈 때만 놓이고 걷는 길에는 놓이지 않습니다. 방마다 늘 같은 모양이며, 바닥·책상 장식은 캐릭터와 같은 순서로 앞뒤가 정해집니다. 날짜는 `ui.season`.
-- 창밖 시간: `scene.json` 의 `windows`(유리 부분)만 실제 시각에 따라 색이 바뀝니다. 낮에는 그대로, 노을(`ui.daylight.sunset`, 17~19시)은 따뜻한 주황, 밤(`ui.daylight.night`, 19~6시)은 짙은 파랑입니다. 방의 나머지는 그대로입니다. 날짜와 시각이 바뀌는 순간까지 타이머 하나만 걸어 두고(주기적으로 확인하지 않음), 숨겨진 탭에서 돌아오면 다시 읽습니다.
+- 창밖 시간: 창밖 풍경(아래 「창밖 풍경」)이 실제 시각에 따라 낮 그림 · 노을(낮 그림 위에 정적 그라데이션 한 겹) · 밤 그림으로 바뀌고 어두운 모드에서는 밤입니다. `scene.json` 의 `windows`(유리 부분)에는 노을·밤에 얇은 색 한 겹만 더합니다(`view` 가 없는 방은 예전처럼 낮에는 그대로, 노을은 따뜻한 주황, 밤은 짙은 파랑). 시각 기준: 노을(`ui.daylight.sunset`, 17~19시)은 따뜻한 주황, 밤(`ui.daylight.night`, 19~6시)은 짙은 파랑입니다. 방의 나머지는 그대로입니다. 날짜와 시각이 바뀌는 순간까지 타이머 하나만 걸어 두고(주기적으로 확인하지 않음), 숨겨진 탭에서 돌아오면 다시 읽습니다.
 - 확인용 주소: `?season=halloween|christmas|lunar|none` 과 `?time=day|sunset|night` 로 날짜·시각을 덮어씁니다(둘 다 따로).
 - 간식: 위쪽 줄의 커피 · 도넛 · 쿠키 · 생선을 캐릭터에게 끌어다 놓으면 손에 간식이 나타나 「냠냠」 한 뒤 「힘이 난다!」 와 함께 `ui.snack.sparkleMs`(기본 2초) 동안 반짝입니다. 캐릭터마다 `ui.snack.cooldownSeconds`(기본 10초) 동안은 「배불러요」 류 대사만 하고 아무 일도 없습니다. 생선은 치즈에게만 맞고(먹고 쓰다듬을 때처럼 하트), 사람에게 생선이나 치즈에게 다른 간식을 주면 웃긴 거절 대사만 합니다. 캐릭터 밖에 놓으면 취소됩니다. 작은 창(PiP)에 층이 있는 동안은 창 사이로 끌 수 없어 간식 단추가 꺼지고 안내가 뜹니다. 대사는 `ui.lines` 의 `snackEat` `snackDone` `snackFull` `snackNoFish` `snackNoCat` `catSnackDone`. 화면 놀이일 뿐 저장되지 않습니다.
 
@@ -109,6 +109,16 @@ Codex 의 imagegen 으로 그림을 만든 뒤 `art\snap.py` 로 격자에 맞�
 5. 배치(`anchor`·`footprint`·자리·`spots`)는 `scene.json` 에 직접 적고 `node scripts\check-scenes.mjs <방>` 로 검사한 뒤, `python art\scene_sheet.py <방>` 으로 점검표(`art\scenes-check\<방>.png`)를 만들어 눈으로 확인합니다.
 6. 모든 방 검사: `node scripts\check-scenes.mjs`(방 이름을 주면 그 방만). `npm test` 도 출하된 장면을 같은 검사기로 돌립니다.
 7. 윤곽: `python art\backdrop.py <방>` 이 `shell.png` 의 바깥 배경을 가장자리에서부터 채워 방 윤곽을 찾고(2~3픽셀 안쪽으로 줄여 테두리 번짐까지 덮음) `scene.json` 의 `outline`(장면 안의 점 3개 이상, 선택 항목)을 적습니다. 어두운 모드에서만 윤곽 바깥을 덮습니다. 껍데기를 새로 만들면 다시 실행합니다(`--check` 는 쓰지 않고 검사만, `--inset`·`--eps`·`--tol` 조절).
+
+### 창밖 풍경 (`view`)
+
+방마다 창밖은 창 하나하나에 붙인 작은 그림이 아니라 방 전체에 걸친 한 장의 풍경(`assets\scenes\<방>iew-day.png`, `view-night.png`)입니다. 그림은 장면 좌표에 고정돼 있어 이웃한 창은 같은 풍경의 이웃한 부분을 보여 주고, 수평선 높이가 방 전체에서 하나(`view.horizon`)이며(높은 창은 하늘, 낮은 창은 가까운 나무·꽃), 멀리는 작고 흐리게 · 가까이는 크고 선명하게 그렸습니다. 방마다 바깥 주제는 그대로입니다(도시 · 호수 산골 · 소나무 숲 · 정원).
+
+- 층: 방 그림(`shell.png`)은 RGBA 이고 유리 자리가 투명(구멍)입니다. 풍경은 그 아래 배경 겹으로 깔리고(`.stage.viewed`, style.css) 날씨·유리 색(`.sky`)·가구·캐릭터·방 어둡게 하는 막(`.stage::after`)은 전과 같은 자리에서 그 위에 얹힙니다. 낮/노을/밤은 `data-light` 만으로 고르므로 자바스크립트도 타이머도 필터도 없고, 가려진 층은 그림을 받아 오지 않습니다.
+- `scene.json` 의 `view`: `{"origin":[x,y],"size":[w,h],"day":"view-day.png","night":"view-night.png","horizon":y}`(선택). 상자는 장면 안에 있고 모든 `windows` 다각형을 덮어야 하며, 그림 크기는 `size` 와 같아야 합니다(`node scripts\check-scenes.mjs`).
+- 풍경 그림 만들기: Codex 로 방마다 낮 1장 · 밤 1장(`art\prompts.json` 의 `views`, 호출은 `python art\extras\gen_view.py <방> day|night`)을 받아 `python artiew.py <방> day|night <원본.png> <수평선 비율>` 로 줄입니다(LANCZOS, 수평선 안개, 팔레트 정리). 방별 상자·수평선은 view.py 안 `ROOMS` 에 있습니다.
+- 유리 구멍 내기: `python art\glass.py <방>` 이 `art\glass.json` 의 방식(`poly` 다각형 · `colour` 다각형에서 창틀 색 빼기 · `flood` 온실처럼 색으로 유리를 찾고 매달린 화분은 빼기)으로 `shell.png` 의 유리를 투명하게 만듭니다. 구멍 밑에는 옛 그림의 RGB 가 남아 있어(알파를 무시하는 도구는 옛 풍경을 봄) 다시 실행해도 같고, 가장자리 1~2픽셀은 옛 유리색 번짐을 창틀 색으로 지웁니다. `art\scene_sheet.py` 는 낮 풍경을 깔고 점검표를 만듭니다.
+- 구멍 때문에 `shell.png` 만 보면 유리가 비어 있습니다. 풍경 파일이 없거나 안 읽히면 유리 자리에 하늘색(`#8fc9ee`)이 보입니다.
 
 ### 앉은 그림
 

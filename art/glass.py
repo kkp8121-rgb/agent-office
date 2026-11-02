@@ -1,0 +1,182 @@
+"""Cuts the window glass out of a room shell, so the outside view painted under the shell shows through.
+
+  python art/glass.py <room> [--preview OUT.png] [--dry]
+
+Reads art/glass.json[room] and assets/scenes/<room>/scene.json (`windows`, `view`):
+  mode "poly"    the hole is every window polygon grown by `grow` px (rooms whose panes have no bars: studio2).
+  mode "colour"  polygon grown by `grow` px minus frame colours (bars and sills: lounge, library). Frame = brownish (R-B > 22 and R-G > 10)
+                 or very dark (max channel < 75), the rest is glass; 3x3 closing keeps yellow flowers and similar glass pixels.
+  mode "flood"   greenhouse: glass is every coloured pixel (saturation > .16 or blue) of a connected area of at least `minArea` px above `maxY`
+                 inside the `zones` boxes and the window polygons grown by `grow` px and inside the room outline, each area closed by
+                 `close` px so clouds, white flowers and glints inside the glass are not holes. Hanging plants (dark green outlines, which the
+                 painted garden has not) are found inside the hand boxes `plants` and left out.
+  `subtract` / `add`: hand polygons removed from / added to the hole (hanging plants painted into the shell, door handles).
+Writes shell.png as RGBA: alpha 0 on the glass, the old picture's RGB kept under the hole (tools that drop alpha still see the old view),
+and the 1-2 px ring around the hole decontaminated: ring pixels that still carry the old glass colour take the nearest frame colour.
+Run it on a shell that still has the old view (git checkout of shell.png), or on its own output (the RGB under the hole is the old view, so it is repeatable).
+Paths are absolute from this file's folder, never from the working directory."""
+import argparse
+import json
+import os
+
+import numpy as np
+from PIL import Image, ImageDraw, ImageFilter
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+
+
+def poly_mask(size, polys):
+    im = Image.new("L", size, 0)
+    d = ImageDraw.Draw(im)
+    for p in polys:
+        d.polygon([tuple(pt) for pt in p], fill=255)
+    return np.asarray(im) > 0
+
+
+def grow(m, r):
+    return np.asarray(Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(2 * r + 1))) > 0 if r > 0 else m
+
+
+def shrink(m, r):
+    return np.asarray(Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(2 * r + 1))) > 0 if r > 0 else m
+
+
+def frame_like(rgb):
+    r, g, b = (rgb[..., i].astype(int) for i in range(3))
+    return ((r - b > 22) & (r - g > 10)) | (rgb.max(axis=2) < 75)
+
+
+def components(mask, y_max):
+    """4-connected components of mask above y_max, as lists of (y, x)."""
+    h, w = mask.shape
+    seen = np.zeros_like(mask)
+    out = []
+    for y0 in range(min(h, y_max)):
+        for x0 in np.flatnonzero(mask[y0] & ~seen[y0]):
+            if seen[y0, x0]:
+                continue
+            seen[y0, x0] = True
+            stack, pts = [(y0, x0)], []
+            while stack:
+                y, x = stack.pop()
+                pts.append((y, x))
+                for yy, xx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+                    if 0 <= yy < y_max and 0 <= xx < w and mask[yy, xx] and not seen[yy, xx]:
+                        seen[yy, xx] = True
+                        stack.append((yy, xx))
+            out.append(np.array(pts))
+    return out
+
+
+def plant_mask(rgb, boxes):
+    """Hanging plants: dark green outlines are dense on a plant and almost absent from the painted garden behind the glass."""
+    mx = rgb.max(axis=2)
+    dg = (mx < 85) & (rgb[..., 1] > rgb[..., 0] + 3) & (rgb[..., 1] >= rgb[..., 2])
+    dens = np.asarray(Image.fromarray((dg * 255).astype(np.uint8)).filter(ImageFilter.BoxBlur(5))) / 255.0
+    blob = grow(dens > 0.07, 4)
+    box = np.zeros(mx.shape, bool)
+    for x0, y0, x1, y1 in boxes:
+        box[y0:y1, x0:x1] = True
+    return blob & box
+
+
+def flood_hole(rgb, cfg, outline, windows):
+    mx, mn = rgb.max(axis=2).astype(int), rgb.min(axis=2).astype(int)
+    sat = (mx - mn) / np.maximum(mx, 1)
+    coloured = ((sat > cfg.get("sat", 0.16)) | (rgb[..., 2].astype(int) > rgb[..., 0].astype(int) + 12)) & (mx >= 90)
+    r, g, b = (rgb[..., i].astype(int) for i in range(3))
+    coloured &= ~plant_mask(rgb, cfg.get("plants", []))
+    coloured &= shrink(poly_mask(mx.shape[::-1], [outline]), 1)  # the painted backdrop outside the room is green too
+    zone = grow(poly_mask(mx.shape[::-1], windows), cfg.get("grow", 8)) | poly_mask(mx.shape[::-1], cfg.get("zones", []))
+    coloured &= zone  # pictures, shelves and the floor are coloured too: only look near the panes
+    hole = np.zeros(mx.shape, bool)
+    for pts in components(coloured, cfg.get("maxY", 345)):
+        if len(pts) < cfg.get("minArea", 150):
+            continue
+        m = np.zeros(mx.shape, bool)
+        m[pts[:, 0], pts[:, 1]] = True
+        hole |= shrink(grow(m, cfg.get("close", 2)), cfg.get("close", 2))
+    return hole
+
+
+def hole_for(rgb, windows, cfg, outline=None):
+    h, w = rgb.shape[:2]
+    mode = cfg.get("mode", "poly")
+    if mode == "flood":
+        hole = flood_hole(rgb, cfg, outline, windows)
+    else:
+        zone = grow(poly_mask((w, h), windows), cfg.get("grow", 1))
+        hole = zone
+        if mode == "colour":
+            glass = zone & ~frame_like(rgb)
+            hole = shrink(grow(glass, 1), 1) & zone  # closing: yellow flowers and light spots inside the glass are not frame
+    if cfg.get("add"):
+        hole |= poly_mask((w, h), cfg["add"])
+    if mode == "flood":  # the hanging plants stay, also where an `add` polygon (door glass) reaches behind them
+        hole &= ~plant_mask(rgb, cfg.get("plants", []))
+    if cfg.get("subtract"):
+        hole &= ~poly_mask((w, h), cfg["subtract"])
+    return hole
+
+
+def decontaminate(rgb, hole, ring_px):
+    """Ring pixels (within ring_px outside the hole) take the nearest pixel that is more than ring_px away from the hole."""
+    out = rgb.copy()
+    near = grow(hole, ring_px) & ~hole
+    src = ~grow(hole, ring_px)  # trusted frame pixels
+    filled = src.copy()
+    todo = near.copy()
+    for _ in range(ring_px + 2):
+        grown = np.zeros_like(filled)
+        acc = np.zeros(rgb.shape, dtype=np.int32)
+        cnt = np.zeros(filled.shape, dtype=np.int32)
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                if dx == 0 and dy == 0:
+                    continue
+                f = np.roll(filled, (dy, dx), (0, 1))
+                c = np.roll(out, (dy, dx), (0, 1)).astype(np.int32)
+                acc += c * f[..., None]
+                cnt += f
+        take = todo & (cnt > 0)
+        out[take] = (acc[take] / cnt[take][:, None]).astype(np.uint8)
+        filled = filled | take
+        todo &= ~take
+        if not todo.any():
+            break
+    return out
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("room")
+    ap.add_argument("--preview", help="write a 4x preview of the hole over the shell here")
+    ap.add_argument("--dry", action="store_true", help="do not write shell.png")
+    a = ap.parse_args()
+    cfg_all = json.load(open(os.path.join(HERE, "glass.json"), encoding="utf-8"))
+    cfg = cfg_all[a.room]
+    d = os.path.join(ROOT, "assets", "scenes", a.room)
+    scene = json.load(open(os.path.join(d, "scene.json"), encoding="utf-8"))
+    shell = Image.open(os.path.join(d, scene["shell"]))
+    rgb = np.asarray(shell.convert("RGB")).copy()
+    hole = hole_for(rgb, scene["windows"], cfg, scene.get("outline"))
+    ring = cfg.get("ring", 2)
+    clean = decontaminate(rgb, hole, ring) if ring else rgb
+    alpha = np.where(hole, 0, 255).astype(np.uint8)
+    out = np.dstack([np.where(hole[..., None], rgb, clean), alpha])  # keep the old view's RGB under the hole
+    print(a.room, "hole px", int(hole.sum()), "ring px", int((grow(hole, ring) & ~hole).sum()))
+    for i, p in enumerate(scene["windows"]):
+        m = poly_mask(hole.shape[::-1], [p])
+        print("  window", i, "glass share %.0f%%" % (100 * (hole & m).sum() / max(1, m.sum())))
+    if a.preview:
+        k = 4
+        bg = Image.new("RGB", shell.size, (255, 0, 255))
+        im = Image.composite(Image.fromarray(clean), bg, Image.fromarray(alpha))
+        im.resize((im.width * k, im.height * k), Image.NEAREST).save(a.preview)
+    if not a.dry:
+        Image.fromarray(out, "RGBA").save(os.path.join(d, scene["shell"]), optimize=True)
+
+
+if __name__ == "__main__":
+    main()

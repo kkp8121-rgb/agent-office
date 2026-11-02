@@ -1879,7 +1879,21 @@ function createFloor(fv) {
   root.style.height = `${r.size[1]}px`;
   const stage = el('div', 'stage');
   stage.classList.add('scened');
-  stage.style.backgroundImage = `url(${sc.url}${encodeURIComponent(r.shell)})`;
+  const shellUrl = `url(${sc.url}${encodeURIComponent(r.shell)})`;
+  if (r.view) { // the room picture has holes where the glass is; the outside view sits under it as further background layers (style.css .stage.viewed)
+    const { origin: [vx, vy], size: [vw, vh] } = r.view;
+    const file = (name) => `url(${sc.url}${encodeURIComponent(name)})`;
+    stage.classList.add('viewed');
+    stage.style.setProperty('--shell', shellUrl);
+    stage.style.setProperty('--view-day', file(r.view.day));
+    stage.style.setProperty('--view-night', file(r.view.night));
+    stage.style.setProperty('--view-hz', `${(((r.view.horizon - vy) / vh) * 100).toFixed(1)}%`);
+    stage.style.backgroundPosition = `0 0, ${vx}px ${vy}px, ${vx}px ${vy}px`;
+    stage.style.backgroundSize = `${r.size[0]}px ${r.size[1]}px, ${vw}px ${vh}px, ${vw}px ${vh}px`;
+  } else {
+    stage.style.backgroundImage = shellUrl;
+    stage.style.backgroundSize = `${r.size[0]}px ${r.size[1]}px`;
+  }
   stage.style.setProperty('--atlas', `url(${sc.url}${encodeURIComponent(r.atlas)})`);
   for (const n of sc.nodes) stage.append(objNode(n));
   if (r.front) {
@@ -1889,7 +1903,6 @@ function createFloor(fv) {
     stage.append(front);
   }
   const reportsAt = [r.tray.at[0] + r.reports[0], r.tray.at[1] + r.reports[1]];
-  stage.style.backgroundSize = `${r.size[0]}px ${r.size[1]}px`;
   // dark mode backdrop cover: the whole scene minus the room outline (evenodd hole), see .stage::before
   if (r.outline) stage.style.setProperty('--bd-clip', `path(evenodd, "M0 0H${r.size[0]}V${r.size[1]}H0Z M${r.outline.map((p) => p.join(' ')).join(' L')}Z")`);
 

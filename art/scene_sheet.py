@@ -348,6 +348,11 @@ def main():
     scene = json.load(open(os.path.join(d, "scene.json"), encoding="utf-8"))
     r = resolve(scene)
     shell = Image.open(os.path.join(d, scene["shell"])).convert("RGBA")
+    v = scene.get("view")  # the shell has holes where the glass is: paint the day view under it
+    if v:
+        under = Image.new("RGBA", shell.size, (0, 0, 0, 255))
+        under.paste(Image.open(os.path.join(d, v["day"])).convert("RGBA"), tuple(v["origin"]))
+        shell = Image.alpha_composite(under, shell)
     atlas = Image.open(os.path.join(d, scene["atlas"])).convert("RGBA")
     front = Image.open(os.path.join(d, scene["front"])).convert("RGBA") if scene.get("front") and os.path.exists(os.path.join(d, scene["front"])) else None
     stand, sit = load_sprites(cfg)

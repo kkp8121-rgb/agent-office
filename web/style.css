@@ -118,6 +118,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background-repeat: no-repeat; background-position: 0 0; image-rendering: pixelated;
   box-shadow: 0 2px 0 var(--shadow);
 }
+/* window views (scene.json "view", app.js createFloor): the room picture has holes where the glass is, the outside view is painted under it as background layers
+   (shell, then the view, then nothing else), anchored in scene pixels so neighbouring panes show neighbouring parts of one picture. The light picks the image:
+   day, sunset (the day image plus one static gradient, no extra art) or night (also forced by dark mode); no script, no timer, no filter. */
+.stage.viewed { background-color: #8fc9ee; background-image: var(--shell), var(--view-day); }
+.stage.viewed[data-light="sunset"] { background-image: var(--shell), linear-gradient(to bottom, rgba(232, 116, 100, .46) 0%, rgba(255, 152, 56, .58) var(--view-hz), rgba(255, 128, 48, .38) 100%), var(--view-day); }
+.stage.viewed[data-light="night"] { background-color: #16204a; background-image: var(--shell), var(--view-night); }
 /* dark mode: one static veil over the room art of each floor (no filter); above the front layer, below name tags, bubbles and the plaque */
 .stage::after { content: ""; position: absolute; inset: 0; z-index: 7500; pointer-events: none; background: rgb(6, 9, 28); opacity: var(--room-dim); }
 /* dark mode: the room art is an opaque picture on a painted backdrop; this static cover (scene.json "outline" as the hole, set by app.js in --bd-clip) paints that backdrop in the page colour, above the veil so it matches the page exactly. Light mode: transparent. */
@@ -491,6 +497,9 @@ li.plain { font-weight: 700; }
 .sky polygon { fill: transparent; transition: fill 1s; }
 .stage[data-light="sunset"] .sky polygon { fill: rgba(255, 140, 50, .42); }
 .stage[data-light="night"] .sky polygon { fill: rgba(14, 24, 74, .62); }
+/* a room with a painted view already has its sunset and night in the picture: the glass tint only evens out the edges */
+.stage.viewed[data-light="sunset"] .sky polygon { fill: rgba(255, 140, 50, .10); }
+.stage.viewed[data-light="night"] .sky polygon { fill: rgba(14, 24, 74, .12); }
 #snacks { display: flex; align-items: center; gap: 4px; margin-right: 6px; padding-right: 10px; border-right: 1px solid var(--line); }
 #topbar button.snack { padding: 1px 5px; display: flex; align-items: center; cursor: grab; touch-action: none; }
 #topbar button.snack img { height: 16px; width: auto; image-rendering: pixelated; pointer-events: none; }

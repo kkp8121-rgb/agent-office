@@ -34,6 +34,13 @@ function run(design) {
     return { errors: [`1단계 형식: scene.json 을 읽지 못했습니다 (${e.message})`], warnings: [], resolved: null };
   }
   const res = checkScene(raw, { atlasSize: readPngSize(path.join(dir, design, String(raw?.atlas ?? ''))), cfg });
+  for (const key of ['day', 'night']) { // the outside view pictures must exist and match view.size exactly
+    const v = raw?.view;
+    if (!v || typeof v[key] !== 'string') continue;
+    const got = readPngSize(path.join(dir, design, v[key]));
+    if (!got) res.errors.push(`10단계 장식 앵커: view.${key} 그림 ${v[key]} 이(가) 없거나 PNG 가 아닙니다`);
+    else if (Array.isArray(v.size) && (got[0] !== v.size[0] || got[1] !== v.size[1])) res.errors.push(`10단계 장식 앵커: view.${key} 그림 크기 ${got.join('x')} 이(가) view.size ${v.size.join('x')} 와 다릅니다`);
+  }
   res.decor = { whiteboard: raw.whiteboard, windows: raw.windows, meeting: raw.meeting, seasonal: raw.seasonal };
   if (raw?.design !== design) res.errors.unshift(`1단계 형식: design: 폴더 이름 "${design}" 과 같아야 합니다`);
   return res;

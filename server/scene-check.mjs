@@ -194,6 +194,19 @@ export function checkScene(raw, { atlasSize, cfg, minSeats }) {
   if (raw.outline !== undefined) {
     if (!Array.isArray(raw.outline) || raw.outline.length < 3 || !raw.outline.every(inside)) bad('outline', '은 장면 안의 점 3개 이상이어야 합니다 (방 바깥 배경을 어둡게 덮을 때 구멍이 되는 방 윤곽)');
   }
+  if (raw.view !== undefined) { // the outside view behind the glass: one picture per room in scene pixels (day and night), see README "Window views"
+    const v = raw.view;
+    const fileOk = (f) => typeof f === 'string' && /^[\w.-]+\.png$/.test(f);
+    const boxOk = Array.isArray(v?.origin) && Array.isArray(v?.size) && v.origin.length === 2 && v.size.length === 2 && [...v.origin, ...v.size].every(Number.isInteger) && v.size[0] > 0 && v.size[1] > 0;
+    if (!boxOk || !fileOk(v.day) || !fileOk(v.night) || !Number.isInteger(v.horizon)) bad('view', '는 {origin:[x, y], size:[w, h], day:"파일.png", night:"파일.png", horizon:y} 여야 합니다');
+    else {
+      if (v.origin[0] < 0 || v.origin[1] < 0 || v.origin[0] + v.size[0] > sw || v.origin[1] + v.size[1] > sh) bad('view', '의 그림 상자가 장면 안에 있어야 합니다');
+      if (v.horizon <= v.origin[1] || v.horizon >= v.origin[1] + v.size[1]) bad('view.horizon', '는 그림 상자 안의 장면 y 여야 합니다');
+      for (const [i, poly] of (raw.windows ?? []).entries()) {
+        if (!poly.every((p) => p[0] >= v.origin[0] && p[0] <= v.origin[0] + v.size[0] && p[1] >= v.origin[1] && p[1] <= v.origin[1] + v.size[1])) bad(`windows[${i}]`, '가 view 그림 상자 밖으로 나갑니다 (창 유리는 모두 풍경으로 덮여야 합니다)');
+      }
+    }
+  }
   if (raw.meeting !== undefined) {
     const m = raw.meeting;
     const spots = Array.isArray(m?.spots) ? m.spots : [];

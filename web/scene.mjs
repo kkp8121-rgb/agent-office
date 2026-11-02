@@ -341,6 +341,7 @@ export function resolveScene(raw) {
     blocked: raw.blocked,
     frontMask: raw.frontMask ?? [],
     outline: raw.outline ?? null,
+    view: raw.view ?? null,
     door: raw.door,
     objects,
     seats,
