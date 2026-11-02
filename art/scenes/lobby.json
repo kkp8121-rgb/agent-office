@@ -40,19 +40,31 @@
         "bench"
       ],
       "prompt": "Use your image generation tool to create a sprite sheet of 6 separate furniture objects in EXACTLY the same pixel-art style, palette, dark outlines, pixel size and camera as the objects in the attached lobby.png. Layout: TWO rows of 3 objects with wide empty gaps, each object alone, on a flat solid #FF00FF magenta background (no shadow, no floor, no glow). Row 1: 1) a tall potted palm in a square cream stone planter; 2) a big leafy green potted plant in a terracotta pot; 3) a fern in a square wooden planter. Row 2: 4) a small information stand (a slim stand with a blank dark screen, no text); 5) a coffee cart with cups; 6) a wooden bench. Do not use magenta inside the objects. No text."
+    },
+    {
+      "id": "s3",
+      "rows": 2,
+      "ref": "art/floors/lobby.png",
+      "pieces": [
+        "desk",
+        "desk-b",
+        "chair",
+        "reception"
+      ],
+      "prompt": "Use your image generation tool to create a sprite sheet of 4 separate furniture objects in EXACTLY the same pixel-art style, palette, dark outlines, pixel size and camera as the objects in the attached lobby.png. ALL four objects are drawn exactly from the FRONT, like a front elevation seen from about 35 degrees above: the long side is exactly horizontal, nothing is diagonal, nothing is rotated, nothing is drawn isometric. Layout: TWO rows of 2 objects with wide empty gaps, each object alone, on a flat solid #FF00FF magenta background (no shadow, no floor, no glow). Row 1: 1) a small wooden office desk seen from the front: a light wooden top surface (a thin strip about one quarter of the desk height), below it a plain front panel with ONE drawer in the middle; on the top at the left of the centre a LOW closed laptop (lid back toward the viewer, as low as a book) and a small white mug at the right end; NO monitor, nothing tall, no chair, no keyboard; about 2.2 times as wide as high. 2) the same desk with the same size and the same front panel, but with an open notebook and a pencil cup on the top instead of the laptop, and one small flat monitor at the far RIGHT end only, turned a little toward the left, its back toward the viewer; nothing in the middle third of the desk top; no chair. Row 2: 3) a dark grey office swivel chair seen exactly from the front: only the backrest, the two armrests and a bit of the seat are visible, nobody in it, slightly taller than wide. 4) a straight reception counter seen from the front: a light wood top, a dark front panel, a small blank plaque on the front, no text, no monitor, nothing on top, about 2.8 times as wide as high. Do not use magenta inside the objects. No text."
     }
   ],
   "kinds": {
     "desk": {
-      "piece": "s1/piece-0",
+      "piece": "s3/piece-0",
       "width": 76
     },
     "chair": {
-      "piece": "s1/piece-1",
-      "height": 42
+      "piece": "s3/piece-2",
+      "height": 38
     },
     "reception": {
-      "piece": "s1/piece-2",
+      "piece": "s3/piece-3",
       "width": 130
     },
     "sofa": {
@@ -86,6 +98,10 @@
     "bench": {
       "piece": "s2/piece-5",
       "width": 90
+    },
+    "desk-b": {
+      "piece": "s3/piece-1",
+      "width": 76
     }
   }
 }

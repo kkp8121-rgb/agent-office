@@ -15,7 +15,7 @@ K = sc.setdefault("kinds", {})
 def kind(name, fp, blocks=True, seat=None):
     k = K.setdefault(name, {})
     r = k["rect"]
-    k["anchor"] = [r[2] // 2, r[3] - 1] if name != "chair" else [13, 41]
+    k["anchor"] = [r[2] // 2, r[3] - 1]
     k["footprint"] = [[-fp[0], -fp[1]], [fp[0], -fp[1]], [fp[0], 0], [-fp[0], 0]]
     k["blocks"] = blocks
     k["depth"] = "auto"
@@ -28,9 +28,12 @@ def kind(name, fp, blocks=True, seat=None):
             k[key] = k.pop(key)
 
 
-kind("desk", (38, 16), seat={"at": [0, -48], "sitAt": [0, -46], "approach": [0, 22], "face": "right"})
+# front-view desks: the standing picture of the agent stands 13 px behind the desk's front line (at == sitAt, no seated picture)
+DESK_SEAT = {"at": [0, -13], "sitAt": [0, -13], "approach": [0, 16], "face": "right"}
+kind("desk", (38, 12), seat=dict(DESK_SEAT))
+kind("desk-b", (38, 12), seat=dict(DESK_SEAT))
 kind("chair", (9, 5), blocks=False)
-kind("reception", (65, 18))
+kind("reception", (65, 14))
 kind("sofa", (52, 22))
 kind("table", (20, 10))
 kind("palm", (12, 9))
@@ -40,15 +43,28 @@ kind("stand", (10, 6))
 kind("cart", (28, 12))
 kind("bench", (40, 10))
 
-COLS = [288 + 92 * i for i in range(8)]
-ROWS = [345, 405, 465, 525, 585]
+# screen art quads (navy area, tl tr br bl) written by art/scenes/lobby_wings.py; the text quads are the navy inset by a few pixels
+WINGS = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "lobby-wings.json")))
+
+
+def inset(q, k):
+    """Quad moved k px inside: vertical edges x +-k, slanted top/bottom edges y +-k (the edges stay on their lines)."""
+    (tl, tr, br, bl) = q
+    f = lambda a, b, x: a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0])
+    x0, x1 = tl[0] + k, tr[0] - k
+    r = lambda v: round(v, 1)
+    return [[x0, r(f(tl, tr, x0) + k)], [x1, r(f(tl, tr, x1) + k)], [x1, r(f(bl, br, x1) - k)], [x0, r(f(bl, br, x0) - k)]]
+
+
+COLS = [296 + 90 * i for i in range(8)]
+ROWS = [345, 407, 469, 531, 593]
 objs, seats = [], []
 n = 0
 for y in ROWS:
     for x in COLS:
         n += 1
-        objs.append({"id": f"desk-{n}", "kind": "desk", "at": [x, y]})
-        objs.append({"id": f"chair-{n}", "kind": "chair", "at": [x, y - 50]})
+        objs.append({"id": f"desk-{n}", "kind": "desk-b" if COLS.index(x) % 2 else "desk", "at": [x, y]})
+        objs.append({"id": f"chair-{n}", "kind": "chair", "at": [x, y - 17]})
         seats.append(f"desk-{n}")
 objs += [
     {"id": "reception", "kind": "reception", "at": [1090, 552]},
@@ -61,8 +77,8 @@ objs += [
     {"id": "fern-1", "kind": "fern", "at": [420, 284]},
     {"id": "fern-2", "kind": "fern", "at": [860, 284]},
     {"id": "stand-1", "kind": "stand", "at": [1120, 470]},
-    {"id": "bench-1", "kind": "bench", "at": [1010, 636], "flipX": True},
-    {"id": "cart-1", "kind": "cart", "at": [920, 640]},
+    {"id": "bench-1", "kind": "bench", "at": [1040, 650], "flipX": True},
+    {"id": "cart-1", "kind": "cart", "at": [1115, 655]},
 ]
 sc.update({
     "version": 1, "design": "lobby", "size": [1280, 720], "shell": "shell.png", "atlas": "objects.png", "front": "front.png",
@@ -72,7 +88,7 @@ sc.update({
     "frontMask": [[[372, 668], [905, 668], [905, 704], [372, 704]]],
     "door": {"at": [1160, 440], "face": "left"},
     "objects": objs, "seats": seats,
-    "lead": {"desk": "reception", "at": [1090, 488], "sitAt": [1090, 486], "approach": [1070, 578], "face": "left"},
+    "lead": {"desk": "reception", "at": [1090, 520], "sitAt": [1090, 520], "approach": [1070, 578], "face": "right"},
     "tray": {"object": "reception", "queue": [[985 + 27 * c, 335 + 28 * r] for r in range(3) for c in range(4)]},
     "idle": [{"at": [430 + 52 * i, 636], "face": "right" if i % 2 else "left"} for i in range(6)],
     "overflow": [{"at": [1010 + 28 * c, y], "face": "left"} for y in (420, 448) for c in range(4)]
@@ -84,12 +100,12 @@ sc.update({
         {"id": "info", "kind": "other", "at": [1135, 505], "face": "left"},
     ],
     "ledWall": {"panels": [
-        {"id": "center", "quad": [[459, 67], [824, 67], [824, 169], [459, 169]]},
-        {"id": "left", "quad": [[222, 140], [396, 82], [396, 162], [222, 220]]},
-        {"id": "right", "quad": [[884, 82], [1058, 140], [1058, 220], [884, 162]]},
-        {"id": "tickerCenter", "quad": [[459, 181], [824, 181], [824, 197], [459, 197]]},
-        {"id": "tickerLeft", "quad": [[222, 232], [396, 185], [396, 201], [222, 248]]},
-        {"id": "tickerRight", "quad": [[884, 185], [1058, 232], [1058, 248], [884, 201]]},
+        {"id": "center", "quad": [[458, 68], [821, 68], [821, 169], [458, 169]]},
+        {"id": "left", "quad": inset(WINGS["left"], 2)},
+        {"id": "right", "quad": inset(WINGS["right"], 2)},
+        {"id": "tickerCenter", "quad": inset(WINGS["tickerCenter"], 1)},
+        {"id": "tickerLeft", "quad": inset(WINGS["tickerLeft"], 1)},
+        {"id": "tickerRight", "quad": inset(WINGS["tickerRight"], 1)},
     ]},
 })
 sc.pop("windows", None); sc.pop("whiteboard", None); sc.pop("meeting", None); sc.pop("seasonal", None)
