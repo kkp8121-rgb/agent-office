@@ -251,7 +251,7 @@ test('fun2 sse: phase and fail go out as their own events once, and never replay
     t.after(() => req.destroy());
   });
   const first = connect((x) => x.includes('event: fail') && x.includes('event: phase'));
-  await new Promise((r) => setTimeout(r, 30));
+  while (server.sseClients < 1) await new Promise((r) => setImmediate(r)); // broadcast only reaches a client that is already registered
   o.applySessionEvents('s1', [launch(100500), fail(100600)], 100600);
   o.setWorkflowProgress('s1', 'r1', prog('가'));
   server.broadcast();
