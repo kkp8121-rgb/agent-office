@@ -10,6 +10,8 @@ Reads art/glass.json[room] and assets/scenes/<room>/scene.json (`windows`, `view
                  inside the `zones` boxes and the window polygons grown by `grow` px and inside the room outline, each area closed by
                  `close` px so clouds, white flowers and glints inside the glass are not holes. Hanging plants (dark green outlines, which the
                  painted garden has not) are found inside the hand boxes `plants` and left out.
+  `plantReach` / `plantDens` (flood): how tightly the plant outline blob is cut (default 4 px / .07; greenhouse 2 / .25, so the pasted pieces of
+                 old picture around the hanging plants become glass); `islands` N: opaque pieces of at most N px cut off from everything else are old-picture specks and become glass.
   `subtract` / `add`: hand polygons removed from / added to the hole (hanging plants painted into the shell, door handles).
 Writes shell.png as RGBA: alpha 0 on the glass, the old picture's RGB kept under the hole (tools that drop alpha still see the old view),
 and the 1-2 px ring around the hole decontaminated: ring pixels that still carry the old glass colour take the nearest frame colour.
@@ -69,12 +71,12 @@ def components(mask, y_max):
     return out
 
 
-def plant_mask(rgb, boxes):
+def plant_mask(rgb, boxes, reach=4, dens_min=0.07):
     """Hanging plants: dark green outlines are dense on a plant and almost absent from the painted garden behind the glass."""
     mx = rgb.max(axis=2)
     dg = (mx < 85) & (rgb[..., 1] > rgb[..., 0] + 3) & (rgb[..., 1] >= rgb[..., 2])
     dens = np.asarray(Image.fromarray((dg * 255).astype(np.uint8)).filter(ImageFilter.BoxBlur(5))) / 255.0
-    blob = grow(dens > 0.07, 4)
+    blob = grow(dens > dens_min, reach)
     box = np.zeros(mx.shape, bool)
     for x0, y0, x1, y1 in boxes:
         box[y0:y1, x0:x1] = True
@@ -86,7 +88,7 @@ def flood_hole(rgb, cfg, outline, windows):
     sat = (mx - mn) / np.maximum(mx, 1)
     coloured = ((sat > cfg.get("sat", 0.16)) | (rgb[..., 2].astype(int) > rgb[..., 0].astype(int) + 12)) & (mx >= 90)
     r, g, b = (rgb[..., i].astype(int) for i in range(3))
-    coloured &= ~plant_mask(rgb, cfg.get("plants", []))
+    coloured &= ~plant_mask(rgb, cfg.get("plants", []), cfg.get("plantReach", 4), cfg.get("plantDens", 0.07))
     coloured &= shrink(poly_mask(mx.shape[::-1], [outline]), 1)  # the painted backdrop outside the room is green too
     zone = grow(poly_mask(mx.shape[::-1], windows), cfg.get("grow", 8)) | poly_mask(mx.shape[::-1], cfg.get("zones", []))
     coloured &= zone  # pictures, shelves and the floor are coloured too: only look near the panes
@@ -114,9 +116,13 @@ def hole_for(rgb, windows, cfg, outline=None):
     if cfg.get("add"):
         hole |= poly_mask((w, h), cfg["add"])
     if mode == "flood":  # the hanging plants stay, also where an `add` polygon (door glass) reaches behind them
-        hole &= ~plant_mask(rgb, cfg.get("plants", []))
+        hole &= ~plant_mask(rgb, cfg.get("plants", []), cfg.get("plantReach", 4), cfg.get("plantDens", 0.07))
     if cfg.get("subtract"):
         hole &= ~poly_mask((w, h), cfg["subtract"])
+    if cfg.get("islands"):  # old-picture specks: small opaque pieces cut off from the frame, inside the glass area
+        for pts in components(~hole, cfg.get("maxY", h)):
+            if len(pts) <= cfg["islands"]:
+                hole[pts[:, 0], pts[:, 1]] = True
     return hole
 
 

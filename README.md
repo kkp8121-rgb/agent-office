@@ -112,11 +112,11 @@ Codex 의 imagegen 으로 그림을 만든 뒤 `art\snap.py` 로 격자에 맞�
 
 ### 창밖 풍경 (`view`)
 
-방마다 창밖은 창 하나하나에 붙인 작은 그림이 아니라 방 전체에 걸친 한 장의 풍경(`assets\scenes\<방>iew-day.png`, `view-night.png`)입니다. 그림은 장면 좌표에 고정돼 있어 이웃한 창은 같은 풍경의 이웃한 부분을 보여 주고, 수평선 높이가 방 전체에서 하나(`view.horizon`)이며(높은 창은 하늘, 낮은 창은 가까운 나무·꽃), 멀리는 작고 흐리게 · 가까이는 크고 선명하게 그렸습니다. 방마다 바깥 주제는 그대로입니다(도시 · 호수 산골 · 소나무 숲 · 정원).
+방마다 창밖은 창 하나하나에 붙인 작은 그림이 아니라 방 전체에 걸친 한 장의 풍경(`assets\scenes\<방>\view-day.png`, `view-night.png`)입니다. 그림은 장면 좌표에 고정돼 있어 이웃한 창은 같은 풍경의 이웃한 부분을 보여 주고, 수평선 높이가 방 전체에서 하나(`view.horizon`)이며(높은 창은 하늘, 낮은 창은 가까운 나무·꽃), 멀리는 작고 흐리게 · 가까이는 크고 선명하게 그렸습니다. 방마다 바깥 주제는 그대로입니다(도시 · 호수 산골 · 소나무 숲 · 정원).
 
 - 층: 방 그림(`shell.png`)은 RGBA 이고 유리 자리가 투명(구멍)입니다. 풍경은 그 아래 배경 겹으로 깔리고(`.stage.viewed`, style.css) 날씨·유리 색(`.sky`)·가구·캐릭터·방 어둡게 하는 막(`.stage::after`)은 전과 같은 자리에서 그 위에 얹힙니다. 낮/노을/밤은 `data-light` 만으로 고르므로 자바스크립트도 타이머도 필터도 없고, 가려진 층은 그림을 받아 오지 않습니다.
 - `scene.json` 의 `view`: `{"origin":[x,y],"size":[w,h],"day":"view-day.png","night":"view-night.png","horizon":y}`(선택). 상자는 장면 안에 있고 모든 `windows` 다각형을 덮어야 하며, 그림 크기는 `size` 와 같아야 합니다(`node scripts\check-scenes.mjs`).
-- 풍경 그림 만들기: Codex 로 방마다 낮 1장 · 밤 1장(`art\prompts.json` 의 `views`, 호출은 `python art\extras\gen_view.py <방> day|night`)을 받아 `python artiew.py <방> day|night <원본.png> <수평선 비율>` 로 줄입니다(LANCZOS, 수평선 안개, 팔레트 정리). 방별 상자·수평선은 view.py 안 `ROOMS` 에 있습니다.
+- 풍경 그림 만들기: Codex 로 방마다 낮 1장 · 밤 1장(`art\prompts.json` 의 `views`, 호출은 `python art\extras\gen_view.py <방> day|night`)을 받아 `python art\view.py <방> day|night <원본.png> <수평선 비율>` 로 줄입니다(LANCZOS, 수평선 안개, 팔레트 정리). 방별 상자·수평선은 view.py 안 `ROOMS` 에 있습니다. 눈높이 느낌은 수평선(먼 풍경 아래쪽 끝)이 창 위쪽에 오고 먼 산·건물 윤곽 위의 하늘이 유리 높이의 약 1/3 이하가 되도록 원본을 아래쪽으로 잘라 `--zoom` 으로 키운 것입니다(밤 그림은 낮 그림과 같은 줄에 오도록 원본끼리 어긋난 만큼 `수평선 비율`을 낮 값에서 빼서 따로 넘깁니다).
 - 유리 구멍 내기: `python art\glass.py <방>` 이 `art\glass.json` 의 방식(`poly` 다각형 · `colour` 다각형에서 창틀 색 빼기 · `flood` 온실처럼 색으로 유리를 찾고 매달린 화분은 빼기)으로 `shell.png` 의 유리를 투명하게 만듭니다. 구멍 밑에는 옛 그림의 RGB 가 남아 있어(알파를 무시하는 도구는 옛 풍경을 봄) 다시 실행해도 같고, 가장자리 1~2픽셀은 옛 유리색 번짐을 창틀 색으로 지웁니다. `art\scene_sheet.py` 는 낮 풍경을 깔고 점검표를 만듭니다.
 - 구멍 때문에 `shell.png` 만 보면 유리가 비어 있습니다. 풍경 파일이 없거나 안 읽히면 유리 자리에 하늘색(`#8fc9ee`)이 보입니다.
 

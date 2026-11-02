@@ -284,6 +284,9 @@
    ]
   ],
   "sat": 0.21,
+  "plantReach": 2,
+  "plantDens": 0.25,
+  "islands": 70,
   "subtract": [
    [
     [

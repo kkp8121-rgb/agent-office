@@ -1101,5 +1101,5 @@
  "meeting": {"boss":{"at":[788,248],"face":"right"},"spots":[{"at":[816,256],"face":"right"},{"at":[760,248],"face":"right"},{"at":[776,272],"face":"right"},{"at":[776,224],"face":"right"},{"at":[804,280],"face":"right"},{"at":[748,224],"face":"right"},{"at":[836,276],"face":"right"}]},
  "seasonal": [{"id":"floor-1","kind":"floor","at":[128,376],"max":[30,56]},{"id":"floor-2","kind":"floor","at":[880,384],"max":[30,56]},{"id":"floor-3","kind":"floor","at":[256,432],"max":[30,56]},{"id":"floor-4","kind":"floor","at":[784,416],"max":[30,56]},{"id":"wall-1","kind":"wall","at":[272,66],"max":[30,46]},{"id":"wall-2","kind":"wall","at":[402,68],"max":[18,40]},{"id":"wall-3","kind":"wall","at":[712,24],"max":[56,60]},{"id":"desk-1","kind":"desk","at":[364,198],"max":[18,18]},{"id":"desk-2","kind":"desk","at":[711,198],"max":[18,18]},{"id":"desk-3","kind":"desk","at":[473,276],"max":[18,18]},{"id":"desk-4","kind":"desk","at":[607,364],"max":[18,18]}],
  "outline":[[727,13],[738,15],[827,66],[1011,180],[1011,345],[1015,350],[1014,356],[605,485],[363,485],[9,331],[9,326],[13,324],[13,174],[247,56],[295,55]],
- "view": {"origin":[64,32],"size":[624,224],"day":"view-day.png","night":"view-night.png","horizon":112}
+ "view": {"origin":[64,32],"size":[624,224],"day":"view-day.png","night":"view-night.png","horizon":87}
 }
