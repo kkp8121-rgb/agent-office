@@ -6,10 +6,11 @@ recipe of snap.py, not nearest neighbour), blends a haze band at the horizon so 
 the palette. Writes assets/scenes/<room>/view-<mode>.png (default --out). The canvas box is the scene.json "view" entry.
 --zoom Z (>1) takes a box 1/Z of the raw picture, so the landscape is bigger and the sky above the far layer is cropped away (eye-level look);
 --hy overrides the room's horizon row (scene y). The horizon of the picture must land on the same canvas row for day and night: give the night
-picture the horizon fraction of its own raw (the day fraction minus the measured vertical drift between the two raws)."""
+picture the horizon fraction of its own raw (the day fraction minus the measured vertical drift between the two raws).
+--gamma G --sat S lift a flat night picture after the palette step: pixels ** G (G<1 brightens), then colour saturation x S (lounge night: 0.78 / 1.25)."""
 import sys, os, argparse
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image, ImageEnhance, ImageFilter
 ROOMS = {  # origin x,y, size w,h, horizon scene y, quantize colours
  "studio2": ((64, 32), (624, 224), 87, 128),
  "lounge": ((344, 64), (376, 136), 130, 64),
@@ -18,7 +19,7 @@ ROOMS = {  # origin x,y, size w,h, horizon scene y, quantize colours
 }
 HAZE = {"day": ((207, 229, 242), 0.30), "night": ((31, 44, 85), 0.25)}
 
-def process(room, mode, src, hfrac, cx=0.5, strength=1.0, zoom=1.0, hy=None):
+def process(room, mode, src, hfrac, cx=0.5, strength=1.0, zoom=1.0, hy=None, gamma=1.0, sat=1.0):
     (ox, oy), (w, h), hy0, ncol = ROOMS[room]
     hy = hy0 if hy is None else hy
     im = Image.open(src).convert("RGB")
@@ -40,6 +41,9 @@ def process(room, mode, src, hfrac, cx=0.5, strength=1.0, zoom=1.0, hy=None):
     a_ = a_ * (1 - band[..., None] * k) + np.array(col, np.float32) * band[..., None] * k
     im = Image.fromarray(np.clip(a_, 0, 255).astype(np.uint8))
     im = im.quantize(ncol, Image.MEDIANCUT, dither=Image.NONE).convert("RGB")
+    if gamma != 1.0 or sat != 1.0:
+        a_ = (np.asarray(im).astype(np.float32) / 255) ** gamma
+        im = ImageEnhance.Color(Image.fromarray((a_ * 255).astype(np.uint8))).enhance(sat)
     return im, shifted
 
 if __name__ == "__main__":
@@ -48,8 +52,9 @@ if __name__ == "__main__":
     p.add_argument("--cx", type=float, default=0.5); p.add_argument("--out", default=None)
     p.add_argument("--strength", type=float, default=1.0)
     p.add_argument("--zoom", type=float, default=1.0); p.add_argument("--hy", type=int, default=None)
+    p.add_argument("--gamma", type=float, default=1.0); p.add_argument("--sat", type=float, default=1.0)
     a = p.parse_args()
-    im, sh = process(a.room, a.mode, a.src, a.hfrac, a.cx, a.strength, a.zoom, a.hy)
+    im, sh = process(a.room, a.mode, a.src, a.hfrac, a.cx, a.strength, a.zoom, a.hy, a.gamma, a.sat)
     out = a.out or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "scenes", a.room)
     os.makedirs(out, exist_ok=True)
     im.save(f"{out}/view-{a.mode}.png", optimize=True)
