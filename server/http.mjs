@@ -174,6 +174,7 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
     // Codex roles reuse the Claude sprite keys, so they must not overwrite the Claude names here.
     for (const [k, r] of Object.entries(cfg.roles)) if (!k.startsWith('codex:')) roles[r.key] = { name: r.name, role: r.role };
     for (const l of cfg.leads) roles[l.key] = { name: l.name, role: l.role };
+    for (const x of cfg.extras ?? []) roles[x.key] = { name: x.name, role: '지원' };
     const scenes = {};
     for (const [design, s] of Object.entries(cfg.scenes)) scenes[design] = { ...s.raw, url: s.url };
     return {

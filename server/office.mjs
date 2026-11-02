@@ -206,11 +206,11 @@ export class Office {
       usedNames: new Set([lead.name]),
       usedSlots: new Set(),
       reports: 0,
-      unknownSeq: this.floorSeq * 5, // start of the pool scan for kinds without a fixed character; advances per pick, and floors start apart
+      unknownSeq: this.floorSeq * 5, // start of the pool scan for agents that need a borrowed face; advances per pick, and floors start apart
     };
   }
 
-  /** Character pool for unknown agent kinds: every sprite key of the roles table, with its Claude and Codex name. */
+  /** Character pool for agents that do not get their kind's own face: every sprite key of the roles table, with its Claude and Codex name, after the extras (one name for both). Bosses are not in it. */
   #buildPool() {
     const byKey = new Map();
     for (const [k, r] of Object.entries(this.cfg.roles)) {
@@ -218,7 +218,9 @@ export class Office {
       if (k.startsWith('codex:')) c.codex ??= r.name;
       else c.claude ??= r.name;
     }
-    return [...byKey.values()].map((c) => ({ key: c.key, claude: c.claude ?? c.codex, codex: c.codex ?? c.claude }));
+    const pool = (this.cfg.extras ?? []).map((x) => ({ key: x.key, claude: x.name, codex: x.name })); // the new faces first: they are the ones borrowed first
+    for (const c of byKey.values()) pool.push({ key: c.key, claude: c.claude ?? c.codex, codex: c.codex ?? c.claude });
+    return pool;
   }
 
   /** Least used boss among the visible floors (not hidden; a leaving floor counts until it is removed); ties go to the first in rotation order from the creation counter. */
@@ -414,7 +416,7 @@ export class Office {
 
   #enterAgent(f, m, now) {
     const { log } = this.cfg;
-    const entry = this.#roleFor(f, m.agentType) ?? this.#spreadRole(f, m.agentType);
+    const entry = this.#faceFor(f, m.agentType);
     const wf = m.workflow;
     const head = clip(wf ? `${wf.phase} · ${wf.label}` : m.description ?? '', log.headMaxChars);
     const slot = this.#allocSceneSlot(f, this.#sceneOf(f.design));
@@ -439,7 +441,7 @@ export class Office {
     if (startTs >= this.logSince(f.sessionId, now)) this.#log(f, a, startTs, LOG_START);
   }
 
-  /** Claude floors know Claude role names, Codex floors the `codex:` ones; anything else is null (see #spreadRole). */
+  /** Claude floors know Claude role names, Codex floors the `codex:` ones; anything else is null (see #faceFor). */
   #roleFor(f, agentType) {
     const { roles } = this.cfg;
     const codex = f.provider === 'codex';
@@ -453,10 +455,16 @@ export class Office {
     return known ? roles[agentType] : null;
   }
 
-  /** An unknown kind takes the pool character least used on the floor (ties: rotation from the floor's own counter); the role label is the kind. */
-  #spreadRole(f, agentType) {
+  /**
+   * The face of an arriving agent: its kind's own character when no one on the floor wears it, else the next unused pool
+   * character (rotation from the floor's own counter); when every pool character is worn, the least used one (names then get +N).
+   * The role label is always the real kind, so the tier stays readable on a borrowed face.
+   */
+  #faceFor(f, agentType) {
+    const own = this.#roleFor(f, agentType);
     const used = new Map();
     for (const a of f.agents.values()) used.set(a.sprite, (used.get(a.sprite) ?? 0) + 1);
+    if (own && !used.has(own.key)) return own;
     const { pool } = this;
     const start = f.unknownSeq++ % pool.length;
     let best = pool[start];
@@ -464,7 +472,7 @@ export class Office {
       const c = pool[(start + k) % pool.length];
       if ((used.get(c.key) ?? 0) < (used.get(best.key) ?? 0)) best = c;
     }
-    return { key: best.key, name: f.provider === 'codex' ? best.codex : best.claude, role: this.#kindLabel(agentType) };
+    return { key: best.key, name: f.provider === 'codex' ? best.codex : best.claude, role: own ? own.role : this.#kindLabel(agentType) };
   }
 
   /** Same rule as sanitize.firstWord: a plain word only (no paths, URLs, spaces); anything else shows as "지원". */

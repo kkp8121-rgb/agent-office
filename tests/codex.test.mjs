@@ -347,10 +347,13 @@ test('office: codex floor uses codex names (도담 for worker) and spreads unkno
   assert.ok(cfg.leads.some((l) => l.name === f.lead.name), 'the boss comes from the leads table, whatever the provider');
   const byId = Object.fromEntries(f.agents.map((a) => [a.agentId, a]));
   assert.deepEqual([byId.a1.name, byId.a1.role], ['도담', '개발']);
-  assert.equal(byId.a2.name, '도담+1');
-  // unknown kinds take the least used character; the label is the kind ("지원" without one)
+  // a second worker borrows an unused face: no +1, its role label is still the real kind
+  assert.equal(byId.a2.role, '개발');
+  assert.notEqual(byId.a2.sprite, 'worker');
+  // unknown kinds take an unused character; the label is the kind ("지원" without one)
   assert.deepEqual([byId.a3.role, byId.a4.role, byId.a5.role], ['mystery', '지원', 'worker']);
-  assert.equal(new Set([byId.a3.sprite, byId.a4.sprite, byId.a5.sprite, 'worker']).size, 4, 'a Claude role name is not a Codex role: a5 is spread, not the Claude worker');
+  assert.equal(new Set(f.agents.map((a) => a.sprite)).size, 5, 'a Claude role name is not a Codex role: a5 is spread, not the Claude worker');
+  assert.equal(new Set(f.agents.map((a) => a.name)).size, 5);
 
   office.syncSessions([{ provider: 'claude', pid: 1, sessionId: 'cl', cwd: 'C:\\Project\\b', status: 'busy', name: '', startedAt: T + 1 }], T + 1);
   office.syncAgents('cl', [{ agentId: 'c1', agentType: 'codex:worker', description: '', finished: false, transcriptPath: '', mtimeMs: T, workflow: null }], T + 1);

@@ -76,20 +76,25 @@ test('office: hidden record is dropped when its session ends', () => {
   assert.equal(o.hide('nope'), false);
 });
 
-test('office: worker gets 서진, second worker 서진+1, freed number reused', () => {
+test('office: worker gets 서진, the next workers borrow unused faces, a freed face is reused', () => {
   const o = setup();
   o.syncAgents('s1', [M('a1'), M('a2'), M('a3')], 1000);
   const names = () => floorOf(o, 's1').agents.map((a) => a.name);
-  assert.deepEqual(names(), ['서진', '서진+1', '서진+2']);
-  const a1 = floorOf(o, 's1').agents[0];
+  const first = names();
+  assert.equal(first[0], '서진');
+  assert.equal(new Set(first).size, 3);
+  const [a1, a2] = floorOf(o, 's1').agents;
   assert.equal(a1.role, '개발');
   assert.equal(a1.sprite, 'worker');
-  // a2 (서진+1) finishes and is removed -> its number is free again
+  assert.equal(a2.role, '개발', 'a borrowed face keeps the real kind label');
+  assert.notEqual(a2.sprite, 'worker');
+  // a2 finishes and is removed -> its face is free again; the newcomer does not get a +N name
   o.syncAgents('s1', [M('a1'), M('a2', { finished: true }), M('a3')], 2000);
   o.tick(2000 + cfg.agent.doneLingerMs);
-  assert.deepEqual(names(), ['서진', '서진+2']);
+  assert.equal(names().length, 2);
   o.syncAgents('s1', [M('a1'), M('a3'), M('a4')], 20000);
-  assert.deepEqual(names(), ['서진', '서진+2', '서진+1']);
+  assert.equal(new Set(names()).size, 3);
+  assert.ok(names().every((n) => !n.includes('+')));
 });
 
 test('office: unknown agentType takes a pool character labelled with the kind', () => {

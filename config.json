@@ -94,7 +94,19 @@
               "security-reviewer": [71.875, 57.5758],
               "worker-high": [78.125, 47.3684],
               "worker-low": [81.25, 48.7179],
-              "worker": [81.25, 51.2195]
+              "worker": [81.25, 51.2195],
+              "extra-01": [79.6875, 42.1053],
+              "extra-02": [81.25, 40.4762],
+              "extra-03": [79.6875, 36.3636],
+              "extra-04": [71.875, 50],
+              "extra-05": [75, 46.8085],
+              "extra-06": [76.5625, 53.125],
+              "extra-07": [84.375, 40.9091],
+              "extra-08": [76.5625, 41.0256],
+              "extra-09": [75, 37.2093],
+              "extra-10": [78.125, 50],
+              "extra-11": [79.6875, 52.2727],
+              "extra-12": [75, 50]
             } },
           "cat": {
             "name": "치즈", "firstDelayMs": [3000, 9000], "moveEveryMs": [180000, 420000],
@@ -117,6 +129,20 @@
     { "key": "lead-3", "name": "수아", "role": "팀장" },
     { "key": "lead-4", "name": "윤슬", "role": "팀장" },
     { "key": "lead-5", "name": "다인", "role": "팀장" }
+  ],
+  "extras": [
+    { "key": "extra-01", "name": "지유" },
+    { "key": "extra-02", "name": "나연" },
+    { "key": "extra-03", "name": "소율" },
+    { "key": "extra-04", "name": "예나" },
+    { "key": "extra-05", "name": "다솜" },
+    { "key": "extra-06", "name": "유리" },
+    { "key": "extra-07", "name": "채이" },
+    { "key": "extra-08", "name": "도희" },
+    { "key": "extra-09", "name": "이솔" },
+    { "key": "extra-10", "name": "아라" },
+    { "key": "extra-11", "name": "연우" },
+    { "key": "extra-12", "name": "민서" }
   ],
   "roles": {
     "scout":                { "key": "scout",                "name": "다온", "role": "정찰" },

@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import { existsSync } from 'node:fs';
 import { loadConfig } from '../server/config.mjs';
 import { Office } from '../server/office.mjs';
 import { createServer } from '../server/http.mjs';
@@ -27,6 +28,8 @@ function setup(live = [S('s1')], now = 1000) {
 
 // Name a sprite key has on a floor of the given provider: the codex: entry first, then the Claude one.
 function nameOf(key, codex) {
+  const extra = cfg.extras.find((x) => x.key === key);
+  if (extra) return extra.name;
   const entries = Object.entries(cfg.roles);
   const claude = entries.find(([k, r]) => !k.startsWith('codex:') && r.key === key)[1].name;
   const cx = entries.find(([k, r]) => k.startsWith('codex:') && r.key === key)?.[1].name;
@@ -47,15 +50,16 @@ test('variety: 5 general-purpose agents on one Claude floor get 5 different spri
   }
 });
 
-test('variety: all 17 pool characters are used before any repeats, then the least used again', () => {
+test('variety: all 29 pool characters (17 roles + 12 extras) are used before any repeats, then the least used again', () => {
   const o = setup();
-  o.syncAgents('s1', many(17), 1000);
+  o.syncAgents('s1', many(29), 1000);
   const agents = floorOf(o, 's1').agents;
-  assert.equal(new Set(agents.map((a) => a.sprite)).size, 17);
-  o.syncAgents('s1', many(18), 1000);
+  assert.equal(new Set(agents.map((a) => a.sprite)).size, 29);
+  assert.equal(new Set(agents.map((a) => a.name)).size, 29);
+  o.syncAgents('s1', many(30), 1000);
   const counts = new Map();
   for (const a of floorOf(o, 's1').agents) counts.set(a.sprite, (counts.get(a.sprite) ?? 0) + 1);
-  assert.deepEqual([...counts.values()].sort(), [...Array(16).fill(1), 2]);
+  assert.deepEqual([...counts.values()].sort(), [...Array(28).fill(1), 2]);
 });
 
 test('variety: known kinds keep their fixed character and count toward the spread', () => {
@@ -77,11 +81,11 @@ test('variety: known kinds keep their fixed character and count toward the sprea
 test('variety: Codex floor unknown kinds use codex: names where they exist, Claude names otherwise', () => {
   const o = setup([S('cx', { provider: 'codex' })]);
   o.syncAgents('cx', [
-    ...many(15, { agentType: 'codex:__default' }),
+    ...many(27, { agentType: 'codex:__default' }),
     M('e1', { agentType: 'codex:explorer' }), M('e2', { agentType: 'codex:explorer' }),
   ], 1000);
   const agents = floorOf(o, 'cx').agents;
-  assert.equal(new Set(agents.map((a) => a.sprite)).size, 17);
+  assert.equal(new Set(agents.map((a) => a.sprite)).size, 29);
   for (const a of agents) assert.equal(a.name, nameOf(a.sprite, true));
   assert.ok(agents.some((a) => a.sprite === 'worker' && a.name === '도담'));
   assert.ok(agents.some((a) => a.sprite === 'default' && a.name === '누리'));
@@ -179,4 +183,103 @@ test('variety: /api/ui lists the bosses so the page can draw lead-2..lead-5', as
     server.closeSse();
     await new Promise((r) => { server.close(r); server.closeAllConnections(); });
   }
+});
+
+// ---- distinct faces on one floor (a type's own face first, then unused ones, +N only when every face is worn) ----
+
+const HIGH = (n, o = {}) => Array.from({ length: n }, (_, i) => M(`h${i}`, { agentType: 'worker-high', ...o }));
+
+test('faces: 8 worker-high agents on one Claude floor get 8 different faces and names, the first is 하린 with role 선임', () => {
+  const o = setup();
+  o.syncAgents('s1', HIGH(8), 1000);
+  const agents = floorOf(o, 's1').agents;
+  assert.equal(new Set(agents.map((a) => a.sprite)).size, 8);
+  assert.equal(new Set(agents.map((a) => a.name)).size, 8);
+  assert.deepEqual([agents[0].sprite, agents[0].name], ['worker-high', '하린']);
+  for (const a of agents) {
+    assert.equal(a.role, '선임', 'the tier stays readable on a borrowed face');
+    assert.equal(a.name, nameOf(a.sprite, false));
+    assert.ok(!a.name.includes('+'));
+  }
+});
+
+test('faces: the signature face goes to the first of its kind, the second borrows', () => {
+  const o2 = setup();
+  o2.syncAgents('s1', [M('w1', { agentType: 'worker' }), M('w2', { agentType: 'worker' })], 1000);
+  const [x, y] = floorOf(o2, 's1').agents;
+  assert.equal(x.sprite, 'worker');
+  assert.notEqual(y.sprite, 'worker');
+});
+
+test('faces: boss faces are never borrowed', () => {
+  const o = setup();
+  o.syncAgents('s1', many(40, { agentType: 'worker-high' }), 1000);
+  const leads = new Set(cfg.leads.map((l) => l.key));
+  for (const a of floorOf(o, 's1').agents) assert.equal(leads.has(a.sprite), false, a.sprite);
+  assert.equal(o.pool.length, 29);
+  assert.equal(o.pool.some((c) => leads.has(c.key)), false);
+});
+
+test('faces: after all 29 faces are worn the old +N numbering takes over', () => {
+  const o = setup();
+  o.syncAgents('s1', HIGH(29), 1000);
+  let agents = floorOf(o, 's1').agents;
+  assert.equal(new Set(agents.map((a) => a.sprite)).size, 29);
+  assert.ok(agents.every((a) => !a.name.includes('+')));
+  o.syncAgents('s1', HIGH(30), 1000);
+  agents = floorOf(o, 's1').agents;
+  assert.equal(agents.length, 30);
+  assert.equal(new Set(agents.map((a) => a.name)).size, 30);
+  assert.equal(agents.filter((a) => /\+1$/.test(a.name)).length, 1, 'only the 30th gets a number');
+  assert.equal(agents[29].role, '선임');
+});
+
+test('faces: a face freed by an agent that left is taken again; a face stays with its agent for life', () => {
+  const o = setup();
+  o.syncAgents('s1', HIGH(29), 1000);
+  const before = Object.fromEntries(floorOf(o, 's1').agents.map((a) => [a.agentId, [a.sprite, a.name]]));
+  const gone = before.h5;
+  // h5 finishes and leaves; everyone else is untouched, a newcomer takes exactly its face
+  o.syncAgents('s1', [...HIGH(29).filter((m) => m.agentId !== 'h5'), ...HIGH(29).filter((m) => m.agentId === 'h5').map((m) => ({ ...m, finished: true }))], 2000);
+  o.tick(2000 + cfg.agent.doneLingerMs);
+  assert.equal(floorOf(o, 's1').agents.length, 28);
+  o.syncAgents('s1', [...HIGH(29).filter((m) => m.agentId !== 'h5'), M('n1', { agentType: 'worker-high' })], 30000);
+  const after = Object.fromEntries(floorOf(o, 's1').agents.map((a) => [a.agentId, [a.sprite, a.name]]));
+  assert.deepEqual(after.n1, gone);
+  for (const [id, v] of Object.entries(before)) if (id !== 'h5') assert.deepEqual(after[id], v, `${id} keeps its face`);
+});
+
+test('faces: arriving all at once or one by one gives the same faces (backfill = live arrival)', () => {
+  const all = setup();
+  all.syncAgents('s1', HIGH(10), 1000);
+  const live = setup();
+  for (let n = 1; n <= 10; n++) live.syncAgents('s1', HIGH(n), 1000 + n);
+  const key = (o) => floorOf(o, 's1').agents.map((a) => `${a.agentId}:${a.sprite}:${a.name}`);
+  assert.deepEqual(key(live), key(all));
+  const again = key(live);
+  live.syncAgents('s1', HIGH(10), 5000); // an update changes nobody's face
+  assert.deepEqual(key(live), again);
+});
+
+test('faces: faces are per floor, two floors may show the same face', () => {
+  const o = setup([S('s1'), S('s2', { startedAt: 1001 })]);
+  o.syncAgents('s1', HIGH(1), 1000);
+  o.syncAgents('s2', HIGH(1), 1000);
+  assert.equal(floorOf(o, 's1').agents[0].sprite, 'worker-high');
+  assert.equal(floorOf(o, 's2').agents[0].sprite, 'worker-high');
+});
+
+test('faces: Codex floors use Codex names, the new girls have one name on both', () => {
+  const o = setup([S('cx', { provider: 'codex' })]);
+  o.syncAgents('cx', HIGH(12, { agentType: 'codex:worker_high' }), 1000);
+  const agents = floorOf(o, 'cx').agents;
+  assert.deepEqual([agents[0].sprite, agents[0].name, agents[0].role], ['worker-high', '한결', '선임']);
+  assert.equal(new Set(agents.map((a) => a.name)).size, 12);
+  for (const a of agents) assert.equal(a.name, nameOf(a.sprite, true));
+  const o2 = setup();
+  o2.syncAgents('s1', many(29), 1000);
+  const names = floorOf(o2, 's1').agents.map((a) => a.name);
+  for (const x of cfg.extras) assert.ok(names.includes(x.name));
+  for (const x of cfg.extras) for (const f of [`${x.key}.png`, `${x.key}-sit.png`]) assert.ok(existsSync(new URL(`../assets/sprites/${f}`, import.meta.url)), f);
+  assert.deepEqual(cfg.extras.map((x) => x.name), ['지유', '나연', '소율', '예나', '다솜', '유리', '채이', '도희', '이솔', '아라', '연우', '민서']);
 });
