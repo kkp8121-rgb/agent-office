@@ -259,7 +259,8 @@ function createChar(av, stage, startAt, sc, isCat = false) {
   }
   flip.append(spr);
   body.append(flip);
-  root.append(body, zz);
+  root.append(body);
+  (isCat ? root : tagRoot).append(zz); // a girl's zZ rides the tag layer so no desk or monitor can cover it; the cat's stays on its own floor-level root
   root.style.zIndex = String(charZ(startAt.y, ui.depth));
   root.style.transform = `translate(${startAt.x}px, ${startAt.y}px)`;
   root.style.setProperty('--fid-ms', `${amb.fidgetMs}ms`);

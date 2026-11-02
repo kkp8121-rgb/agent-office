@@ -86,7 +86,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .spr img.sit { display: none; height: var(--sit-h, 50px); }
 .ag.sitting .spr img.stand { display: none; }
 .ag.sitting .spr img.sit { display: block; }
-.ag.sitting .zz { bottom: 44px; }
 /* the name tag stands beside the torso: below the feet it would hit the speech bubbles of the desk row underneath */
 .tag {
   position: absolute; left: 20px; top: -26px; white-space: nowrap;
@@ -120,8 +119,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: none; position: absolute; left: 14px; bottom: 58px; font-weight: 800; font-size: 12px; color: #6a5aa8;
   animation: zz 2.4s ease-in-out infinite;
 }
+/* a girl who wrote nothing for agent.staleMs sleeps at full colour: her zZ sits just above the head, in the tag layer (above every desk), outlined to read on any floor */
+.agt .zz {
+  --zz-size: 16px; --zz-left: 10px; --zz-stand: 64px; --zz-sit: 48px;
+  left: var(--zz-left); bottom: var(--zz-stand); font-size: var(--zz-size); line-height: 1; color: #5a49a0;
+  text-shadow: -1px 0 var(--paper), 1px 0 var(--paper), 0 -1px var(--paper), 0 1px var(--paper);
+}
+.agt.sitting .zz { bottom: var(--zz-sit); }
 .st-stale .zz { display: block; }
-.st-stale .spr { opacity: .5; }
 
 .st-idle .spr, .st-enter .spr { animation: breathe 2.8s ease-in-out infinite; }
 .st-thinking .spr { animation: breathe 3.6s ease-in-out infinite; }
@@ -165,7 +170,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   cursor: grabbing; transform-origin: 50% 0; translate: 0 calc(var(--lift) * -1);
   animation: swing .8s ease-in-out infinite alternate;
 }
-.ag.held .body::before, .ag.held .zz { display: none; }
+.ag.held .body::before, .agt.held .zz { display: none; }
 .agt.held .tag { translate: 0 calc(var(--lift) * -1); }
 .agt.held .bub:not(.grab), .agt.dizzy .bub:not(.grab) { display: none; }
 .agt .bub.grab { display: block; bottom: 72px; }
