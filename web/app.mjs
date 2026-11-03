@@ -2781,6 +2781,7 @@ function abortStroll(rec) {
   rec.walk = null;
   rec.away = false;
   rec.el.classList.remove('walking');
+  noteWalk(rec, false);
   clearGestures(rec);
   placeAt(rec, rec.home.at, false);
   setFacing(rec, rec.home.face);
