@@ -1,1 +1,14 @@
-/* Effects area "events" (celebration and status effects drawn on the floors' .fx-layer). Scope rules under html.fx-on; animate only transform and opacity. */
+/* Effects area "events" (celebration and status effects drawn on the floors' .fx-layer). Scope rules under html.fx-on; animate only transform and opacity.
+   A particle is one <i class="fxe KIND"> put on the layer by fx-events.mjs while it animates; position, size and colour (--fxe-c) are set once when it starts, never animated. */
+html.fx-on .fx-layer .fxe { position: absolute; left: 0; top: 0; margin: 0; padding: 0; opacity: 0; pointer-events: none; will-change: transform, opacity; transform-origin: 50% 50%; }
+/* four-point star */
+html.fx-on .fx-layer .fxe.star { background: var(--fxe-c, #ffe27a); clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+html.fx-on .fx-layer .fxe.rect { background: var(--fxe-c, #ffd93d); border-radius: 1px; }
+/* rain drop and sweat drop */
+html.fx-on .fx-layer .fxe.drop { background: var(--fxe-c, #6fb3ff); border-radius: 50%; }
+html.fx-on .fx-layer .fxe.sweat { background: var(--fxe-c, #bfe3ff); border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%; box-shadow: 0 0 0 1px rgba(80, 140, 200, .55); }
+html.fx-on .fx-layer .fxe.dot { background: var(--fxe-c, #cfd6ff); border-radius: 50%; }
+/* soft glow of a finished agent (static radial gradient, only its transform and opacity move) */
+html.fx-on .fx-layer .fxe.glow { background: radial-gradient(circle, var(--fxe-c, rgba(255, 238, 150, .95)) 0%, rgba(255, 238, 150, 0) 70%); border-radius: 50%; }
+/* phase title over the board */
+html.fx-on .fx-layer .fxe.title { padding: 2px 7px; border-radius: 7px; background: var(--fxe-bg); color: var(--fxe-ink); box-shadow: 0 0 0 1.5px var(--fxe-ring); font-weight: 800; font-size: var(--fxe-font); line-height: 1.3; white-space: nowrap; }

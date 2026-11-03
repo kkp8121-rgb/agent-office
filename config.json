@@ -66,7 +66,17 @@
               "enabled": true
             },
             "events": {
-              "enabled": true
+              "enabled": true,
+              "pool": 40,
+              "headStandPx": 64, "headSeatPx": 50, "bodyMidPx": 32,
+              "sparkle": { "count": 6, "leadCount": 3, "radiusPx": 24, "sizePx": [6, 10], "ms": 800, "staggerMs": 45, "colors": ["#ffe27a", "#fff6c8", "#ffc34d"] },
+              "confetti": { "count": 14, "meetingCount": 8, "sizePx": [4, 7], "spreadPx": 46, "upPx": [26, 48], "fallPx": [14, 30], "spinDeg": [180, 540], "ms": [900, 1300], "staggerMs": 18, "colors": ["#ff6b6b", "#ffd93d", "#6bcB77", "#4d96ff", "#c77dff", "#ff9f45"] },
+              "title": { "ms": 2200, "popAt": 0.14, "settleAt": 0.24, "fadeAt": 0.82, "riseOutPx": 10, "lift": 8, "fontPx": 11, "maxChars": 12, "bg": "rgba(32, 34, 56, 0.9)", "ink": "#ffffff", "ring": "#ffd93d" },
+              "highFive": { "count": 8, "sizePx": [5, 8], "radiusPx": [16, 32], "ms": 560, "upPx": 40, "colors": ["#fff6c8", "#ffe27a", "#ffffff"] },
+              "rain": { "drops": 3, "widthPx": 2, "heightPx": 7, "spreadPx": 9, "fromPx": 62, "fallPx": 26, "ms": 700, "staggerMs": 230, "color": "#6fb3ff" },
+              "sweat": { "drops": 2, "sizePx": 4, "offsetXPx": 10, "dxPx": [6, 12], "dyPx": 14, "ms": 900, "staggerMs": 450, "color": "#bfe3ff" },
+              "glow": { "sizePx": 56, "ms": 1000, "scaleFrom": 0.5, "scaleTo": 1.5, "peak": 0.9, "peakAt": 0.4, "sparkles": 3, "color": "rgba(255, 238, 150, 0.95)" },
+              "think": { "dots": 3, "sizePx": 3, "gapPx": 6, "risePx": 10, "ms": 900, "staggerMs": 160, "cooldownMs": 20000, "color": "#cfd6ff" }
             },
             "led": {
               "enabled": true
