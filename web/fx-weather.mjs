@@ -186,6 +186,7 @@ export function init(ctx) {
   let fadeMs = 0;
   let lightningTimer = 0;
   let syncTimer = 0;
+  let glowOnlyPending = true; // true while only pose/state events asked for the next sync: then only the glows are refreshed
   const reduced = () => !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   const bg = (spec) => {
@@ -282,8 +283,11 @@ export function init(ctx) {
         void el.offsetWidth; // one reflow so the first opacity change is a transition
         st.glows.set(w.rec, el);
       }
-      el.style.transitionDuration = `${fadeMs || 400}ms`;
-      el.style.opacity = String(target.glow);
+      const o = String(target.glow);
+      if (el.style.opacity !== o) {
+        el.style.transitionDuration = `${fadeMs || 400}ms`;
+        el.style.opacity = o;
+      }
     }
   }
 
@@ -316,6 +320,15 @@ export function init(ctx) {
   // ---- syncing ----
   function sync() {
     syncTimer = 0;
+    const glowOnly = glowOnlyPending;
+    glowOnlyPending = true;
+    if (glowOnly && target) {
+      for (const floor of ctx.floors()) {
+        const st = floorsState.get(floor);
+        if (st && !floor.off) syncGlow(floor, st);
+      }
+      return;
+    }
     const next = ctx.light();
     const p = next === phase ? null : fadePlan(phase, next, cfg);
     if (p) {
@@ -337,16 +350,21 @@ export function init(ctx) {
         dress(st);
         st.dressed = true;
       }
-      applyLight(st);
-      st.root.dataset.phase = phase;
-      st.root.dataset.kind = kind;
+      const key = `${phase}|${kind}|${fadeMs}`;
+      if (st.lightKey !== key) {
+        applyLight(st);
+        st.root.dataset.phase = phase;
+        st.root.dataset.kind = kind;
+        st.lightKey = key;
+      }
       syncGlow(floor, st);
     }
     if (kindChanged) armLightning();
   }
 
   /** Several events can come in one tick (state changes especially): one sync after a short pause. */
-  function later() {
+  function later(full = true) {
+    if (full) glowOnlyPending = false;
     if (!syncTimer) syncTimer = ctx.timers.setTimeout(sync, cfg.settleMs);
   }
 
@@ -363,9 +381,11 @@ export function init(ctx) {
     target = null;
     kind = 'none';
     fadeMs = 0;
+    glowOnlyPending = false;
   }
 
-  for (const name of ['weather', 'daylight', 'floor-shown', 'pose', 'state', 'crop']) fx.onFx(name, later);
+  for (const name of ['weather', 'daylight', 'floor-shown', 'crop']) fx.onFx(name, () => later(true));
+  for (const name of ['pose', 'state']) fx.onFx(name, () => later(false));
   fx.onFx('floor-hidden', (d) => {
     const st = floorsState.get(d.floor);
     if (!st) return;
