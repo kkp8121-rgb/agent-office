@@ -531,7 +531,7 @@ export function init(ctx) {
     if (to !== 'thinking') thinkSince.delete(rec);
   }, always);
   fx.onFx('floor-hidden', ({ floor, removed }) => {
-    for (const rec of ctx.chars(floor)) { stopOf(rec); if (roamers.has(rec)) endRoam(rec); }
+    for (const rec of ctx.chars(floor)) { stopOf(rec); if (roamers.has(rec)) endRoam(rec); if (removed) thinkSince.delete(rec); }
     if (removed) floorState.delete(floor.sid);
   }, always);
   fx.onFx('floor-shown', ({ floor }) => { director.reset(floor.sid); director.kick(); }, always);
