@@ -2,3 +2,5 @@
 .dc { position: absolute; background-image: var(--decor); background-repeat: no-repeat; image-rendering: pixelated; pointer-events: none; }
 /* a mirrored desk node mirrors its children too: the picture is turned back (its place was already computed for the mirror) */
 .obj.flip > .dc { transform: scaleX(-1); }
+/* ...but a screen belongs to its monitor, which the node mirrors: it keeps the mirror (the lounge's sheared screens would lean the wrong way) */
+.obj.flip > .dc.scr { transform: none; }

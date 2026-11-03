@@ -73,8 +73,13 @@ function build(data, cfg, desk, design, rng) {
       return;
     }
   };
-  const surf = shuffled(rng, slots.surface).slice(0, Math.min(intIn(rng, cfg.surface), slots.surface.length));
-  surf.forEach((pt, k) => put(pool.surface, 'surface', pt, lead && k === 0 ? 'lead' : null));
+  const want = Math.min(intIn(rng, cfg.surface), slots.surface.length);
+  let filled = 0;
+  for (const pt of shuffled(rng, slots.surface)) { // a point nothing fits on (its neighbours are in the way) is skipped, the next one is tried
+    if (filled >= want) break;
+    put(pool.surface, 'surface', pt, lead && filled === 0 ? 'lead' : null);
+    filled = items.length;
+  }
   const personal = cfg.personal && items.length ? Math.floor(rng() * items.length) : -1;
   for (const pt of shuffled(rng, slots.monitorTop ?? []).slice(0, intIn(rng, cfg.monitorTop))) put(pool.monitorTop, 'monitorTop', pt);
   const stickerPts = shuffled(rng, [...(slots.bezel ?? []).map((p) => ['bezel', p]), ...(slots.monitorEdge ?? []).map((p) => ['monitorEdge', p])]);

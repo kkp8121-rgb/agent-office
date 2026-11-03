@@ -1,18 +1,15 @@
 // Desk props: every desk of a floor is different, the choice is stable, nothing overlaps, flipped desks mirror right.
-// Data: DECOR_DATA=<path to a decor.json> (a placeholder while the art is missing), else assets/decor/decor.json; neither -> every test is skipped.
+// Data: the shipped assets/decor/decor.json.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { resolveScene } from '../web/scene.mjs';
 import { deskSlots, localPlacement, overlaps, personalFor, planFloor, signature, withPersonal, worldLeft } from '../web/decor.mjs';
 import { cfg, ROOT } from './helpers/fixture.mjs';
 
 const C = cfg.ui.decor;
-const file = process.env.DECOR_DATA || join(ROOT, 'assets', 'decor', 'decor.json');
-const skip = existsSync(file) ? false : `no decor data (${file}): set DECOR_DATA or add assets/decor/decor.json`;
-if (skip) console.log(`# decor tests skipped: ${skip}`);
-const data = skip ? null : JSON.parse(readFileSync(file, 'utf8'));
+const data = JSON.parse(readFileSync(join(ROOT, 'assets', 'decor', 'decor.json'), 'utf8'));
 const DESIGNS = [...cfg.designOrder, cfg.lobby.design];
 const rawOf = (design) => JSON.parse(readFileSync(join(ROOT, 'assets', 'scenes', design, 'scene.json'), 'utf8'));
 const desksOf = (design, edit) => {
@@ -21,7 +18,7 @@ const desksOf = (design, edit) => {
   return resolveScene(raw).objects.filter((o) => data.desks[design]?.[o.kind]);
 };
 const plan = (design, floor = 2, desks = desksOf(design)) => planFloor({ design, floor, desks, data, cfg: C });
-const t = (name, fn) => test(`decor: ${name}`, { skip }, fn);
+const t = (name, fn) => test(`decor: ${name}`, fn);
 
 t('config: the ui.decor block holds every number', () => {
   assert.deepEqual([C.enabled, C.surface, C.monitorTop, C.stickers, C.personal], [true, [2, 4], [0, 1], [0, 2], true]);
@@ -166,4 +163,27 @@ t('a flipped scene desk of the real data mirrors about its anchor', () => {
   const left = o.at[0] - (w - o.anchor[0]);
   const [pl] = plan('studio2', 2, desks);
   for (const it of pl.items) assert.equal(worldLeft(it, left, w, true), left + w - it.x - it.w);
+});
+
+t('no prop can reach the head of the character sitting at its desk (any item on any slot point)', () => {
+  const H = 64; // sprite height; the head box is its rows 4-32 (28 px wide) above the seat's foot point
+  for (const design of DESIGNS) {
+    const raw = rawOf(design);
+    for (const o of raw.objects) {
+      const slots = data.desks[design]?.[o.kind];
+      if (!slots) continue;
+      const k = raw.kinds[o.kind];
+      const foot = o.kind.startsWith('lead') ? raw.lead.sitAt : [o.at[0] + k.seat.sitAt[0], o.at[1] + k.seat.sitAt[1]];
+      const head = { x: foot[0] - 14, y: foot[1] - H + 4, w: 28, h: 28 };
+      for (const slot of ['surface', 'monitorTop', 'bezel', 'monitorEdge']) {
+        for (const [px, py] of slots[slot] ?? []) {
+          for (const [id, it] of Object.entries(data.items)) {
+            if (it.slot !== slot) continue;
+            const p = { x: o.at[0] - k.anchor[0] + px - it.anchor[0], y: o.at[1] - k.anchor[1] + py - it.anchor[1], w: it.rect[2], h: it.rect[3] };
+            assert.ok(!overlaps(p, head), `${design} ${o.id} ${slot} (${px},${py}) ${id} reaches the head`);
+          }
+        }
+      }
+    }
+  }
 });
