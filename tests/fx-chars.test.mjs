@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { alignDelay, bobFrames, createMotion, init, iterationsToFinish, sitFrames, standFrames, stepMs } from '../web/fx-chars.mjs';
+import { alignDelay, bobFrames, createMotion, init, iterationsToFinish, settleFrames, sitFrames, standFrames, stepMs } from '../web/fx-chars.mjs';
 import { createFx } from '../web/fx.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -100,6 +100,42 @@ test('motion: a walk starts a bob of one step and runs on to the end of the step
   assert.deepEqual(el.anims[0].timings, [{ iterations: 6 }]);
   assert.equal(m.running(), true);
   el.anims[0].finish();
+  assert.equal(m.running(), true, 'the settle out of the squash runs');
+  assert.equal(el.anims[1].timing.duration, cfg.settleMs);
+  el.anims[1].finish();
+  assert.equal(m.running(), false);
+});
+
+test('settle: the walk ends easing from the landing squash to the identity pose, never a snap', () => {
+  const bob = bobFrames(cfg.bob);
+  const settle = settleFrames(cfg.bob);
+  assert.equal(settle[0].transform, bob.at(-1).transform, 'starts where the last bob step ends');
+  assert.equal(settle.at(-1).transform, 'translateY(0px) scale(1, 1)');
+  assert.ok(cfg.settleMs > 0);
+});
+
+test('motion: a walk that starts during the settle replaces it (both begin on the landing squash)', () => {
+  const el = fakeEl();
+  const m = createMotion(cfg, el);
+  m.walking(true);
+  el.anims[0].currentTime = 100;
+  m.walking(false);
+  el.anims[0].finish();
+  m.walking(true);
+  assert.equal(el.anims[1].state, 'idle', 'the settle was cancelled');
+  assert.equal(el.anims[2].timing.delay, 0);
+  assert.equal(live(el).length, 1);
+});
+
+test('motion: cancel (lift, floor hidden) also drops the settle at once', () => {
+  const el = fakeEl();
+  const m = createMotion(cfg, el);
+  m.walking(true);
+  el.anims[0].currentTime = 100;
+  m.walking(false);
+  el.anims[0].finish();
+  m.cancel();
+  assert.equal(live(el).length, 0);
   assert.equal(m.running(), false);
 });
 

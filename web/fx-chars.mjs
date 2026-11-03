@@ -5,7 +5,8 @@
 //   walk   a small hop and a slight squash in time with the steps. The legs swap every half of style.css "walking legs" (leg cycle
 //          ui.fx.chars.legCycleMs, two steps per cycle), so one bob = one step. Walking is 150 px/s, a step is about 30 px. The bob starts
 //          on 'walk-start' (the same task that turns the legs on, so both start on the same frame) and, on 'walk-end', runs to the end
-//          of its current step instead of stopping dead.
+//          of its current step instead of stopping dead, then eases from the landing squash back to the normal pose (settle) so the
+//          figure never snaps out of the squash.
 //   sit    on 'pose' (seated) with animate: the figure drops into the chair, dips a little and settles.
 //   stand  on 'pose' (standing) with animate: a small crouch, a push-off hop and settle (a walk that follows waits for it).
 // A pose change without animate (the first draw, a hidden tab catching up) shows nothing: no invented activity.
@@ -30,6 +31,14 @@ export function bobFrames(b) {
     { offset: 0, transform: land, easing: 'ease-out' },
     { offset: 0.5, transform: pose(-b.upPx, b.airX, b.airY), easing: 'ease-in' },
     { offset: 1, transform: land },
+  ];
+}
+
+/** The end of a walk: from the landing squash (where a bob's last step ends) back to the normal pose. */
+export function settleFrames(b) {
+  return [
+    { offset: 0, transform: pose(0, b.landX, b.landY), easing: 'ease-out' },
+    { offset: 1, transform: pose(0, 1, 1) },
   ];
 }
 
@@ -60,8 +69,9 @@ export function createMotion(cfg, el, onIdle = () => {}) {
   const period = stepMs(cfg);
   let bob = null; // {anim, delay, finishing}
   let dip = null; // {anim, ms}
+  let settle = null; // {anim}: the walk's end easing out of the landing squash
   const idle = () => {
-    if (!bob && !dip) onIdle();
+    if (!bob && !dip && !settle) onIdle();
   };
   const run = (frames, timing, onDone) => {
     const anim = el.animate(frames, { fill: 'none', ...timing });
@@ -81,12 +91,26 @@ export function createMotion(cfg, el, onIdle = () => {}) {
           }
           return;
         }
+        // a settle that still runs ends where the new bob starts (both are the landing squash)
+        const s0 = settle;
+        settle = null;
+        s0?.anim.cancel();
         const delay = dip ? alignDelay(dip.ms - time(dip.anim), period) : 0;
         const mine = { delay, finishing: false };
         mine.anim = run(bobFrames(cfg.bob), { duration: period, iterations: Infinity, delay }, () => {
           if (bob === mine) bob = null;
           idle();
         });
+        mine.anim.onfinish = () => {
+          if (bob !== mine) return;
+          bob = null;
+          const set = {};
+          set.anim = run(settleFrames(cfg.bob), { duration: cfg.settleMs }, () => {
+            if (settle === set) settle = null;
+            idle();
+          });
+          settle = set;
+        };
         bob = mine;
         return;
       }
@@ -109,17 +133,15 @@ export function createMotion(cfg, el, onIdle = () => {}) {
     },
     /** Everything stops at once (picked up, floor hidden, effects off). */
     cancel() {
-      const b = bob;
-      const d = dip;
-      bob = dip = null;
-      b?.anim.cancel();
-      d?.anim.cancel();
+      const all = [bob, dip, settle];
+      bob = dip = settle = null;
+      for (const s of all) s?.anim.cancel();
     },
     /** The page is hidden (true) or shown again (false). */
     pause(on) {
-      for (const s of [bob, dip]) if (s) on ? s.anim.pause() : s.anim.play();
+      for (const s of [bob, dip, settle]) if (s) on ? s.anim.pause() : s.anim.play();
     },
-    running: () => !!(bob || dip),
+    running: () => !!(bob || dip || settle),
   };
   return api;
 }
