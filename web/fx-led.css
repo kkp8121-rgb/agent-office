@@ -1,1 +1,19 @@
 /* Effects area "led" (the 1F lobby LED status wall). Scope rules under html.fx-on; animate only transform and opacity. */
+
+/* the LED look: all static (nothing here is animated by CSS); the blink and the marquee are Web Animations of opacity / transform started by fx-led.mjs */
+/* a soft inner glow and a faint dot grid: the 3 px cells' gaps are drawn as a slightly darker mesh. Everything is one background and one
+   static shadow of the panel itself (no pseudo-element overlay and no outer glow: those made every panel repaint a second and third layer) */
+html.fx-on .led {
+  background:
+    linear-gradient(rgba(2, 8, 24, .16) 1px, transparent 1px) 0 0 / 100% 3px,
+    linear-gradient(90deg, rgba(2, 8, 24, .16) 1px, transparent 1px) 0 0 / 3px 100%,
+    radial-gradient(circle at 50% 50%, var(--led-dots) 0 .7px, transparent 1.1px) 0 0 / 3px 3px, var(--led-bg);
+  box-shadow: inset 0 0 0 1px var(--led-bezel), inset 0 0 9px rgba(70, 140, 255, .22);
+}
+/* CPU / memory colour steps of the board header (thresholds: config ui.fx.led.load.steps) */
+html.fx-on .led .sv { font-weight: 700; }
+html.fx-on .led .sv[data-load="1"] { color: #ffb020; text-shadow: 0 0 3px rgba(255, 176, 32, .6); }
+html.fx-on .led .sv[data-load="2"] { color: #ff5a44; text-shadow: 0 0 3px rgba(255, 90, 68, .7); font-weight: 800; }
+/* a ticker line that does not fit scrolls inside its clipping box (the ellipsis is replaced by a clean clip while it scrolls) */
+html.fx-on .led .tk-t[data-mq="on"] { text-overflow: clip; }
+html.fx-on .led .tk-t[data-mq="on"] .tk-m { display: inline-block; will-change: transform; }
