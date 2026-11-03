@@ -4,6 +4,7 @@
 import { resolveScene, trayPoint } from './scene.mjs';
 import { createNav } from './nav.mjs';
 import { charZ, objectNodes, splitWalk } from './depth.mjs';
+import { localPlacement, planFloor, withPersonal } from './decor.mjs';
 import { fitZoom } from './pip.mjs';
 import { LOBBY_ID, orderFloors, nextFloor, fallbackFloor, fitBox, pruneEvents, activityScore, busiestFloor, chooseFollow, viewOrder } from './view.mjs';
 import { canStroll, nextStrollAt, scaleLife, strollTarget } from './lobbylife.mjs';
@@ -1385,6 +1386,8 @@ function onFail(sig) {
 // ---------- seasons, day and night windows, snacks (screen play only: nothing is sent or saved) ----------
 
 let decorItems = []; // assets/seasonal/items.json
+let deskDecor = null; // assets/decor/decor.json: slots and rects of the desk props (null: none, the desks stay plain)
+const deskPropsOf = new WeakMap(); // stage -> its desks' props [{id, plan, desk, nodes, els, sprite}]
 let season = 'none'; // halloween | christmas | lunar | none
 let light = 'day'; // day | sunset | night
 let skyTimer = 0; // clockTimers token: the one timer to the next hour or date boundary
@@ -1978,8 +1981,56 @@ function buildNavDebug(frec, sc) {
   };
 }
 
+/** One prop of a desk: a piece of the decor atlas inside the desk's node that holds it (the strip, for a desk cut into depth strips). */
+function mountProp(dp, i, p) {
+  const lp = localPlacement(p, dp.desk, dp.nodes);
+  const d = dp.els[i] ?? (dp.els[i] = el('div', 'dc'));
+  Object.assign(d.style, {
+    left: `${lp.x}px`, top: `${lp.y}px`, width: `${p.w}px`, height: `${p.h}px`, backgroundPosition: `${-p.rx}px ${-p.ry}px`, zIndex: p.slot === 'screen' ? '1' : String(10 + Math.round(p.y + p.h)),
+  });
+  if (d.parentElement !== dp.divs[lp.node]) dp.divs[lp.node].append(d);
+}
+
+/** Gives every desk of a stage its own props (web/decor.mjs): static children of the desk's nodes, so they share its depth and mirror. */
+function buildDeskProps(stage, sc, design, floorNo, divs) {
+  const cfg = ui.ui.decor;
+  if (!deskDecor || !cfg?.enabled || !deskDecor.desks[design]) return;
+  const desks = sc.r.objects.filter((o) => deskDecor.desks[design][o.kind]);
+  let plans;
+  try {
+    plans = planFloor({ design, floor: floorNo, desks, data: deskDecor, cfg });
+  } catch (e) {
+    console.error(e.message); // more desks than distinct sets: the desks stay plain rather than repeat
+    return;
+  }
+  stage.style.setProperty('--decor', `url(${deskDecor.atlasUrl})`);
+  const props = desks.map((o, k) => {
+    const idx = sc.nodes.map((n, j) => (n.objId === o.id ? j : -1)).filter((j) => j >= 0);
+    const [, , w] = o.rect;
+    const dp = {
+      id: o.id, plan: plans[k], sprite: null, els: [], divs: idx.map((j) => divs[j]), nodes: idx.map((j) => sc.nodes[j]),
+      desk: { left: o.at[0] - (o.flipX ? w - o.anchor[0] : o.anchor[0]), w, flipX: !!o.flipX },
+    };
+    plans[k].items.forEach((p, i) => mountProp(dp, i, p));
+    return dp;
+  });
+  deskPropsOf.set(stage, props);
+}
+
+/** Shows each seated character's personal prop on its desk. `seated` maps a desk id to the sprite key sitting there; the others show their own. */
+function syncDeskProps(stage, seated) {
+  const props = deskPropsOf.get(stage);
+  if (!props || !ui.ui.decor.personal) return;
+  for (const dp of props) {
+    const key = seated.get(dp.id) ?? null;
+    if (dp.sprite === key || dp.plan.personal < 0) continue;
+    dp.sprite = key;
+    mountProp(dp, dp.plan.personal, withPersonal(dp.plan, deskDecor, key)[dp.plan.personal]);
+  }
+}
+
 /** The room of a scene: its picture, objects, front overlay and the dark-mode backdrop cover (shared by a session floor and the lobby). */
-function buildStage(sc) {
+function buildStage(sc, design, floorNo) {
   const { r } = sc;
   const stage = el('div', 'stage');
   stage.classList.add('scened');
@@ -1999,7 +2050,9 @@ function buildStage(sc) {
     stage.style.backgroundSize = `${r.size[0]}px ${r.size[1]}px`;
   }
   stage.style.setProperty('--atlas', `url(${sc.url}${encodeURIComponent(r.atlas)})`);
-  for (const n of sc.nodes) stage.append(objNode(n));
+  const divs = sc.nodes.map((n) => objNode(n));
+  stage.append(...divs);
+  buildDeskProps(stage, sc, design, floorNo, divs);
   if (r.front) {
     const front = el('div', 'front');
     front.style.backgroundImage = `url(${sc.url}${encodeURIComponent(r.front)})`;
@@ -2027,7 +2080,7 @@ function createFloor(fv) {
   root.style.setProperty('--c', colorOf(fv.sessionId));
   root.style.width = `${r.size[0]}px`;
   root.style.height = `${r.size[1]}px`;
-  const stage = buildStage(sc);
+  const stage = buildStage(sc, fv.design, fv.floorNo);
   const layer = addFxLayer(stage);
   const reportsAt = [r.tray.at[0] + r.reports[0], r.tray.at[1] + r.reports[1]];
 
@@ -2190,6 +2243,12 @@ function renderFloor(fv, elm) {
     }
   }
   limitBubbles(rec.agents.values(), ui.ui.bubbleFullMax);
+  const seated = new Map(); // desk id -> sprite key of whoever sits there now (arrivals, leavers and sprite changes all pass through here)
+  for (const a of rec.agents.values()) {
+    const deskId = a.state === 'done' ? null : a.isLead ? rec.scene.r.lead.deskId : a.slot?.kind === 'seat' ? rec.scene.r.seats[a.slot.i]?.deskId : null;
+    if (deskId) seated.set(deskId, a.sprite);
+  }
+  syncDeskProps(rec.stage, seated);
   rec.populated = true;
   if (rec.clockOn) rec.clock.kick();
   else startAmbient(rec);
@@ -2313,7 +2372,7 @@ function createLobby() {
   root.style.width = `${r.size[0]}px`;
   root.style.height = `${r.size[1]}px`;
   root.setAttribute('aria-label', L.wallLabel);
-  const stage = buildStage(sc);
+  const stage = buildStage(sc, ui.lobby.design, 1);
   const layer = addFxLayer(stage);
   stage.style.width = `${r.size[0]}px`; // fixed, so the small window can crop the floor to the wall without squeezing the room
   stage.style.height = `${r.size[1]}px`;
@@ -2495,6 +2554,12 @@ function drawLobby() {
     lb.chars.delete(key);
   }
   limitBubbles(lb.chars.values(), ui.ui.bubbleFullMax);
+  const seated = new Map();
+  for (const e of lb.roster) {
+    const slot = lb.seatMap.get(e.key);
+    if (slot?.kind === 'seat') seated.set(r.seats[slot.i].deskId, e.sprite);
+  }
+  syncDeskProps(lb.stage, seated);
   lb.populated = true;
   lb.clock.kick(); // new figures brought their own times
   put(lb.boardLine, lobbyFill(L.signLine, { n: lb.roster.length }));
@@ -3754,6 +3819,16 @@ async function init() {
     decorItems = await (await fetch(ITEMS_URL)).json();
   } catch {
     decorItems = []; // no pictures list: the rooms stay plain
+  }
+  deskDecor = null;
+  if (ui.ui.decor?.enabled) {
+    try {
+      const url = new URL(ui.ui.decor.data, location.href);
+      const data = await (await fetch(url)).json();
+      deskDecor = { ...data, atlasUrl: new URL(data.atlas, url).pathname };
+    } catch {
+      deskDecor = null; // no decor files: the desks stay plain
+    }
   }
   setupScenes();
   startFx(ui.ui.fx, document); // before the settings panel and the areas read the switches

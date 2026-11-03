@@ -170,6 +170,10 @@
             "reactChance": 0.5, "reactMs": 2200, "landMs": 1400,
             "pet": { "resetMs": 2500, "maxLevel": 4, "sayMs": 2200, "pauseMs": 900, "hearts": [1, 2, 3, 5] } },
           "sessionPalette": ["#d9534f", "#2f80d0", "#2e9e5b", "#d98a1e", "#8e5bd0", "#12a3a8", "#d6458f", "#7a8f1d", "#8a6a42", "#4f5fd6"],
+          "decor": {
+            "enabled": true, "surface": [2, 4], "monitorTop": [0, 1], "stickers": [0, 2], "personal": true,
+            "tries": 400, "data": "/assets/decor/decor.json"
+          },
           "ambient": {
             "enabled": true, "tickMinMs": 1000, "firstDelayMs": [3000, 20000],
             "fidgetEveryMs": [8000, 40000], "fidgetMs": 1200, "fidgetJitterMs": [0, 3000],
