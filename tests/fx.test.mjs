@@ -256,7 +256,7 @@ test('config: ui.fx and ui.officeLife exist, every area on its own lines, string
   assert.equal(cfg.ui.weather.sfxSwitch, '효과음');
   const text = read('config.json');
   for (const a of ['weather', 'chars', 'events', 'led', 'hit']) assert.match(text, new RegExp(`"${a}": \\{\\n\\s+"enabled": true(,\\n|\\n\\s+\\})`), `${a} is written on several lines`);
-  assert.match(text, /"officeLife": \{\n\s+"enabled": true\n\s+\},/);
+  assert.match(text, /"officeLife": \{\n\s+"enabled": true,/);
 });
 
 // ---- the wiring: behaviour of the pieces app.mjs changed (run the real source in a vm) ----

@@ -630,7 +630,8 @@ function startLeg(frec, rec) {
   rec.trip.cur = leg;
   const target = { x: leg.x, y: leg.y, face: leg.face, seated: false, seat: null };
   const walkMs = goTo(rec, frec, target, () => chat(frec, rec, leg));
-  rec.m.returnAt = Date.now() + walkMs + between(rec.rng, amb.stayMs);
+  const stay = leg.stayMs ?? amb.stayMs; // a life trip names its own stay: a number, or a [min, max] range
+  rec.m.returnAt = Date.now() + walkMs + (Array.isArray(stay) ? between(rec.rng, stay) : stay);
 }
 
 function doTrip(frec, rec) {
@@ -1880,8 +1881,8 @@ function renderAgent(av, floorEl) {
   } else if (rec.targetKey !== key) {
     rec.targetKey = key;
     retarget(rec, frec, target);
-  } else if (rec.away && av.state === 'working') {
-    retarget(rec, frec, target); // back to work: the server's place wins over the trip
+  } else if (rec.away && (av.state === 'working' || (av.state === 'thinking' && rec.trip?.legs.some((l) => l.life)))) {
+    retarget(rec, frec, target); // back to work: the server's place wins over the trip (a life trip of the office-life area ends for thinking too)
   } else if (done && !rec.walk) {
     rec.arrived = true;
     rec.el.classList.add('arrived');
