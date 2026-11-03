@@ -214,7 +214,7 @@ add("toy-blocks", "surface", ["toy"], """
 bbbbgggg
 bwwbgwwg
 bbbbgggg""")
-add("rubik-cube", "surface", ["toy"], """
+add("puzzle-cube", "surface", ["toy"], """
 rrzyyzbb
 rrzyyzbb
 zzzzzzzz
