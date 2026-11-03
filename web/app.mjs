@@ -616,13 +616,13 @@ function chat(frec, rec, leg) {
   const P = ui.ui.play;
   const mate = [...frec.agents.values()].find((a) => a !== rec && a.away && !a.walk && a.trip?.cur?.spotId === leg.spotId);
   if (!mate) {
-    if (Math.random() < P.mutterChance) chatter(rec, line('idleMutter'), P.talkMs);
+    if (Math.random() < P.mutterChance) chatter(rec, line('idleMutter', undefined, rec), P.talkMs);
     return;
   }
   setFacing(rec, rec.x < mate.x ? 'right' : 'left');
   setFacing(mate, mate.x < rec.x ? 'right' : 'left');
-  chatter(rec, talkLine(), P.talkMs);
-  chatter(mate, talkLine(), P.talkMs);
+  chatter(rec, talkLine(rec), P.talkMs);
+  chatter(mate, talkLine(mate), P.talkMs);
 }
 
 function startLeg(frec, rec) {
@@ -819,7 +819,7 @@ function dropChar(rec, stars, fling = null) {
   emitFx('drop', { rec });
   const { frec } = rec;
   placeAt(rec, dropPoint(nav.grid(frec.design), [rec.x, rec.y], frec.scene.r.size) ?? [rec.x, rec.y]);
-  if (rec.isCat) return landChar(rec, catLanding()); // a cat lands on its feet: no scene, no stars
+  if (rec.isCat) return landChar(rec, catLanding(rec)); // a cat lands on its feet: no scene, no stars
   const hit = stars ? partnerAt(rec) : null;
   if (hit && hit.kind !== 'bossLine') {
     landChar(rec, null, false);
@@ -901,7 +901,7 @@ function landThrown(rec) {
   cancelFlight(g); // after the inline position is set, so the character does not blink back to the start
   g.flight = null;
   emitFx('landed', { rec, bounces: g.bounces });
-  landChar(rec, rec.isCat ? catLanding() : { dizzyMs: ui.ui.throw.dizzyMs, text: line('landed', undefined, rec) });
+  landChar(rec, rec.isCat ? catLanding(rec) : { dizzyMs: ui.ui.throw.dizzyMs, text: line('landed', undefined, rec) });
 }
 
 /** The drop is over: near a free rest spot it rests there for an ambient-style stay, otherwise it walks to where the server wants it. */
@@ -987,7 +987,7 @@ function line(situation, fill, who) {
   return fill === undefined ? text : text.replace('{task}', fill).replace('{phase}', fill);
 }
 
-const talkLine = () => line(daypart(new Date().getHours()) === 'Night' && Math.random() < ui.ui.play.nightTalkChance ? 'smallTalkNight' : 'smallTalk');
+const talkLine = (who) => line(daypart(new Date().getHours()) === 'Night' && Math.random() < ui.ui.play.nightTalkChance ? 'smallTalkNight' : 'smallTalk', undefined, who);
 
 /** A short canned line over a character's head. While it shows it hides the character's own bubble, so keep `ms` short. One per character. */
 function sayFor(rec, text, ms, shiftPx = 0) {
@@ -1669,7 +1669,7 @@ function catHold() {
   setCatPose('stand');
 }
 
-const catLanding = () => ({ dizzyMs: catC.landMs, text: line('catLanded') });
+const catLanding = (rec) => ({ dizzyMs: catC.landMs, text: line('catLanded', undefined, rec) });
 
 /** The cat's next act: walk to a spot, a colleague's desk or a random point and stay a while, or leave for another floor. */
 function catNext() {
