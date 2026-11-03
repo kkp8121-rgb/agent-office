@@ -61,8 +61,7 @@ export function init(ctx) {
     if (node.getAttribute(name) !== value) node.setAttribute(name, value);
   }
 
-  function paintLoad() {
-    const s = ctx.sysload();
+  function paintLoad(s = ctx.sysload()) {
     if (!att || !s) return;
     for (const k of ['cpu', 'mem']) {
       const node = att.wall.sysVal?.[k];
@@ -138,7 +137,7 @@ export function init(ctx) {
     att = null;
   }
 
-  fx.onFx('sysload', () => { attach(); paintLoad(); });
+  fx.onFx('sysload', (d) => { attach(); paintLoad(d); });
   for (const name of ['floor-shown', 'floor-hidden', 'crop']) fx.onFx(name, () => { attach(); refresh(); });
   ctx.onPauseChange(() => syncActive());
   fx.onFxChange(({ fx: on }) => {
