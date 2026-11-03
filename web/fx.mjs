@@ -51,7 +51,7 @@
 //                                                    from === '' means the first time this page sees that character (page load or newcomer).
 //   'walk-start'    {rec}                            the character started walking (not fired for a move on a floor that is not shown).
 //   'walk-end'      {rec}                            it stopped: arrived, or the walk was cut (picked up, hidden tab, new route).
-//   'pose'          {rec, seated}                    it sat down or stood up (a changed pose only).
+//   'pose'          {rec, seated, animate}           it sat down or stood up (a changed pose only); animate = a visible change, not a first draw.
 //   'weather'       {kind, real}                     what the windows show now: kind = clear|cloudy|fog|rain|snow|storm|none (viewer's
 //                                                    choice applied), real = the server's real weather kind or null. Fires on every
 //                                                    change of either (and once at start-up).

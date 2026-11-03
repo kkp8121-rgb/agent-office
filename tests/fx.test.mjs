@@ -218,7 +218,7 @@ test('app.mjs emits exactly the documented events, each with the documented fiel
     'high-five': '{ a: guest, b: host }',
     'meeting-start': '{ floor: frec, title: phase }',
     state: '{ rec, from, to: av.state }',
-    pose: '{ rec, seated: sit }',
+    pose: '{ rec, seated: sit, animate }',
     daylight: '{ phase: next }',
     sysload: '{ cpu: sysLoad.cpu, mem: sysLoad.mem }',
   };
@@ -255,7 +255,8 @@ test('config: ui.fx and ui.officeLife exist, every area on its own lines, string
   assert.equal(cfg.ui.weather.fxSwitch, '화려한 효과');
   assert.equal(cfg.ui.weather.sfxSwitch, '효과음');
   const text = read('config.json');
-  for (const a of ['weather', 'chars', 'events', 'led', 'hit']) assert.match(text, new RegExp(`"${a}": \\{\\n\\s+"enabled": true\\n\\s+\\}`), `${a} is written on several lines`);
+  for (const a of ['weather', 'events', 'led', 'hit']) assert.match(text, new RegExp(`"${a}": \\{\\n\\s+"enabled": true\\n\\s+\\}`), `${a} is written on several lines`);
+  assert.match(text, /"chars": \{\n\s+"enabled": true,\n/, 'chars carries its numbers, one per line group');
   assert.match(text, /"officeLife": \{\n\s+"enabled": true\n\s+\},/);
 });
 
