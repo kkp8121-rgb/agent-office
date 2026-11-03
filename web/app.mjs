@@ -19,6 +19,14 @@ import { clearBubbles } from './bubbles.mjs';
 import { lightAt, msToNextChange, placeSeason, seasonOn } from './season.mjs';
 import { pickAt, snackOutcome } from './snack.mjs';
 import { CHOICES as WX_CHOICES, buildWeather, effectKind, loadChoice, saveChoice, setWeatherKind, statusLine } from './weather.mjs';
+import * as fxApi from './fx.mjs';
+import { emitFx, fxChoices, nextCombo, onFxChange, setFx, setSfx, startFx, trackDoc } from './fx.mjs';
+import { init as initFxWeather } from './fx-weather.mjs';
+import { init as initFxChars } from './fx-chars.mjs';
+import { init as initFxEvents } from './fx-events.mjs';
+import { init as initFxLed } from './fx-led.mjs';
+import { init as initFxHit } from './fx-hit.mjs';
+import { init as initOfficeLife } from './officelife.mjs';
 
 // Visual constants (how things look/move, not planning numbers; those come from /api/ui).
 const WALK_PX_PER_SEC = 150;
@@ -83,6 +91,7 @@ let es = null; // EventSource (kept after close() so readyState stays inspectabl
 let retryTimer = 0;
 let lastNow = Date.now(); // server clock of the latest state
 let pipWin = null; // the Document Picture-in-Picture window while the floors live there
+let pipFxStop = null; // stops html.fx-on tracking of that window
 
 const floorRecs = new Map(); // sessionId -> {el, stage, refs..., agents: Map(key -> rec)}
 const rowRecs = new Map(); // sessionId -> {el, ...}
@@ -279,14 +288,18 @@ function createChar(av, stage, startAt, sc, isCat = false, still = false) {
   }
   flip.append(spr);
   body.append(flip);
-  root.append(body);
+  const fxMove = el('div', 'fx-move'); // effect wrappers (style.css "effects scaffolding"): neutral until an effects area animates them; walking stays on the root
+  const fxHit = el('div', 'fx-hit');
+  fxHit.append(body);
+  fxMove.append(fxHit);
+  root.append(fxMove);
   (isCat ? root : tagRoot).append(zz); // a girl's zZ rides the tag layer so no desk or monitor can cover it; the cat's stays on its own floor-level root
   root.style.zIndex = String(charZ(startAt.y, ui.depth));
   root.style.transform = `translate(${startAt.x}px, ${startAt.y}px)`;
   root.style.setProperty('--fid-ms', `${amb.fidgetMs}ms`);
   tagRoot.style.transform = root.style.transform;
   const rec = {
-    el: root, tagRoot, body, bubTxt, bubDot, flip, tag, img, legs, spr, sitImg: null, sprite: av.sprite, x: startAt.x, y: startAt.y, state: '', bubKey: null, arrived: false,
+    el: root, tagRoot, body, fxMove, fxHit, bubTxt, bubDot, flip, tag, img, legs, spr, sitImg: null, sprite: av.sprite, x: startAt.x, y: startAt.y, state: '', bubKey: null, arrived: false,
     scene: sc, walk: null, seated: false, seat: null, away: false, trip: null, target: null, targetKey: '', slot: av.slot, isLead: false, frec: null, m: null, rng: null,
   };
   if (sitSet.has(av.sprite)) {
@@ -324,12 +337,20 @@ function placeAt(rec, p, commit = true) {
   if (commit) void rec.el.offsetWidth;
 }
 
+/** Tells the effects when a character starts or stops walking (once per change, however many pieces the walk has). */
+function noteWalk(rec, on) {
+  if (!!rec.fxWalking === on) return;
+  rec.fxWalking = on;
+  emitFx(on ? 'walk-start' : 'walk-end', { rec });
+}
+
 /** Stops a walk where the character is right now (the one place the live position is read). */
 function freeze(rec) {
   if (!rec.walk) return;
   const m = new DOMMatrixReadOnly(rec.el.ownerDocument.defaultView.getComputedStyle(rec.el).transform);
   rec.walk = null;
   rec.el.classList.remove('walking');
+  noteWalk(rec, false);
   placeAt(rec, [m.m41, m.m42]);
 }
 
@@ -339,6 +360,7 @@ function stepWalk(rec) {
   if (!piece) {
     rec.walk = null;
     rec.el.classList.remove('walking');
+    noteWalk(rec, false);
     w.onArrive?.();
     return;
   }
@@ -350,6 +372,7 @@ function stepWalk(rec) {
   rec.el.style.zIndex = String(piece.z);
   rec.el.style.transitionDuration = rec.tagRoot.style.transitionDuration = `${ms}ms`;
   rec.el.classList.add('walking');
+  noteWalk(rec, true);
   rec.el.style.transform = rec.tagRoot.style.transform = `translate(${piece.to[0]}px, ${piece.to[1]}px)`;
 }
 
@@ -387,6 +410,7 @@ function setPose(rec, seated, animate) {
   rec.seated = sit;
   rec.el.classList.toggle('sitting', sit);
   rec.tagRoot.classList.toggle('sitting', sit);
+  emitFx('pose', { rec, seated: sit });
   if (animate) {
     clearGestures(rec);
     void rec.body.offsetWidth;
@@ -497,12 +521,17 @@ function settleNow(rec, animate = false) {
   abortTrip(rec);
   rec.walk = null;
   rec.el.classList.remove('walking');
+  noteWalk(rec, false);
   clearGestures(rec);
   placeAt(rec, [rec.target.x, rec.target.y], false);
   arriveAt(rec, rec.target, animate);
 }
 
 // ---------- life: gestures and trips ----------
+
+const tripPickers = new Set(); // effects (ctx.life.addTripPicker): extra trips, asked before the default legs
+const fidgetPickers = new Set(); // effects (ctx.life.addFidgetPicker): a fidget of their own
+const catPickers = new Set(); // effects (ctx.life.addCatPicker): the cat's next act
 
 const whoOf = (frec, rec) => ({ isLead: rec.isLead, state: rec.state, floorStatus: frec.status });
 
@@ -535,6 +564,7 @@ function playFidget(rec, name) {
 function doFidget(frec, rec) {
   rec.m.nextFidgetAt = Date.now() + between(rec.rng, amb.fidgetEveryMs);
   if (rec.walk || rec.away || rec.grab || rec.play || rec.state === 'done' || rec.el.classList.contains('walking')) return;
+  if (fidgetPickers.size && firstFrom(fidgetPickers, frec, rec)) return; // effects: the office life area did its own
   playFidget(rec, chooseFidget(rec.rng, rec.seated, amb));
 }
 
@@ -560,6 +590,8 @@ function takenSpots(frec, except) {
 
 /** The stops of one trip: the lead tours seated colleagues' desks (or the whiteboard), everyone else visits one spot. */
 function pickLegs(frec, rec) {
+  const own = tripPickers.size ? firstFrom(tripPickers, frec, rec) : undefined; // effects: the office life area's own trips
+  if (own?.length) return own;
   const { r } = frec.scene;
   if (rec.isLead) {
     const desks = [];
@@ -696,7 +728,7 @@ function bindGrab(rec) {
   const end = (e) => {
     if (rec.press?.id === e.pointerId) {
       clearPress(rec); // a plain click is a poke
-      if (e.type === 'pointerup') pokeChar(rec);
+      if (e.type === 'pointerup') pokeChar(rec, e);
     } else if (rec.grab?.phase === 'held' && rec.grab.id === e.pointerId) {
       let fling = null;
       if (e.type === 'pointerup') {
@@ -739,7 +771,7 @@ function armSay(rec) {
   g.timer = clockTimers.setTimeout(() => {
     g.timer = 0;
     g.step++;
-    setText(g.say, line(rec.isCat ? 'catHeldLong' : 'heldLong'));
+    setText(g.say, line(rec.isCat ? 'catHeldLong' : 'heldLong', undefined, rec));
     armSay(rec);
   }, after[g.step] - (after[g.step - 1] ?? 0));
 }
@@ -762,7 +794,7 @@ function liftUp(rec) {
   rec.seat = null; // it left its desk: the way back must not start through the desk
   rec.arrived = false;
   const shadow = el('div', 'gshadow');
-  const say = el('div', 'bub grab', line(rec.isCat ? 'catLift' : rec.isLead ? 'liftLead' : 'lift'));
+  const say = el('div', 'bub grab', line(rec.isCat ? 'catLift' : rec.isLead ? 'liftLead' : 'lift', undefined, rec));
   rec.el.prepend(shadow);
   rec.tagRoot.append(say);
   rec.grab = { phase: 'held', id: p.id, step: 0, timer: 0, shadow, say, stars: null, samples: [], anims: null };
@@ -772,6 +804,7 @@ function liftUp(rec) {
   sample(rec, at);
   holdAt(rec, at);
   armSay(rec);
+  emitFx('lift', { rec });
 }
 
 /** Lets go. A fast release throws; otherwise it lands on the nearest walkable point with a squash-and-bounce, and with `stars` a
@@ -782,6 +815,7 @@ function dropChar(rec, stars, fling = null) {
   g.timer = 0;
   releaseCapture(rec, g.id);
   if (stars && fling && throwChar(rec, fling)) return;
+  emitFx('drop', { rec });
   const { frec } = rec;
   placeAt(rec, dropPoint(nav.grid(frec.design), [rec.x, rec.y], frec.scene.r.size) ?? [rec.x, rec.y]);
   if (rec.isCat) return landChar(rec, catLanding()); // a cat lands on its feet: no scene, no stars
@@ -790,7 +824,7 @@ function dropChar(rec, stars, fling = null) {
     landChar(rec, null, false);
     return startScene(rec, hit);
   }
-  landChar(rec, stars ? { dizzyMs: ui.ui.grab.dizzyMs, text: line(hit ? 'bossDrop' : rec.isLead ? 'grumbleLead' : 'grumble') } : null, !stars);
+  landChar(rec, stars ? { dizzyMs: ui.ui.grab.dizzyMs, text: line(hit ? 'bossDrop' : rec.isLead ? 'grumbleLead' : 'grumble', undefined, rec) } : null, !stars);
 }
 
 /** The landing: held look off, squash-and-bounce, then the dizzy spell (`dizzy`: its length and line) or, without one, the walk back. */
@@ -832,7 +866,8 @@ function throwChar(rec, fling) {
   const path = throwPath([rec.x, rec.y], fling, box, T);
   g.phase = 'flying';
   g.flight = path.pts.at(-1);
-  setText(g.say, line(rec.isCat ? 'catLift' : 'thrown'));
+  g.bounces = path.bounces;
+  setText(g.say, line(rec.isCat ? 'catLift' : 'thrown', undefined, rec));
   const move = path.pts.map((p, i) => ({ offset: path.offsets[i], transform: `translate(${p[0]}px, ${p[1]}px)` }));
   // the body rises on each leg and comes down at the walls (the wall height is lower than the hand)
   const arc = [{ offset: 0, translate: `0 -${LIFT_PX}px`, easing: 'ease-out' }];
@@ -844,6 +879,7 @@ function throwChar(rec, fling) {
   const opts = { duration: path.ms, fill: 'forwards' };
   g.anims = [rec.el.animate(move, { ...opts, easing: 'linear' }), rec.tagRoot.animate(move, { ...opts, easing: 'linear' }), rec.body.animate(arc, opts)];
   g.anims[0].onfinish = () => landThrown(rec);
+  emitFx('thrown', { rec, vx: fling.vx, vy: fling.vy });
   return true;
 }
 
@@ -863,7 +899,8 @@ function landThrown(rec) {
   placeAt(rec, dropPoint(nav.grid(frec.design), g.flight, frec.scene.r.size) ?? g.flight);
   cancelFlight(g); // after the inline position is set, so the character does not blink back to the start
   g.flight = null;
-  landChar(rec, rec.isCat ? catLanding() : { dizzyMs: ui.ui.throw.dizzyMs, text: line('landed') });
+  emitFx('landed', { rec, bounces: g.bounces });
+  landChar(rec, rec.isCat ? catLanding() : { dizzyMs: ui.ui.throw.dizzyMs, text: line('landed', undefined, rec) });
 }
 
 /** The drop is over: near a free rest spot it rests there for an ambient-style stay, otherwise it walks to where the server wants it. */
@@ -925,8 +962,25 @@ function cancelGrab(rec) {
 
 const lastLine = new Map(); // situation -> the line said last, so the same line never comes twice in a row
 
-/** A canned line of a situation (config ui.lines), never the one before it; `{task}` is filled with `fill`. */
-function line(situation, fill) {
+const linePickers = new Set(); // effects: persona-aware pickers asked first (ctx.addLinePicker)
+
+/** The first answer of an effects hook set (`fns`) to `args`, or undefined; a hook that throws is reported and skipped, never allowed to break the office. */
+function firstFrom(fns, ...args) {
+  for (const fn of fns) {
+    try {
+      const out = fn(...args);
+      if (out !== undefined && out !== null && out !== false) return out;
+    } catch (err) {
+      console.error('효과 연결 지점에서 오류가 났습니다:', err);
+    }
+  }
+  return undefined;
+}
+
+/** A canned line of a situation (config ui.lines), never the one before it; `{task}` is filled with `fill`. `who` = the speaking character, for the persona-aware pickers. */
+function line(situation, fill, who) {
+  const picked = linePickers.size ? firstFrom(linePickers, situation, fill, who) : undefined;
+  if (typeof picked === 'string') return picked;
   const text = pickLine(Math.random, ui.ui.lines[situation], lastLine.get(situation));
   lastLine.set(situation, text);
   return fill === undefined ? text : text.replace('{task}', fill).replace('{phase}', fill);
@@ -969,17 +1023,20 @@ function clearSteam(rec) {
 }
 
 /** A plain click: the reaction grows with quick repeated clicks (ui.poke), at the top level steam comes off the head. */
-function pokeChar(rec) {
-  if (rec.isCat) return petCat(rec);
+function pokeChar(rec, e) {
+  if (rec.isCat) return petCat(rec, e);
   if (rec.state === 'done' || rec.grab || rec.play || rec.el.classList.contains('gone')) return;
   const P = ui.ui.poke;
-  rec.poke = nextPoke(rec.poke ?? null, performance.now(), P);
+  const now = performance.now();
+  rec.poke = nextPoke(rec.poke ?? null, now, P);
+  rec.pokeCombo = nextCombo(rec.pokeCombo ?? null, now, P.resetMs); // not capped by maxLevel
   const lv = rec.poke.level;
-  sayFor(rec, line(`${rec.isLead ? 'pokeLead' : 'poke'}${lv}`), P.sayMs);
+  sayFor(rec, line(`${rec.isLead ? 'pokeLead' : 'poke'}${lv}`, undefined, rec), P.sayMs);
   clearGestures(rec);
   rec.body.style.removeProperty('--fid-delay');
   void rec.body.offsetWidth;
   rec.body.classList.add(lv >= P.maxLevel ? 'fid-hop' : 'squash');
+  emitFx('poke', { rec, key: rec.sprite, level: lv, combo: rec.pokeCombo.n, x: e.clientX, y: e.clientY });
   if (lv < P.maxLevel) return;
   clearSteam(rec);
   const steam = el('div', 'steam');
@@ -1049,10 +1106,11 @@ function sceneAct(sc) {
     const pat = sc.kind === 'pat'; // the boss comforts the one who failed, who answers
     const task = isStatusText(guest.bubbleText) ? '' : guest.bubbleText; // a status word ("생각 중…") is not a task
     if (pat && !host.seated) setFacing(host, guest.x < host.x ? 'left' : 'right');
-    sayFor(guest, pat ? line('patBoss') : task ? line('report', task) : line('reportRest'), P.reportSayMs, away * P.bubbleLeanPx);
+    if (!pat) emitFx('report', { rec: guest, lead: host });
+    sayFor(guest, pat ? line('patBoss', undefined, guest) : task ? line('report', task, guest) : line('reportRest', undefined, guest), P.reportSayMs, away * P.bubbleLeanPx);
     sc.timer = clockTimers.setTimeout(() => {
       if (pat) clearMood(host);
-      sayFor(host, line(pat ? 'patReply' : 'bossReply'), P.replyMs, -away * P.bubbleLeanPx);
+      sayFor(host, line(pat ? 'patReply' : 'bossReply', undefined, host), P.replyMs, -away * P.bubbleLeanPx);
       sc.timer = clockTimers.setTimeout(() => endPlay(sc, null), P.replyMs + P.endPauseMs);
     }, P.replyDelayMs);
     return;
@@ -1064,8 +1122,9 @@ function sceneAct(sc) {
   sc.spark.style.left = `${(guest.x + host.x) / 2}px`;
   sc.spark.style.top = `${(guest.y + host.y) / 2}px`;
   guest.frec.stage.append(sc.spark); // its own layer above the name tags (the tag layers stack by character)
-  sayFor(guest, line('highFive'), P.highFiveMs, away * P.bubbleLeanPx);
-  sayFor(host, line('highFive'), P.highFiveMs, -away * P.bubbleLeanPx);
+  emitFx('high-five', { a: guest, b: host });
+  sayFor(guest, line('highFive', undefined, guest), P.highFiveMs, away * P.bubbleLeanPx);
+  sayFor(host, line('highFive', undefined, host), P.highFiveMs, -away * P.bubbleLeanPx);
   sc.timer = clockTimers.setTimeout(() => endPlay(sc, null), P.highFiveMs + P.endPauseMs);
 }
 
@@ -1194,6 +1253,17 @@ function toggleBig(frec) {
 const meetable = (a) => !a.grab && !a.press && !a.play && a.state !== 'done' && a.target && !a.el.classList.contains('gone');
 
 const paused = () => document.body.classList.contains('paused');
+const pauseFns = new Set(); // effects: ctx.onPauseChange listeners
+
+function notePause(on) {
+  for (const fn of [...pauseFns]) {
+    try {
+      fn(on);
+    } catch (err) {
+      console.error('효과 연결 지점에서 오류가 났습니다:', err);
+    }
+  }
+}
 
 /**
  * A workflow went on to its next phase (SSE "phase"): the floor's characters walk to the meeting spots in front of the board, the boss
@@ -1203,6 +1273,7 @@ function onPhase(sig) {
   noteActivity(sig.sessionId, Date.now(), ui.ui.follow.phaseWeight);
   followPoke();
   const frec = floorRecs.get(sig.sessionId);
+  if (frec) emitFx('phase', { floor: frec, title: clipPhase(sig.phase, ui.ui.meeting.phaseMaxChars) });
   const spots = frec?.scene.raw.meeting;
   if (!spots || frec.off || paused() || frec.status === 'leaving') return;
   const M = ui.ui.meeting;
@@ -1220,6 +1291,7 @@ function onPhase(sig) {
   if (boss) place.set(boss, spots.boss);
   const next = { kind: 'meeting', frec, members: new Set(), boss, phase, hold: false, timer: 0 };
   frec.meeting = next;
+  emitFx('meeting-start', { floor: frec, title: phase });
   let walkMs = 0;
   for (const [rec, spot] of place) {
     abortTrip(rec);
@@ -1256,7 +1328,9 @@ function endMeeting(mt) {
 
 function finishMeeting(mt) {
   clockTimers.clearTimeout(mt.timer);
-  if (mt.frec.meeting === mt) mt.frec.meeting = null;
+  if (mt.frec.meeting !== mt) return;
+  mt.frec.meeting = null;
+  emitFx('meeting-end', { floor: mt.frec });
 }
 
 /** One character leaves the meeting for its own reasons (picked up, finished, moved by the server, floor hidden); the caller deals with it from there. */
@@ -1268,17 +1342,18 @@ function leaveMeeting(mt, rec) {
   if (mt.members.size === 0) finishMeeting(mt);
 }
 
-function clearMood(rec) {
+function clearMood(rec, restart = false) {
   const m = rec.mood;
   if (!m) return;
   rec.mood = null;
   clockTimers.clearTimeout(m.timer);
   m.el.remove();
+  if (!restart) emitFx('fail-end', { rec });
 }
 
 /** A sweat drop or rain cloud above the head for ui.fail.seconds; another failure in the meantime starts the time again. */
 function showMood(rec, streak) {
-  clearMood(rec);
+  clearMood(rec, true);
   const kind = moodKind(streak);
   const m = el('div', `mood ${kind}`);
   const frames = kind === 'cloud' ? ['rain-cloud-1', 'rain-cloud-2'] : ['sweat-drop'];
@@ -1289,6 +1364,7 @@ function showMood(rec, streak) {
   }
   rec.tagRoot.append(m);
   rec.mood = { el: m, timer: clockTimers.setTimeout(() => clearMood(rec), ui.ui.fail.seconds * 1000) };
+  emitFx('fail-start', { rec });
 }
 
 /** A command or test failed (SSE "fail"): the mood shows; from ui.fail.patStreak in a row the boss comes to comfort (not for the boss itself). */
@@ -1373,13 +1449,20 @@ function currentLight(now) {
   return lightQuery ?? (isDark() && ui.ui.dark.nightWindows ? 'night' : lightAt(now.getHours(), ui.ui.daylight));
 }
 
+/** The light outside changed (the hour, dark mode, ?time=): the effects hear it once per real change. */
+function setLight(next) {
+  if (next === light) return;
+  light = next;
+  emitFx('daylight', { phase: next });
+}
+
 /** Reads the date and the hour (or the query), updates every shown floor, and sets the one timer for the next change. */
 function applyTime() {
   if (skyTimer) clockTimers.clearTimeout(skyTimer);
   skyTimer = 0;
   const now = new Date();
   season = seasonQuery ?? seasonOn(now, ui.ui.season);
-  light = currentLight(now);
+  setLight(currentLight(now));
   for (const f of floorRecs.values()) syncDecor(f);
   if (!paused()) skyTimer = clockTimers.setTimeout(applyTime, msToNextChange(now, ui.ui.daylight));
 }
@@ -1425,14 +1508,15 @@ function snackTargetAt(cx, cy) {
 function giveSnack(rec, kind) {
   const S = ui.ui.snack;
   const out = snackOutcome(kind, !!rec.isCat, rec.snackAt, Date.now(), S.cooldownSeconds);
-  if (out !== 'eat') return sayFor(rec, line(out === 'full' ? 'snackFull' : rec.isCat ? 'snackNoCat' : 'snackNoFish'), S.refuseMs);
+  emitFx('snack', { rec, kind, result: out });
+  if (out !== 'eat') return sayFor(rec, line(out === 'full' ? 'snackFull' : rec.isCat ? 'snackNoCat' : 'snackNoFish', undefined, rec), S.refuseMs);
   clearSnack(rec);
   rec.snackAt = Date.now();
   const hand = el('img', 'snackhand');
   hand.src = `${SNACK_URL}${kind}.png`;
   hand.alt = '';
   rec.tagRoot.append(hand);
-  sayFor(rec, line('snackEat'), S.eatMs);
+  sayFor(rec, line('snackEat', undefined, rec), S.eatMs);
   if (rec.isCat) {
     if (rec.walk) freeze(rec);
     if (rec.el.classList.contains('cat-sleep')) setCatPose('sit');
@@ -1451,7 +1535,7 @@ function giveSnack(rec, kind) {
       s.spark.append(i);
     });
     rec.tagRoot.append(s.spark);
-    sayFor(rec, line(rec.isCat ? 'catSnackDone' : 'snackDone'), S.sparkleMs);
+    sayFor(rec, line(rec.isCat ? 'catSnackDone' : 'snackDone', undefined, rec), S.sparkleMs);
     if (rec.isCat) burstHearts(rec, catC.pet.hearts[2]);
     s.timer = clockTimers.setTimeout(() => clearSnack(rec), S.sparkleMs);
   }, S.eatMs);
@@ -1557,6 +1641,7 @@ function catHalt() {
   if (rec.walk) {
     rec.walk = null;
     rec.el.classList.remove('walking');
+    noteWalk(rec, false);
     placeAt(rec, [rec.x, rec.y], false);
   }
 }
@@ -1598,7 +1683,7 @@ function catNext() {
     if (seat?.visit) desks.push({ x: seat.visit[0], y: seat.visit[1], face: seat.at[0] < seat.visit[0] ? 'left' : 'right', agent: a });
   }
   const grid = nav.grid(frec.design);
-  const pick = chooseCatAct(Math.random, {
+  const pick = (catPickers.size ? firstFrom(catPickers, { cat, floor: frec }) : undefined) ?? chooseCatAct(Math.random, {
     cat: catC, spots: r.spots, taken: takenSpots(frec, null), desks, point: () => openPoint(Math.random, grid),
     leaveDue: floorRecs.size > 1 && Date.now() >= cat.leaveAt, force: cat.force,
   });
@@ -1657,18 +1742,21 @@ function burstHearts(rec, n) {
 }
 
 /** A plain click on the cat: hearts and a purr, and a bigger one for each quick click after it (ui.cat.pet). */
-function petCat(rec) {
+function petCat(rec, e) {
   if (rec.grab) return;
   const P = catC.pet;
   if (rec.walk) freeze(rec);
-  cat.poke = nextPoke(cat.poke, performance.now(), P);
+  const now = performance.now();
+  cat.poke = nextPoke(cat.poke, now, P);
+  cat.pokeCombo = nextCombo(cat.pokeCombo ?? null, now, P.resetMs);
   const lv = cat.poke.level;
   if (rec.el.classList.contains('cat-sleep')) setCatPose('sit'); // a sleeper wakes up
-  sayFor(rec, line(`catPet${lv}`), P.sayMs);
+  sayFor(rec, line(`catPet${lv}`, undefined, rec), P.sayMs);
   burstHearts(rec, P.hearts[lv - 1]);
   clearGestures(rec);
   void rec.body.offsetWidth;
   rec.body.classList.add(lv >= P.maxLevel ? 'fid-hop' : 'squash');
+  emitFx('cat-pet', { cat: rec, level: lv, combo: cat.pokeCombo.n, x: e.clientX, y: e.clientY });
   catAt(P.sayMs + P.pauseMs, catNext); // after a pet it goes on with its day
 }
 
@@ -1764,6 +1852,7 @@ function renderAgent(av, floorEl) {
 
   const stateChanged = rec.state !== av.state;
   if (stateChanged) {
+    const from = rec.state;
     if (rec.state) {
       rec.el.classList.remove(`st-${rec.state}`);
       rec.tagRoot.classList.remove(`st-${rec.state}`);
@@ -1773,6 +1862,7 @@ function renderAgent(av, floorEl) {
     rec.tagRoot.classList.add(`st-${av.state}`);
     rec.tagRoot.classList.toggle('done', done); // finished agents stand together on the tray: their tags would pile up
     if (done) clearMood(rec);
+    emitFx('state', { rec, from, to: av.state });
   }
   if (done && !frec.populated && lastNow - av.since > DONE_STALE_MS) rec.el.classList.add('gone'); // already reported before this page loaded
   if (rec.m.nextTripAt === Infinity && !rec.away && rec.m.returnAt === 0) {
@@ -1921,6 +2011,13 @@ function buildStage(sc) {
   return stage;
 }
 
+/** The floor's one empty effects layer (style.css .fx-layer): above the characters and name tags, below the floor's own plaques. */
+function addFxLayer(stage) {
+  const layer = el('div', 'fx-layer');
+  stage.append(layer);
+  return layer;
+}
+
 function createFloor(fv) {
   const sc = sceneOf(fv.design);
   const { r } = sc;
@@ -1931,6 +2028,7 @@ function createFloor(fv) {
   root.style.width = `${r.size[0]}px`;
   root.style.height = `${r.size[1]}px`;
   const stage = buildStage(sc);
+  const layer = addFxLayer(stage);
   const reportsAt = [r.tray.at[0] + r.reports[0], r.tray.at[1] + r.reports[1]];
 
   const board = el('div', 'board');
@@ -1959,7 +2057,7 @@ function createFloor(fv) {
   stage.append(board, sign, reports);
   root.append(stage);
   const rec = {
-    el: root, stage, bt, bl, fno, ft, ff, fs, prov, reports, agents: new Map(), populated: false,
+    el: root, stage, layer, bt, bl, fno, ft, ff, fs, prov, reports, agents: new Map(), populated: false,
     sid: fv.sessionId, off: root.hidden, design: fv.design, scene: sc, status: fv.status, dbg: null, clock: null, clockOn: false, warned: false,
   };
   rec.clock = makeClock(rec);
@@ -1973,6 +2071,7 @@ function createFloor(fv) {
     stage.append(rec.dbg.svg);
   }
   floorRecs.set(fv.sessionId, rec);
+  if (!rec.off) emitFx('floor-shown', { floor: rec });
   return rec;
 }
 
@@ -2215,6 +2314,7 @@ function createLobby() {
   root.style.height = `${r.size[1]}px`;
   root.setAttribute('aria-label', L.wallLabel);
   const stage = buildStage(sc);
+  const layer = addFxLayer(stage);
   stage.style.width = `${r.size[0]}px`; // fixed, so the small window can crop the floor to the wall without squeezing the room
   stage.style.height = `${r.size[1]}px`;
   const board = el('div', 'board');
@@ -2227,6 +2327,7 @@ function createLobby() {
   Object.assign(more.style, { left: `${r.door.at[0] - 150}px`, top: `${r.door.at[1] - 120}px` }); // beside the door, above the standing crowd
   stage.append(board, more);
   const wall = buildWall(stage, sc.raw);
+  const chars = new Map(); // the lobby's figures (also lobby.agents, so an effects area reads every floor the same way)
   const quads = (sc.raw.ledWall?.panels ?? []).flatMap((p) => p.quad);
   const xs = quads.map((p) => p[0]);
   const ys = quads.map((p) => p[1]);
@@ -2247,7 +2348,7 @@ function createLobby() {
   root.append(stage);
   floorsEl.append(root);
   lobby = {
-    el: root, stage, scene: sc, off: true, dirty: false, floors: [], roster: [], seatMap: new Map(), chars: new Map(), populated: false, news: [],
+    el: root, stage, layer, sid: LOBBY_ID, scene: sc, off: true, dirty: false, floors: [], roster: [], seatMap: new Map(), chars, agents: chars, populated: false, news: [],
     hist: new Map(), page: 0, pages: 1, pageAt: 0, timer: 0, wall, crop, cropped: false, writes: 0, boardLine, more, backRow: backRowSeats(sc.r.seats),
     design: ui.lobby.design, life: DEBUG_AMBIENT ? scaleLife(L.life, 0.1) : L.life, clock: null,
   };
@@ -2282,6 +2383,7 @@ function lobbyBox(mini) {
     lb.stage.style.marginTop = mini ? `${-y}px` : '';
     if (mini) stopLobbyLife(); // the figures are display:none in the crop: a walk would never get its transitionend
     else startLobbyLife();
+    emitFx('crop', { cropped: mini, floor: lb });
   }
   return mini ? [lb.crop.w, lb.crop.h] : lb.scene.r.size;
 }
@@ -2558,9 +2660,11 @@ function setLobbyOff(off) {
     lb.page = 0;
     lb.pageAt = 0;
     lb.populated = false; // the next time it is shown its figures stand there, nobody fades in
+    emitFx('floor-hidden', { floor: lb, removed: false });
   } else {
     drawLobby();
     startLobbyLife();
+    emitFx('floor-shown', { floor: lb });
   }
 }
 
@@ -2801,6 +2905,7 @@ function removeSession(sessionId, withLog = true) {
     if (cat?.frec === f) catRemove();
     f.el.remove();
     floorRecs.delete(sessionId);
+    emitFx('floor-hidden', { floor: f, removed: true });
   }
   const r = rowRecs.get(sessionId);
   if (r) {
@@ -2970,7 +3075,7 @@ function connect() {
   es.addEventListener('phase', (ev) => onPhase(JSON.parse(ev.data)));
   es.addEventListener('fail', (ev) => onFail(JSON.parse(ev.data)));
   es.addEventListener('weather', (ev) => onWeather(JSON.parse(ev.data)));
-  es.addEventListener('sysload', (ev) => { sysLoad = JSON.parse(ev.data); if (lobby?.wall) drawSys(); });
+  es.addEventListener('sysload', (ev) => { sysLoad = JSON.parse(ev.data); emitFx('sysload', { cpu: sysLoad.cpu, mem: sysLoad.mem }); if (lobby?.wall) drawSys(); });
   es.addEventListener('error', () => {
     showConn('연결이 끊겼습니다. 다시 연결하는 중…');
     // The browser retries by itself unless the server refused the stream (then the state is CLOSED).
@@ -2988,6 +3093,7 @@ function pause() {
   skyTimer = 0;
   if (es) es.close();
   document.body.classList.add('paused');
+  notePause(true);
   closeBig();
   // nothing moves while hidden: every walking or away character goes to its server place now
   for (const f of floorRecs.values()) {
@@ -2999,6 +3105,7 @@ function pause() {
 
 async function resume() {
   document.body.classList.remove('paused');
+  notePause(false);
   connEl.hidden = true;
   if (!ui) return init(); // the first /api/ui failed while the tab was in front
   await refreshState();
@@ -3033,8 +3140,15 @@ function syncWeather(frec) {
   setWeatherKind(frec.wx, kind);
 }
 
+let wxSaid = ''; // the last 'weather' effect event, so only a real change is announced
+
 function applyWeather() {
   for (const f of floorRecs.values()) syncWeather(f);
+  const kind = effectKind(wxChoice, wxReal?.kind);
+  const real = wxReal?.kind ?? null;
+  if (wxSaid === `${kind}|${real}`) return;
+  wxSaid = `${kind}|${real}`;
+  emitFx('weather', { kind, real });
 }
 
 function onWeather(field) {
@@ -3071,6 +3185,7 @@ function initWeather() {
     label.append(radio, ` ${S.choices[value]}`);
     group.append(label);
   }
+  initFxSwitches(S);
   setText($('wx-now'), statusLine(S, ui.weather.enabled, wxReal, ui.weather.city));
   panel.addEventListener('toggle', (ev) => {
     const open = ev.newState === 'open';
@@ -3082,6 +3197,95 @@ function initWeather() {
     group.querySelector('input:checked')?.focus();
   });
   applyWeather();
+}
+
+// ---------- effects: the switches in the settings panel, the context handed to the effects areas (web/fx.mjs documents ctx) ----------
+
+/** The 「화려한 효과」 and 「효과음」 switches: checkboxes in the settings panel, next to the weather choice. */
+function initFxSwitches(S) {
+  const group = $('fx-choices');
+  setText(group.querySelector('legend'), S.fxGroup);
+  const boxes = {};
+  for (const [which, text, set] of [['fx', S.fxSwitch, setFx], ['sfx', S.sfxSwitch, setSfx]]) {
+    const label = el('label', 'wx-opt');
+    const box = el('input');
+    box.type = 'checkbox';
+    box.checked = fxChoices()[which];
+    box.addEventListener('change', () => set(box.checked));
+    boxes[which] = box;
+    label.append(box, ` ${text}`);
+    if (which === 'sfx') label.title = S.sfxHint;
+    group.append(label);
+  }
+  onFxChange(() => { // the reduced-motion default can flip while the panel exists
+    for (const which of Object.keys(boxes)) boxes[which].checked = fxChoices()[which];
+  });
+}
+
+/** Everything an effects area may use of the office, so it never reaches into this file (the typedef in web/fx.mjs is the documentation). */
+function buildFxCtx() {
+  const floorList = () => [...floorRecs.values(), ...(lobby ? [lobby] : [])];
+  const charList = (floor) => (floor ? [...(floor.agents ?? floor.chars).values()] : [...floorList().flatMap((f) => [...(f.agents ?? f.chars).values()]), ...(cat ? [cat.rec] : [])]);
+  const hook = (set) => (fn) => {
+    set.add(fn);
+    return () => set.delete(fn);
+  };
+  return {
+    ui: ui.ui,
+    server: ui,
+    fx: fxApi,
+    floors: floorList,
+    floor: (id) => (id === LOBBY_ID ? lobby : floorRecs.get(id) ?? null),
+    lobby: () => lobby,
+    chars: charList,
+    bySprite: (key) => charList().filter((r) => r.sprite === key),
+    recOf: (e) => recOf.get(e),
+    cat: () => cat,
+    line,
+    addLinePicker: hook(linePickers),
+    sayFor,
+    clearSay,
+    chatter,
+    floorActive: (f) => !f.off && !f.cropped && !paused(),
+    paused,
+    onPauseChange: hook(pauseFns),
+    now: Date.now,
+    timers: clockTimers,
+    light: () => light,
+    season: () => season,
+    weather: () => ({ choice: wxChoice, real: wxReal?.kind ?? null, kind: effectKind(wxChoice, wxReal?.kind) }),
+    sysload: () => sysLoad,
+    walkPath,
+    goTo,
+    placeAt,
+    setPose,
+    arriveAt,
+    setFacing,
+    freeze,
+    clearGestures,
+    nav: { path: (d, a, b) => nav.path(d, a, b), snap: (d, p) => nav.snap(d, p), grid: (d) => nav.grid(d) },
+    life: {
+      get ambient() { return amb; },
+      get cat() { return catC; },
+      takenSpots,
+      addTripPicker: hook(tripPickers),
+      addFidgetPicker: hook(fidgetPickers),
+      addCatPicker: hook(catPickers),
+      members: (f) => [...f.agents.values()].filter((r) => r.m && r.state !== 'done' && !r.el.classList.contains('gone')),
+    },
+  };
+}
+
+/** Starts every effects area once; an area that fails to start is reported and skipped, the office goes on. */
+function initFxAreas() {
+  const ctx = buildFxCtx();
+  for (const init of [initFxWeather, initFxChars, initFxEvents, initFxLed, initFxHit, initOfficeLife]) {
+    try {
+      init(ctx);
+    } catch (err) {
+      console.error('효과 영역을 시작하지 못했습니다:', err);
+    }
+  }
 }
 
 // ---------- floor switcher: top bar, single-floor view, rotation, fullscreen, session panel ----------
@@ -3189,11 +3393,13 @@ function setOff(f, off) {
     if (bigBoard?.frec === f) closeBig();
     stopAmbient(f);
     for (const a of f.agents.values()) settleNow(a);
+    emitFx('floor-hidden', { floor: f, removed: false });
   } else {
     renderBoard(f);
     syncDecor(f);
     syncWeather(f);
     startAmbient(f, true);
+    emitFx('floor-shown', { floor: f });
   }
 }
 
@@ -3418,7 +3624,7 @@ function applyTheme() {
   paintTheme(document);
   if (pipWin) paintTheme(pipWin.document);
   setAttr(themeBtn, 'aria-pressed', String(isDark()));
-  light = currentLight(new Date());
+  setLight(currentLight(new Date()));
   for (const f of floorRecs.values()) syncDecor(f);
 }
 
@@ -3462,6 +3668,7 @@ async function openPip() {
   d.documentElement.style.setProperty('--sit-h', `${ui.sitHeight}px`);
   d.body.classList.add('pip-mini');
   paintTheme(d);
+  pipFxStop = trackDoc(d); // the small window's <html> carries fx-on too
   landFlights(); // moving the floors cancels running animations
   closeBig(); // its listeners belong to this page's document
   pipWin = w;
@@ -3482,6 +3689,8 @@ function pipClosed() {
   if (!pipWin) return;
   const gone = pipWin;
   pipWin = null;
+  pipFxStop?.();
+  pipFxStop = null;
   landFlights();
   closeBig();
   for (const t of liveTimers.values()) {
@@ -3546,8 +3755,10 @@ async function init() {
     decorItems = []; // no pictures list: the rooms stay plain
   }
   setupScenes();
+  startFx(ui.ui.fx, document); // before the settings panel and the areas read the switches
   applyTime();
   initWeather();
+  initFxAreas();
   clearBubbleOverlap();
   connEl.hidden = true;
   if (document.hidden) document.body.classList.add('paused');

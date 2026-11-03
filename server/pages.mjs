@@ -10,6 +10,12 @@ export const INDEX_HTML = String.raw`<!doctype html>
 <link rel="icon" href="data:,">
 <script>try{var t=localStorage.getItem("agent-office.theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="stylesheet" href="/web/style.css">
+<link rel="stylesheet" href="/web/fx-weather.css">
+<link rel="stylesheet" href="/web/fx-chars.css">
+<link rel="stylesheet" href="/web/fx-events.css">
+<link rel="stylesheet" href="/web/fx-led.css">
+<link rel="stylesheet" href="/web/fx-hit.css">
+<link rel="stylesheet" href="/web/officelife.css">
 </head>
 <body>
 <header id="topbar">
@@ -35,6 +41,7 @@ export const INDEX_HTML = String.raw`<!doctype html>
     <div id="settings-panel" popover role="dialog" aria-labelledby="settings-title">
       <h2 id="settings-title"></h2>
       <fieldset id="wx-choices"><legend></legend></fieldset>
+      <fieldset id="fx-choices"><legend></legend></fieldset>
       <p id="wx-now" role="status"></p>
       <p class="wx-credit" id="wx-credit"></p>
       <button id="settings-close" type="button" popovertarget="settings-panel" popovertargetaction="hide"></button>

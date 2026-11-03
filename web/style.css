@@ -672,3 +672,12 @@ body.paused .wx-a, body.paused .wx-b, body.paused .wx-f { animation-play-state: 
 .led .tk-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--led-ink); font-size: 9px; }
 /* the small window crops to the wall: figures that peek over the crop edge stay out of it */
 .floor.lobby.crop .ag, .floor.lobby.crop .agt, .floor.lobby.crop .lobby-more { display: none; }
+
+/* ---- effects scaffolding (web/fx.mjs, web/fx-*.css): neutral wrappers and an empty layer; the areas fill them ---- */
+/* every character: .fx-move (movement effects) around .fx-hit (hit feel) around the picture parts; both are zero-size, transform none, so they change nothing until an area animates them. Their origin is the feet. */
+.fx-move, .fx-hit { position: absolute; left: 0; top: 0; width: 0; height: 0; transform: none; }
+/* one empty layer per floor stage: above the characters and the name tags (8000) and the dark-mode veil, below the floor's own plaques (9000) */
+.fx-layer { position: absolute; inset: 0; z-index: 8200; pointer-events: none; }
+/* while nothing is in it the layer is not drawn at all: even an empty overlay makes Chrome draw the text under it with grayscale instead of LCD anti-aliasing (measured on the lobby sign), so the office stays pixel-identical */
+.fx-layer:empty { display: none; }
+#fx-choices .wx-opt { grid-column: 1 / -1; }

@@ -270,7 +270,7 @@ test('crop mode: switching the lobby to the small-window crop stops its life, le
   const calls = [];
   const el = () => ({ ...fakeEl(), style: {} });
   const lb = { cropped: false, crop: { x: 3, y: 4, w: 50, h: 60 }, scene: { r: { size: [200, 100] } }, el: el(), stage: el() };
-  const lobbyBox = fnIn('lobbyBox', { lobby: lb, stopLobbyLife: () => calls.push('stop'), startLobbyLife: () => calls.push('start') });
+  const lobbyBox = fnIn('lobbyBox', { lobby: lb, stopLobbyLife: () => calls.push('stop'), startLobbyLife: () => calls.push('start'), emitFx() {} });
   assert.deepEqual([...lobbyBox(true)], [50, 60]);
   assert.deepEqual([...lobbyBox(true)], [50, 60]);
   assert.deepEqual([...lobbyBox(false)], [200, 100]);
