@@ -548,12 +548,6 @@ wzwzw
 wwwww
 wwwww
 w.w.w""")
-add("webcam", "monitorTop", ["tech"], """
-.KKKK.
-KkkkkK
-KkKKkK
-.KKKK.
-..SS..""")
 
 # ---------------------------------------------------------------- bezel stickers (white die-cut border)
 sticker("sticker-star", """
