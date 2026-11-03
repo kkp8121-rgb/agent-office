@@ -102,3 +102,17 @@ test('no duplicate line within a persona and no line used by more than two chara
   }
   for (const [s, who] of owners) assert.ok(who.length <= 2, `"${s}" used by ${who.join(', ')}`);
 });
+
+test('characters of the same type share at most two lines', () => {
+  const keys = Object.keys(P);
+  for (let i = 0; i < keys.length; i++) {
+    for (let j = i + 1; j < keys.length; j++) {
+      const a = P[keys[i]];
+      const b = P[keys[j]];
+      if (a.type !== b.type) continue;
+      const lines = new Set(Object.values(a.lines).flat());
+      const shared = new Set(Object.values(b.lines).flat().filter((s) => lines.has(s)));
+      assert.ok(shared.size <= 2, `${keys[i]} and ${keys[j]} (${a.type}) share ${shared.size} lines: ${[...shared].join(' / ')}`);
+    }
+  }
+});
