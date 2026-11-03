@@ -256,3 +256,10 @@ test('/api/ui carries the validated cards of the cards.json in the root (and {} 
   assert.deepEqual(await ask(dirname(bare.file)), {});
   bare.done();
 });
+
+test('card.css only styles card classes: a bare .c-name would also restyle the lobby LED board columns (.led .c-name)', () => {
+  const css = readFileSync(join(ROOT, 'web', 'card.css'), 'utf8');
+  assert.equal(/(^|[\s,}])\.c-[a-z]/.test(css), false);
+  const js = readFileSync(join(ROOT, 'web', 'card.mjs'), 'utf8');
+  assert.equal(/cell\(doc, 'c-/.test(js), false);
+});
