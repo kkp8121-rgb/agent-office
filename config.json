@@ -69,7 +69,10 @@
               "enabled": true
             },
             "led": {
-              "enabled": true
+              "enabled": true,
+              "load": { "steps": [80, 90] },
+              "blink": { "ms": 700, "count": 2, "min": 0.3 },
+              "marquee": { "speed": 14, "holdMs": 1800, "minOverflow": 2 }
             },
             "hit": {
               "enabled": true

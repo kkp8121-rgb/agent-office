@@ -2245,6 +2245,16 @@ function buildWall(stage, raw) {
     clk.append(wall.date, wall.time);
     wall.sys = el('span', 'sys');
     wall.sys.hidden = true; // until the first value
+    wall.sysVal = {}; // the two numbers sit in their own spans (data-k) so the LED effect can colour and blink each one
+    for (const part of L.sysText.split(/\{(cpu|mem)\}/)) {
+      if (part !== 'cpu' && part !== 'mem') {
+        wall.sys.append(part);
+        continue;
+      }
+      wall.sysVal[part] = el('span', 'sv');
+      wall.sysVal[part].dataset.k = part;
+      wall.sys.append(wall.sysVal[part]);
+    }
     hd.append(el('b', '', L.boardTitle), wall.page, wall.sys, clk);
     const cap = Math.max(1, tableCapacity(center.frame.h, LED_ROW_PX, LED_PAD_PX) - 1); // the title line and the column line
     wall.rows = Array.from({ length: cap }, () => {
@@ -2293,9 +2303,11 @@ function buildWall(stage, raw) {
   wall.tickers = ['tickerLeft', 'tickerCenter', 'tickerRight'].map((id) => {
     const t = boxes.get(id);
     if (!t) return null;
-    const text = el('span', 'tk-t');
+    const box = el('span', 'tk-t');
+    const text = el('span', 'tk-m'); // the text itself; the LED effect scrolls it inside the clipping .tk-t when it does not fit
+    box.append(text);
     if (id === 'tickerCenter') t.el.append(el('span', 'tk-l', L.newsTitle));
-    t.el.append(text);
+    t.el.append(box);
     return text;
   });
   return wall;
@@ -2521,7 +2533,10 @@ function drawSys() {
   const sys = lobby.wall.sys;
   if (!sys) return;
   sys.hidden = !sysLoad;
-  if (sysLoad) put(sys, ui.ui.lobby.sysText.replace('{cpu}', String(sysLoad.cpu)).replace('{mem}', String(sysLoad.mem)));
+  if (!sysLoad) return;
+  const v = lobby.wall.sysVal;
+  put(v.cpu, String(sysLoad.cpu));
+  put(v.mem, String(sysLoad.mem));
 }
 
 /** The whole wall at `now`: numbers, clock, employee page, floor index, news. Cells that did not change are not touched. */
