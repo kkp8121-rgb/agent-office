@@ -35,41 +35,60 @@ export function init(ctx) {
   const reduced = () => !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   // ---- what is playing (so it can all be taken away) ----
-  const free = []; // detached particle elements ready for reuse
-  let made = 0;
-  const live = new Set(); // {node, anim, floor, pooled}
+  // Particles are kept per floor and per look (class, text, colour, size): a finished one stays in the layer (opacity 0 by style sheet, nothing drawn)
+  // and is played again at a new place by its animation alone, so a poke adds and removes no element and writes no style: no layout pass for the burst.
+  const pools = new Map(); // floor -> {idle: Map<look, node[]>, count: number of particle nodes in that floor's layer}
+  const live = new Set(); // {node, anim, floor, look} (look is '' for the white flash copy, which stays attached)
   const hitAnims = new Map(); // rec -> its current reaction animation on .fx-hit
   const wiggles = new Map(); // rec -> the dangling wiggle while held
   const flashes = new Map(); // rec -> {node, anim}
   const combos = new Map(); // rec -> its combo counter {node, anim}
   const shakes = new Map(); // floor -> shake animation
 
+  const poolOf = (floor) => {
+    let p = pools.get(floor);
+    if (!p) pools.set(floor, (p = { idle: new Map(), count: 0 }));
+    return p;
+  };
+
   function release(item) {
     if (!live.delete(item)) return;
     item.anim.onfinish = item.anim.oncancel = null;
-    item.node.remove();
-    if (item.pooled) free.push(item.node);
+    item.anim.cancel(); // back to the style sheet's opacity 0
+    if (!item.look) return; // the white flash copy stays in place for the next flash (tidy takes it away)
+    const idle = poolOf(item.floor).idle;
+    const list = idle.get(item.look);
+    if (list) list.push(item.node);
+    else idle.set(item.look, [item.node]);
   }
 
-  /** Puts one particle on the floor's effects layer and plays `frames`; null when the pool is used up (the effect is simply skipped). */
+  /** Takes the floor's idle particles out of its layer (the floor is not shown, or the effects went off). */
+  function dropPool(floor) {
+    const p = pools.get(floor);
+    if (!p) return;
+    for (const list of p.idle.values()) for (const node of list) node.remove();
+    pools.delete(floor);
+  }
+
+  /** Plays one particle on the floor's effects layer at (x, y) with `frames` (transforms relative to that point); null when the pool is used up (the effect is simply skipped). */
   function fly(floor, cls, text, x, y, frames, ms, { delay = 0, color = '', size = 0, easing = 'ease-out' } = {}) {
     if (!floor.layer || live.size >= H.pool.maxActive) return null;
-    let node = free.pop();
+    const look = `${cls}|${text ?? ''}|${color}|${size}`;
+    const p = poolOf(floor);
+    let node = p.idle.get(look)?.pop();
     if (!node) {
-      if (made >= H.pool.max) return null;
-      made++;
+      if (p.count >= H.pool.max) return null;
+      p.count++;
       node = document.createElement('i');
+      node.className = `fxh ${cls}`;
+      node.textContent = text ?? '';
+      if (size) node.style.fontSize = px(size);
+      if (color) node.style.setProperty('--c', color);
+      floor.layer.append(node);
     }
-    node.className = `fxh ${cls}`;
-    node.textContent = text ?? '';
-    node.style.left = px(x);
-    node.style.top = px(y);
-    node.style.fontSize = size ? px(size) : '';
-    if (color) node.style.setProperty('--c', color);
-    else node.style.removeProperty('--c');
-    floor.layer.append(node);
-    const anim = node.animate(frames, { duration: ms, delay, easing, fill: 'both' });
-    const item = { node, anim, floor, pooled: true };
+    const at = `translate(${px(x)}, ${px(y)}) `;
+    const anim = node.animate(frames.map((f) => ({ ...f, transform: at + f.transform })), { duration: ms, delay, easing, fill: 'both' });
+    const item = { node, anim, floor, look };
     live.add(item);
     anim.onfinish = anim.oncancel = () => release(item);
     return item;
@@ -108,25 +127,29 @@ export function init(ctx) {
       for (const [rec, v] of [...map]) {
         if (rec.frec !== floor) continue;
         (v.anim ?? v).cancel();
-        v.node?.remove();
+        if (!v.look) v.node?.remove(); // particles go back to the pool, the flash copy goes away
         map.delete(rec);
       }
     }
     shakes.get(floor)?.cancel();
     shakes.delete(floor);
+    dropPool(floor);
+    for (const node of floor.stage.querySelectorAll('.spr.fxw')) node.remove();
   }
 
   function tidyAll() {
-    for (const floor of new Set([...live].map((i) => i.floor))) tidyFloor(floor);
+    for (const floor of new Set([...live].map((i) => i.floor).concat([...pools.keys()]))) tidyFloor(floor);
     for (const map of [hitAnims, wiggles, flashes, combos]) {
       for (const [rec, v] of [...map]) {
         (v.anim ?? v).cancel();
-        v.node?.remove();
+        if (!v.look) v.node?.remove(); // particles go back to the pool, the flash copy goes away
         map.delete(rec);
       }
     }
     for (const a of shakes.values()) a.cancel();
     shakes.clear();
+    lastShake.clear();
+    for (const node of document.querySelectorAll('.spr.fxw')) node.remove(); // idle flash copies too
   }
 
   // ---- geometry: where things are, in floor pixels (the layer's own space) ----
@@ -197,15 +220,23 @@ export function init(ctx) {
     if (item) combos.set(rec, item);
   }
 
+  const flashCopies = new WeakMap(); // rec -> {node, kids}: the whitened copy of its picture, kept in place (opacity 0) between flashes
+
   function whiteFlash(rec, floor) {
     const F = H.flash;
     flashes.get(rec)?.anim.cancel();
-    const node = rec.spr.cloneNode(true); // a copy of the picture, whitened by a static filter (style sheet); only its opacity moves
-    node.className = 'spr fxw';
-    node.setAttribute('aria-hidden', 'true');
-    rec.flip.append(node);
-    const anim = node.animate([{ opacity: 0 }, { offset: 0.2, opacity: F.opacity }, { opacity: 0 }], { duration: F.ms, easing: 'ease-out' });
-    const item = { node, anim, floor, pooled: false };
+    let copy = flashCopies.get(rec);
+    const kids = rec.spr.childElementCount; // legs and the seated picture are added later: the copy is made again then
+    if (!copy || !copy.node.isConnected || copy.kids !== kids) {
+      copy?.node.remove();
+      const node = rec.spr.cloneNode(true); // a copy of the picture, whitened by a static filter (style sheet); only its opacity moves
+      node.className = 'spr fxw';
+      node.setAttribute('aria-hidden', 'true');
+      rec.flip.append(node);
+      flashCopies.set(rec, (copy = { node, kids }));
+    }
+    const anim = copy.node.animate([{ opacity: 0 }, { offset: 0.2, opacity: F.opacity }, { opacity: 0 }], { duration: F.ms, easing: 'ease-out' });
+    const item = { node: copy.node, anim, floor, look: '' };
     live.add(item);
     flashes.set(rec, item);
     anim.onfinish = anim.oncancel = () => {
@@ -214,8 +245,13 @@ export function init(ctx) {
     };
   }
 
+  const lastShake = new Map(); // floor -> when it last shook (a storm of pokes does not keep the whole room moving)
+
   function shakeFloor(floor) {
     const S = H.shake;
+    const now = performance.now();
+    if (now - (lastShake.get(floor) ?? -Infinity) < S.cooldownMs) return;
+    lastShake.set(floor, now);
     shakes.get(floor)?.cancel();
     const frames = [{ translate: '0px 0px' }];
     for (let i = 1; i <= S.steps; i++) {
@@ -284,8 +320,8 @@ export function init(ctx) {
     const name = typeOf(rec, persona);
     const T = H.types[name];
     if (!T) return;
+    const f = frame(rec); // measured before any style is written, so it does not force a layout pass
     rec.body.classList.remove('squash', 'fid-hop'); // our reaction replaces the office's own squash and hop
-    const f = frame(rec);
     const [ix, iy] = f.to(cx, cy);
     const li = levelIndex(level, H.hitStopMs);
     const miss = !!T.missChance && rng() < T.missChance[Math.min(li, T.missChance.length - 1)];

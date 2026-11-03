@@ -35,6 +35,12 @@ test('hit-stop: 50-90 ms, longer with the level, plus the type bonus (tough hold
   assert.ok(ms[0] >= 50 && ms[3] <= 90);
   assert.ok(ms.every((v, i) => i === 0 || v > ms[i - 1]));
   assert.equal(hitStopMs(1, H.types.tough, H), H.hitStopMs[0] + H.types.tough.stopBonus);
+  assert.equal(hitStopMs(4, H.types.tough, H), H.hitStopMs[3]); // the bonus never pushes it past the top of the window
+  for (const name of [...TYPES, 'cat']) {
+    const row = [1, 2, 3, 4].map((l) => hitStopMs(l, H.types[name], H));
+    assert.ok(row.every((v) => v >= 50 && v <= 90), `${name} hit-stop ${row} inside 50-90 ms`);
+    assert.ok(row.every((v, i) => i === 0 || v >= row[i - 1]), `${name} hit-stop ${row} does not shrink with the level`);
+  }
   assert.equal(hitStopMs(9, plain, H), H.hitStopMs[3]); // beyond the top level: the top level
   assert.equal(hitStopMs(0, plain, H), H.hitStopMs[0]);
 });

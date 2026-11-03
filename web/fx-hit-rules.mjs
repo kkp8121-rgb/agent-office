@@ -96,10 +96,10 @@ export function personaLine(persona, situation, rec, rng, last, pickLine) {
 
 // ---- time staging of a hit ----
 
-/** The hit-stop of a poke level in ms (config hitStopMs by level), plus the type's bonus (tough ones hold a little longer). */
+/** The hit-stop of a poke level in ms (config hitStopMs by level), plus the type's bonus (tough ones hold a little longer), never above the top level's value (the 50-90 ms window). */
 export function hitStopMs(level, p, H) {
   const at = Math.min(Math.max(level, 1), H.hitStopMs.length) - 1;
-  return H.hitStopMs[at] + (p.stopBonus ?? 0);
+  return Math.min(H.hitStopMs[at] + (p.stopBonus ?? 0), H.hitStopMs[H.hitStopMs.length - 1]);
 }
 
 const r3 = (n) => Math.round(n * 1000) / 1000;
