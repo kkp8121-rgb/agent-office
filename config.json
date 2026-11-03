@@ -78,7 +78,7 @@
           "officeLife": {
             "enabled": true,
             "everyMs": [5000, 10000], "firstDelayMs": [2000, 6000], "retryMs": 1500, "minTickMs": 500,
-            "charCooldownMs": 15000, "repeatWeight": 0.3, "neighborPx": 170, "arriveSnapPx": 30, "pollMs": 400, "pendingMs": 4000,
+            "charCooldownMs": 15000, "leadOwnChance": 0.6, "repeatWeight": 0.3, "neighborPx": 170, "arriveSnapPx": 30, "pollMs": 400, "pendingMs": 4000,
             "sayMs": 2400, "tailMs": 400, "replyMs": 1400, "logCap": 300,
             "acts": {
               "type": { "group": "desk", "states": ["working"], "weight": 4, "cooldownMs": 25000, "ms": 1700, "anim": "type" },
@@ -89,15 +89,15 @@
               "nod": { "group": "desk", "states": ["working"], "weight": 3, "cooldownMs": 35000, "ms": 1500, "anim": "nod" },
               "lean": { "group": "desk", "states": ["working", "thinking"], "needs": "neighbor", "weight": 2, "cooldownMs": 60000, "ms": 2300, "anim": "lean" },
               "roll": { "group": "desk", "states": ["working", "thinking"], "weight": 1.5, "cooldownMs": 70000, "ms": 1800, "anim": "roll" },
-              "eureka": { "group": "event", "states": ["working"], "weight": 0, "cooldownMs": 45000, "ms": 1200, "anim": "eureka", "prop": "bang", "line": "lifeEureka", "lineChance": 0.3 },
-              "coffee": { "group": "roam", "states": ["idle"], "weight": 3, "cooldownMs": 90000, "spotKinds": ["coffee", "water"], "stayMs": [9000, 16000], "ms": 2600, "anim": "sip", "prop": "mug", "line": "lifeCoffee" },
-              "plant": { "group": "roam", "states": ["idle"], "weight": 2, "cooldownMs": 120000, "spotKinds": ["plant"], "stayMs": [7000, 12000], "ms": 2400, "anim": "water", "prop": "drops", "line": "lifePlant" },
-              "window": { "group": "roam", "states": ["idle", "stale"], "weight": 3, "cooldownMs": 80000, "spotKinds": ["window"], "stayMs": [8000, 18000], "ms": 4200, "anim": "gaze", "line": "lifeWindow" },
-              "shelf": { "group": "roam", "states": ["idle"], "weight": 2, "cooldownMs": 90000, "spotKinds": ["shelf", "other"], "stayMs": [7000, 14000], "ms": 3000, "anim": "browse", "line": "lifeShelf" },
-              "sofa": { "group": "roam", "states": ["idle", "stale"], "weight": 2, "cooldownMs": 150000, "spotKinds": ["sofa"], "stayMs": [20000, 45000], "ms": 4200, "anim": "nap", "prop": "zzz", "line": "lifeNap" },
-              "board": { "group": "roam", "states": ["idle"], "weight": 2, "cooldownMs": 100000, "spotKinds": ["whiteboard"], "stayMs": [8000, 15000], "ms": 1600, "anim": "doodle", "prop": "note", "line": "lifeBoard" },
-              "snack": { "group": "roam", "states": ["idle"], "weight": 2, "cooldownMs": 150000, "spotKinds": ["coffee", "water"], "stayMs": [10000, 18000], "ms": 2600, "anim": "sip", "prop": "mug", "line": "lifeSnack" },
-              "visit": { "group": "roam", "states": ["idle"], "weight": 4, "cooldownMs": 90000, "bringKinds": ["coffee", "water"], "bringChance": 0.5, "pickupMs": 3000, "stayMs": [6000, 11000], "ms": 1500, "anim": "nod", "line": "lifeCheer", "bringLine": "lifeCheerCoffee", "replyLine": "lifeThanks" }
+              "eureka": { "group": "event", "states": ["working"], "weight": 0, "cooldownMs": 90000, "minThinkMs": 12000, "ms": 1200, "anim": "eureka", "prop": "bang", "line": "lifeEureka", "lineChance": 0.3 },
+              "coffee": { "group": "roam", "states": ["idle", "enter"], "weight": 3, "cooldownMs": 90000, "spotKinds": ["coffee", "water"], "stayMs": [9000, 16000], "ms": 2600, "anim": "sip", "prop": "mug", "line": "lifeCoffee" },
+              "plant": { "group": "roam", "states": ["idle", "enter"], "weight": 2, "cooldownMs": 120000, "spotKinds": ["plant"], "stayMs": [7000, 12000], "ms": 2400, "anim": "water", "prop": "drops", "line": "lifePlant" },
+              "window": { "group": "roam", "states": ["idle", "enter", "stale"], "weight": 3, "cooldownMs": 80000, "spotKinds": ["window"], "stayMs": [8000, 18000], "ms": 4200, "anim": "gaze", "line": "lifeWindow" },
+              "shelf": { "group": "roam", "states": ["idle", "enter"], "weight": 2, "cooldownMs": 90000, "spotKinds": ["shelf", "other"], "stayMs": [7000, 14000], "ms": 3000, "anim": "browse", "line": "lifeShelf" },
+              "sofa": { "group": "roam", "states": ["idle", "enter", "stale"], "weight": 2, "cooldownMs": 150000, "spotKinds": ["sofa"], "stayMs": [20000, 45000], "ms": 4200, "anim": "nap", "prop": "zzz", "line": "lifeNap" },
+              "board": { "group": "roam", "states": ["idle", "enter"], "weight": 2, "cooldownMs": 100000, "spotKinds": ["whiteboard"], "stayMs": [8000, 15000], "ms": 1600, "anim": "doodle", "prop": "note", "line": "lifeBoard" },
+              "snack": { "group": "roam", "states": ["idle", "enter"], "weight": 2, "cooldownMs": 150000, "spotKinds": ["coffee", "water"], "stayMs": [10000, 18000], "ms": 2600, "anim": "sip", "prop": "mug", "line": "lifeSnack" },
+              "visit": { "group": "roam", "states": ["idle", "enter"], "weight": 4, "cooldownMs": 90000, "bringKinds": ["coffee", "water"], "bringChance": 0.5, "pickupMs": 3000, "stayMs": [6000, 11000], "ms": 1500, "anim": "nod", "line": "lifeCheer", "bringLine": "lifeCheerCoffee", "replyLine": "lifeThanks" }
             },
             "cat": {
               "enabled": true, "ownChance": 0.75, "repeatWeight": 0.4,

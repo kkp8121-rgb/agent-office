@@ -120,7 +120,7 @@ export function chooseLifeAct(rng, L, snap, mem, opts = {}) {
   const options = [];
   for (const [kind, def] of Object.entries(L.acts)) {
     if (def.group === 'event' || (opts.group && def.group !== opts.group)) continue;
-    const who = pool.filter((m) => def.states.includes(m.state) && !(def.group === 'roam' && m.isLead) && ready(mem, L, m.id, kind, snap.now));
+    const who = pool.filter((m) => def.states.includes(m.state) && ready(mem, L, m.id, kind, snap.now));
     if (!who.length) continue;
     const make = BUILD[def.group === 'desk' ? 'desk' : (BUILD[kind] ? kind : 'spot')](rng, L, def, kind, snap, who, room);
     if (make) options.push({ w: def.weight * (kind === snap.lastKind ? L.repeatWeight : 1), make });
@@ -418,7 +418,7 @@ export function init(ctx) {
 
   /** The floor clock asks for the trip of `rec`: a chosen one first, else (a natural trip of an idle or stale character) a new choice. */
   ctx.life.addTripPicker((f, rec) => {
-    if (!isFloor(f) || !ctx.floorActive(f) || rec.isLead) return null;
+    if (!isFloor(f) || !ctx.floorActive(f)) return null;
     const s = stateOf(f);
     const p = pending.get(rec);
     if (p) {
@@ -427,6 +427,7 @@ export function init(ctx) {
       beginRoam(f, rec, p.kind, p.legs);
       return p.legs;
     }
+    if (rec.isLead && s.rng() >= L.leadOwnChance) return null; // an idle lead goes on its desk tour (the office's own rules) part of the time
     const snap = snapshot(f, s);
     const pick = chooseLifeAct(s.rng, L, snap, s.mem, { only: idOf(rec), group: 'roam' });
     if (!pick || pick.picks.length !== 1) return null; // a pair is the director's job
@@ -522,9 +523,12 @@ export function init(ctx) {
   fx.onFx('report', ({ rec, lead }) => { stopOf(rec); stopOf(lead); }, always);
   fx.onFx('high-five', ({ a, b }) => { stopOf(a); stopOf(b); }, always);
   fx.onFx('meeting-start', ({ floor }) => { for (const rec of ctx.chars(floor)) { stopOf(rec); if (roamers.has(rec)) endRoam(rec); } }, always);
+  const thinkSince = new Map(); // rec -> when it began thinking: a eureka needs a real stretch of thinking before
   fx.onFx('state', ({ rec, from, to }) => {
+    if (to === 'thinking') thinkSince.set(rec, ctx.now());
     if (roamers.has(rec) && headsBack(to, true)) stopOf(rec); // the office walks it home; the poll ends the trip
-    if (from === 'thinking' && to === 'working' && !rec.isCat) eureka(rec);
+    if (from === 'thinking' && to === 'working' && !rec.isCat && ctx.now() - (thinkSince.get(rec) ?? ctx.now()) >= L.acts.eureka.minThinkMs) eureka(rec);
+    if (to !== 'thinking') thinkSince.delete(rec);
   }, always);
   fx.onFx('floor-hidden', ({ floor, removed }) => {
     for (const rec of ctx.chars(floor)) { stopOf(rec); if (roamers.has(rec)) endRoam(rec); }
@@ -545,7 +549,7 @@ export function init(ctx) {
     if (!f || !isFloor(f) || !ctx.floorActive(f) || f.meeting) return;
     const s = stateOf(f);
     const t = ctx.now();
-    if (!ready(s.mem, L, idOf(rec), 'eureka', t) || !isFree({ ...rec, busy: acts.has(rec), gone: rec.el.classList.contains('gone') })) return;
+    if (t - (s.mem.chars.get(idOf(rec))?.kinds.eureka ?? -Infinity) < L.acts.eureka.cooldownMs || !isFree({ ...rec, busy: acts.has(rec), gone: rec.el.classList.contains('gone') })) return;
     noteStart(s.mem, idOf(rec), 'eureka', t);
     startDesk(f, rec, 'eureka');
   }

@@ -100,18 +100,19 @@
 .life-prop {
   position: absolute; left: 20px; bottom: 36px; display: block; font-style: normal; font-weight: 800; font-size: 13px; line-height: 1;
   color: var(--ink); pointer-events: none; will-change: transform, opacity;
+  text-shadow: -1px 0 var(--paper), 1px 0 var(--paper), 0 -1px var(--paper), 0 1px var(--paper); /* static outline so it reads on any floor */
 }
 .agt.sitting .life-prop { bottom: 22px; }
-.life-p-mug { left: 21px; bottom: 30px; width: 8px; height: 7px; background: var(--paper); border: 1.5px solid var(--ink); border-top-width: 1px; border-radius: 0 0 2px 2px; box-sizing: border-box; }
-.agt.sitting .life-p-mug { bottom: 18px; }
+.life-p-mug { left: -27px; bottom: 28px; width: 8px; height: 7px; background: var(--paper); border: 1.5px solid var(--ink); border-top-width: 1px; border-radius: 0 0 2px 2px; box-sizing: border-box; }
+.agt.sitting .life-p-mug { bottom: 16px; }
 .life-p-mug::before { content: ""; position: absolute; right: -4px; top: 0; width: 3px; height: 3px; border: 1.5px solid var(--ink); border-left: 0; border-radius: 0 2px 2px 0; }
 .life-p-mug::after { content: ""; position: absolute; left: 1px; top: -7px; width: 4px; height: 5px; border-radius: 50%; background: var(--paper); opacity: 0; animation: life-steam 1.6s ease-out infinite; }
-.life-p-note { color: #b8741a; font-size: 12px; bottom: 56px; left: 12px; animation: life-float 1.3s ease-out infinite; }
-.agt.sitting .life-p-note { bottom: 44px; }
-.life-p-bang { color: #d9382b; font-size: 17px; bottom: 62px; left: 15px; animation: life-pop 1.2s ease-out both; }
-.agt.sitting .life-p-bang { bottom: 48px; }
-.life-p-zzz { color: var(--zz-agt, #5a49a0); font-size: 11px; letter-spacing: 1px; bottom: 56px; left: 14px; animation: life-drift 2.6s ease-in-out infinite; }
-.life-p-drops { color: #3f9bdc; font-size: 9px; bottom: 26px; left: 24px; letter-spacing: 3px; animation: life-drip 1s ease-in infinite; }
+.life-p-note { color: #b8741a; font-size: 15px; bottom: 58px; left: 16px; animation: life-float 1.3s ease-out infinite; }
+.agt.sitting .life-p-note { bottom: 46px; }
+.life-p-bang { color: #d9382b; font-size: 22px; bottom: 60px; left: 16px; animation: life-pop 1.2s ease-out both; }
+.agt.sitting .life-p-bang { bottom: 46px; }
+.life-p-zzz { color: var(--zz-agt, #5a49a0); font-size: 14px; letter-spacing: 1px; bottom: 58px; left: 14px; animation: life-drift 2.6s ease-in-out infinite; }
+.life-p-drops { color: #3f9bdc; font-size: 12px; bottom: 24px; left: 22px; letter-spacing: 3px; animation: life-drip 1s ease-in infinite; }
 .life-p-drops::before { content: "\2022 \2022"; }
 
 @keyframes life-steam { 0% { transform: translate(0, 3px) scale(.6); opacity: 0; } 30% { opacity: .85; } 100% { transform: translate(1px, -5px) scale(1.1); opacity: 0; } }

@@ -107,11 +107,13 @@ test('rules: a working or thinking character never gets a roaming activity, and 
   const starts = run(simFloor(), 30);
   assert.ok(starts.length > 50);
   for (const { pick, members } of starts) {
-    if (pick.group === 'roam') for (const p of pick.picks) assert.ok(['idle', 'stale'].includes(stateOf(members, p.id)), `${pick.kind} for ${stateOf(members, p.id)}`);
+    if (pick.group === 'roam') for (const p of pick.picks) assert.ok(['idle', 'enter', 'stale'].includes(stateOf(members, p.id)), `${pick.kind} for ${stateOf(members, p.id)}`);
     else assert.ok(L.acts[pick.kind].states.includes(stateOf(members, pick.id)), `${pick.kind} for ${stateOf(members, pick.id)}`);
   }
   assert.ok(starts.some((s) => s.pick.group === 'roam') && starts.some((s) => s.pick.group === 'desk'), 'both groups happen');
-  assert.ok(!starts.some((s) => s.pick.group === 'roam' && s.pick.picks.some((p) => p.id === 'lead')), 'the lead keeps to the desk activities');
+  assert.ok(!starts.some((s) => s.pick.group === 'roam' && s.pick.picks.some((p) => p.id === 'lead')), 'a working lead keeps to the desk activities');
+  const idleLead = run(simFloor(ROSTER.map((m) => (m.isLead ? { ...m, state: 'idle' } : m))), 30, 'lead');
+  assert.ok(idleLead.some((s) => s.pick.group === 'roam' && s.pick.picks.some((p) => p.id === 'lead')), 'an idle lead (the only one who is ever idle) roams too');
 });
 
 test('rules: with only working characters on a floor nothing ever leaves a desk', () => {
@@ -487,16 +489,28 @@ test('office: props (mug, note, zzz) come only with the effects on; the gestures
   }
 });
 
-test('office: eureka when thinking turns into working, but only for a free character and not twice in a row', () => {
+test('office: eureka when thinking turns into working, but only after real thinking, for a free character and not twice in a row', () => {
   const o = fakeOffice();
   const rec = o.byId('w3');
+  const quick = o.byId('w2');
+  o.fx.emit('state', { rec: quick, from: 'working', to: 'thinking' });
+  o.advance(2000);
+  quick.state = 'working';
+  o.fx.emit('state', { rec: quick, from: 'thinking', to: 'working' });
+  assert.ok(!lifeClasses(quick).includes('life-eureka'), 'a short think is not a eureka');
+  o.fx.emit('state', { rec, from: 'working', to: 'thinking' });
+  o.advance(L.acts.eureka.minThinkMs + 1);
   rec.state = 'working';
+  o.fx.emit('poke', { rec }); // whatever it was doing ends
   o.fx.emit('state', { rec, from: 'thinking', to: 'working' });
   assert.ok(lifeClasses(rec).includes('life-eureka'));
   o.advance(5000);
   assert.equal(lifeClasses(rec).length, 0 || lifeClasses(rec).filter((c) => c === 'life-eureka').length);
   const again = fakeOffice();
   const r2 = again.byId('w3');
+  again.fx.emit('state', { rec: r2, from: 'working', to: 'thinking' });
+  again.advance(L.acts.eureka.minThinkMs + 1);
+  again.fx.emit('poke', { rec: r2 });
   r2.grab = {};
   again.fx.emit('state', { rec: r2, from: 'thinking', to: 'working' });
   assert.ok(!lifeClasses(r2).includes('life-eureka'), 'not while held');
