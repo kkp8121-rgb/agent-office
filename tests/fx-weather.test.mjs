@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { seeded, tileSvg, motion, layerBox, layersFor, lightTarget, fadePlan, planBurst, flashFrames, glowSpots } from '../web/fx-weather.mjs';
+import { seeded, tileSvg, motion, layerBox, layersFor, lightTarget, fadePlan, planBurst, flashFrames, glowSpots, glowClip } from '../web/fx-weather.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const cfg = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8')).ui.fx.weather;
@@ -87,4 +87,24 @@ test('glow spots: only seated, present, working or thinking characters', () => {
   const spots = glowSpots(recs, cfg);
   assert.equal(spots.length, 2);
   assert.deepEqual([spots[0].x, spots[0].y], [100 + cfg.glow.offset[0], 50 + cfg.glow.offset[1]]);
+});
+
+test('glow clip: the box minus the monitor back, per design and desk kind; unknown design or no holes: no clip', () => {
+  const { size, holes } = cfg.glow;
+  for (const design of ['studio2', 'lounge', 'library', 'greenhouse']) {
+    for (const [kind, lead] of [['desk', false], ['lead', true]]) {
+      const pts = holes[design][kind];
+      assert.ok(pts.length >= 3, `${design}/${kind} is a polygon`);
+      const clip = glowClip(size, holes, design, lead);
+      assert.ok(clip.startsWith(`path(evenodd, "M0 0H${size[0]}V${size[1]}H0Z M`), clip);
+      assert.equal((clip.match(/ L/g) ?? []).length, pts.length - 1);
+    }
+  }
+  assert.equal(glowClip(size, holes, 'lobby', false), '');
+  assert.equal(glowClip(size, undefined, 'studio2', false), '');
+  assert.deepEqual(glowSpots([{ seated: true, state: 'working', x: 1, y: 1, isLead: true }, { seated: true, state: 'working', x: 2, y: 2 }], cfg).map((w) => w.lead), [true, false]);
+});
+
+test('glow position: the centre is up on the face and chest, so the light reaches the character and the monitor ornaments stay outside it', () => {
+  assert.ok(cfg.glow.offset[1] <= -20, 'above the monitor top, not on the monitor');
 });

@@ -165,9 +165,21 @@ export function glowSpots(recs, cfg) {
   const out = [];
   for (const rec of recs) {
     if (!rec.seated || rec.away || !cfg.glow.states.includes(rec.state)) continue;
-    out.push({ rec, x: Math.round(rec.x + cfg.glow.offset[0]), y: Math.round(rec.y + cfg.glow.offset[1]) });
+    out.push({ rec, x: Math.round(rec.x + cfg.glow.offset[0]), y: Math.round(rec.y + cfg.glow.offset[1]), lead: Boolean(rec.isLead) });
   }
   return out;
+}
+
+/**
+ * The clip of one glow: its box minus the back of the monitor on the desk. The seated one faces the screen, so the viewer sees only the dark
+ * back panel; the light falls on the face, the upper body and the desk around it, never on the panel. `holes` (cfg.glow.holes) holds, per design and
+ * desk kind (desk | lead), the panel's outline as points in scene pixels around the glow's centre. Nothing known for a design: no clip.
+ */
+export function glowClip(size, holes, design, lead) {
+  const pts = holes?.[design]?.[lead ? 'lead' : 'desk'];
+  if (!pts?.length) return '';
+  const [w, h] = size;
+  return `path(evenodd, "M0 0H${w}V${h}H0Z M${pts.map(([x, y]) => `${x + w / 2} ${y + h / 2}`).join(' L')}Z")`;
 }
 
 // ---------------------------------------------------------------- DOM part
@@ -279,6 +291,8 @@ export function init(ctx) {
         el = doc.createElement('div');
         el.className = 'fxw-glow';
         Object.assign(el.style, { left: `${w.x - cfg.glow.size[0] / 2}px`, top: `${w.y - cfg.glow.size[1] / 2}px`, width: `${cfg.glow.size[0]}px`, height: `${cfg.glow.size[1]}px`, opacity: '0' });
+        const clip = glowClip(cfg.glow.size, cfg.glow.holes, floor.design, w.lead);
+        if (clip) el.style.clipPath = clip;
         floor.layer.append(el);
         void el.offsetWidth; // one reflow so the first opacity change is a transition
         st.glows.set(w.rec, el);
