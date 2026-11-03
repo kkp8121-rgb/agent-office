@@ -1,0 +1,4005 @@
+{
+ "version": 1,
+ "atlas": "decor.png",
+ "items": {
+  "fig-bear": {
+   "rect": [
+    354,
+    68,
+    10,
+    13
+   ],
+   "anchor": [
+    4,
+    11
+   ],
+   "slot": "surface",
+   "tags": [
+    "figure",
+    "toy"
+   ]
+  },
+  "fig-cat": {
+   "rect": [
+    408,
+    68,
+    10,
+    12
+   ],
+   "anchor": [
+    4,
+    10
+   ],
+   "slot": "surface",
+   "tags": [
+    "figure",
+    "toy"
+   ]
+  },
+  "fig-bunny": {
+   "rect": [
+    300,
+    68,
+    9,
+    14
+   ],
+   "anchor": [
+    4,
+    12
+   ],
+   "slot": "surface",
+   "tags": [
+    "figure",
+    "toy"
+   ]
+  },
+  "fig-penguin": {
+   "rect": [
+    376,
+    68,
+    9,
+    13
+   ],
+   "anchor": [
+    4,
+    11
+   ],
+   "slot": "surface",
+   "tags": [
+    "figure",
+    "toy"
+   ]
+  },
+  "fig-dino": {
+   "rect": [
+    487,
+    68,
+    12,
+    11
+   ],
+   "anchor": [
+    5,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "figure",
+    "toy"
+   ]
+  },
+  "fig-owl": {
+   "rect": [
+    441,
+    68,
+    9,
+    12
+   ],
+   "anchor": [
+    4,
+    10
+   ],
+   "slot": "surface",
+   "tags": [
+    "figure",
+    "toy"
+   ]
+  },
+  "fig-fox": {
+   "rect": [
+    396,
+    68,
+    11,
+    12
+   ],
+   "anchor": [
+    5,
+    10
+   ],
+   "slot": "surface",
+   "tags": [
+    "figure",
+    "toy"
+   ]
+  },
+  "fig-frog": {
+   "rect": [
+    97,
+    97,
+    10,
+    9
+   ],
+   "anchor": [
+    4,
+    7
+   ],
+   "slot": "surface",
+   "tags": [
+    "figure",
+    "toy"
+   ]
+  },
+  "fig-ghost": {
+   "rect": [
+    451,
+    68,
+    9,
+    12
+   ],
+   "anchor": [
+    4,
+    10
+   ],
+   "slot": "surface",
+   "tags": [
+    "figure",
+    "toy"
+   ]
+  },
+  "fig-astronaut": {
+   "rect": [
+    386,
+    68,
+    9,
+    13
+   ],
+   "anchor": [
+    4,
+    11
+   ],
+   "slot": "surface",
+   "tags": [
+    "figure",
+    "toy"
+   ]
+  },
+  "toy-robot": {
+   "rect": [
+    310,
+    68,
+    9,
+    14
+   ],
+   "anchor": [
+    4,
+    12
+   ],
+   "slot": "surface",
+   "tags": [
+    "figure",
+    "toy",
+    "tech"
+   ]
+  },
+  "fig-bobblehead": {
+   "rect": [
+    320,
+    68,
+    9,
+    14
+   ],
+   "anchor": [
+    4,
+    12
+   ],
+   "slot": "surface",
+   "tags": [
+    "figure",
+    "toy",
+    "personal"
+   ]
+  },
+  "plush-heart": {
+   "rect": [
+    387,
+    85,
+    10,
+    10
+   ],
+   "anchor": [
+    4,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "toy",
+    "plush"
+   ]
+  },
+  "rubber-duck": {
+   "rect": [
+    500,
+    68,
+    11,
+    11
+   ],
+   "anchor": [
+    5,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "toy",
+    "figure"
+   ]
+  },
+  "lucky-cat": {
+   "rect": [
+    365,
+    68,
+    10,
+    13
+   ],
+   "anchor": [
+    4,
+    11
+   ],
+   "slot": "surface",
+   "tags": [
+    "figure",
+    "personal",
+    "charm"
+   ]
+  },
+  "toy-rocket": {
+   "rect": [
+    471,
+    68,
+    7,
+    12
+   ],
+   "anchor": [
+    3,
+    10
+   ],
+   "slot": "surface",
+   "tags": [
+    "toy",
+    "figure"
+   ]
+  },
+  "toy-blocks": {
+   "rect": [
+    108,
+    97,
+    10,
+    9
+   ],
+   "anchor": [
+    4,
+    7
+   ],
+   "slot": "surface",
+   "tags": [
+    "toy"
+   ]
+  },
+  "rubik-cube": {
+   "rect": [
+    24,
+    85,
+    10,
+    11
+   ],
+   "anchor": [
+    4,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "toy"
+   ]
+  },
+  "dice-red": {
+   "rect": [
+    464,
+    85,
+    9,
+    10
+   ],
+   "anchor": [
+    4,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "toy"
+   ]
+  },
+  "game-controller": {
+   "rect": [
+    34,
+    97,
+    12,
+    9
+   ],
+   "anchor": [
+    5,
+    7
+   ],
+   "slot": "surface",
+   "tags": [
+    "tech",
+    "toy"
+   ]
+  },
+  "plant-cactus": {
+   "rect": [
+    330,
+    68,
+    9,
+    14
+   ],
+   "anchor": [
+    4,
+    12
+   ],
+   "slot": "surface",
+   "tags": [
+    "plant"
+   ]
+  },
+  "plant-succulent": {
+   "rect": [
+    398,
+    85,
+    10,
+    10
+   ],
+   "anchor": [
+    4,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "plant"
+   ]
+  },
+  "plant-tulips": {
+   "rect": [
+    101,
+    85,
+    9,
+    11
+   ],
+   "anchor": [
+    4,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "plant"
+   ]
+  },
+  "plant-bonsai": {
+   "rect": [
+    340,
+    68,
+    13,
+    13
+   ],
+   "anchor": [
+    6,
+    11
+   ],
+   "slot": "surface",
+   "tags": [
+    "plant"
+   ]
+  },
+  "plant-sprout": {
+   "rect": [
+    19,
+    97,
+    7,
+    10
+   ],
+   "anchor": [
+    3,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "plant"
+   ]
+  },
+  "mug-red": {
+   "rect": [
+    119,
+    97,
+    9,
+    9
+   ],
+   "anchor": [
+    4,
+    7
+   ],
+   "slot": "surface",
+   "tags": [
+    "mug"
+   ]
+  },
+  "mug-blue": {
+   "rect": [
+    129,
+    97,
+    9,
+    9
+   ],
+   "anchor": [
+    4,
+    7
+   ],
+   "slot": "surface",
+   "tags": [
+    "mug"
+   ]
+  },
+  "mug-green": {
+   "rect": [
+    139,
+    97,
+    9,
+    9
+   ],
+   "anchor": [
+    4,
+    7
+   ],
+   "slot": "surface",
+   "tags": [
+    "mug"
+   ]
+  },
+  "mug-white": {
+   "rect": [
+    149,
+    97,
+    9,
+    9
+   ],
+   "anchor": [
+    4,
+    7
+   ],
+   "slot": "surface",
+   "tags": [
+    "mug"
+   ]
+  },
+  "mug-yellow": {
+   "rect": [
+    159,
+    97,
+    9,
+    9
+   ],
+   "anchor": [
+    4,
+    7
+   ],
+   "slot": "surface",
+   "tags": [
+    "mug"
+   ]
+  },
+  "mug-teal": {
+   "rect": [
+    169,
+    97,
+    9,
+    9
+   ],
+   "anchor": [
+    4,
+    7
+   ],
+   "slot": "surface",
+   "tags": [
+    "mug"
+   ]
+  },
+  "mug-violet": {
+   "rect": [
+    179,
+    97,
+    9,
+    9
+   ],
+   "anchor": [
+    4,
+    7
+   ],
+   "slot": "surface",
+   "tags": [
+    "mug"
+   ]
+  },
+  "teacup": {
+   "rect": [
+    73,
+    97,
+    11,
+    9
+   ],
+   "anchor": [
+    5,
+    7
+   ],
+   "slot": "surface",
+   "tags": [
+    "mug"
+   ]
+  },
+  "cup-takeout": {
+   "rect": [
+    141,
+    85,
+    8,
+    11
+   ],
+   "anchor": [
+    3,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "mug",
+    "food"
+   ]
+  },
+  "cup-takeout-green": {
+   "rect": [
+    150,
+    85,
+    8,
+    11
+   ],
+   "anchor": [
+    3,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "mug",
+    "food"
+   ]
+  },
+  "drink-iced": {
+   "rect": [
+    27,
+    97,
+    6,
+    10
+   ],
+   "anchor": [
+    2,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "mug",
+    "food"
+   ]
+  },
+  "pen-cup": {
+   "rect": [
+    474,
+    85,
+    9,
+    10
+   ],
+   "anchor": [
+    4,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "note",
+    "tech"
+   ]
+  },
+  "candle-pink": {
+   "rect": [
+    186,
+    85,
+    7,
+    11
+   ],
+   "anchor": [
+    3,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "food",
+    "charm"
+   ]
+  },
+  "candle-teal": {
+   "rect": [
+    194,
+    85,
+    7,
+    11
+   ],
+   "anchor": [
+    3,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "food",
+    "charm"
+   ]
+  },
+  "book-stack-a": {
+   "rect": [
+    47,
+    97,
+    12,
+    9
+   ],
+   "anchor": [
+    5,
+    7
+   ],
+   "slot": "surface",
+   "tags": [
+    "book"
+   ]
+  },
+  "book-stack-b": {
+   "rect": [
+    0,
+    85,
+    11,
+    11
+   ],
+   "anchor": [
+    5,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "book"
+   ]
+  },
+  "photo-frame": {
+   "rect": [
+    189,
+    97,
+    9,
+    9
+   ],
+   "anchor": [
+    4,
+    7
+   ],
+   "slot": "surface",
+   "tags": [
+    "note",
+    "personal"
+   ]
+  },
+  "photo-frame-pair": {
+   "rect": [
+    219,
+    97,
+    11,
+    8
+   ],
+   "anchor": [
+    5,
+    6
+   ],
+   "slot": "surface",
+   "tags": [
+    "note",
+    "personal"
+   ]
+  },
+  "desk-calendar": {
+   "rect": [
+    484,
+    85,
+    9,
+    10
+   ],
+   "anchor": [
+    4,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "note"
+   ]
+  },
+  "sticky-pad-yellow": {
+   "rect": [
+    255,
+    97,
+    8,
+    8
+   ],
+   "anchor": [
+    3,
+    6
+   ],
+   "slot": "surface",
+   "tags": [
+    "note"
+   ]
+  },
+  "sticky-pad-pink": {
+   "rect": [
+    264,
+    97,
+    8,
+    8
+   ],
+   "anchor": [
+    3,
+    6
+   ],
+   "slot": "surface",
+   "tags": [
+    "note"
+   ]
+  },
+  "sticky-pad-blue": {
+   "rect": [
+    273,
+    97,
+    8,
+    8
+   ],
+   "anchor": [
+    3,
+    6
+   ],
+   "slot": "surface",
+   "tags": [
+    "note"
+   ]
+  },
+  "stapler": {
+   "rect": [
+    372,
+    97,
+    10,
+    7
+   ],
+   "anchor": [
+    4,
+    5
+   ],
+   "slot": "surface",
+   "tags": [
+    "note"
+   ]
+  },
+  "alarm-clock": {
+   "rect": [
+    419,
+    68,
+    10,
+    12
+   ],
+   "anchor": [
+    4,
+    10
+   ],
+   "slot": "surface",
+   "tags": [
+    "tech"
+   ]
+  },
+  "trophy-small": {
+   "rect": [
+    159,
+    85,
+    8,
+    11
+   ],
+   "anchor": [
+    3,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ]
+  },
+  "globe-desk": {
+   "rect": [
+    430,
+    68,
+    10,
+    12
+   ],
+   "anchor": [
+    4,
+    10
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ]
+  },
+  "fan-desk": {
+   "rect": [
+    461,
+    68,
+    9,
+    12
+   ],
+   "anchor": [
+    4,
+    10
+   ],
+   "slot": "surface",
+   "tags": [
+    "tech"
+   ]
+  },
+  "headphones": {
+   "rect": [
+    60,
+    97,
+    12,
+    9
+   ],
+   "anchor": [
+    5,
+    7
+   ],
+   "slot": "surface",
+   "tags": [
+    "tech",
+    "personal"
+   ]
+  },
+  "snack-chips": {
+   "rect": [
+    494,
+    85,
+    9,
+    10
+   ],
+   "anchor": [
+    4,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "food"
+   ]
+  },
+  "cookie-jar": {
+   "rect": [
+    111,
+    85,
+    9,
+    11
+   ],
+   "anchor": [
+    4,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "food"
+   ]
+  },
+  "lamp-red": {
+   "rect": [
+    409,
+    85,
+    10,
+    10
+   ],
+   "anchor": [
+    4,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "tech"
+   ]
+  },
+  "lamp-green": {
+   "rect": [
+    420,
+    85,
+    10,
+    10
+   ],
+   "anchor": [
+    4,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "tech"
+   ]
+  },
+  "aquarium": {
+   "rect": [
+    349,
+    85,
+    12,
+    10
+   ],
+   "anchor": [
+    5,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "tech",
+    "figure"
+   ]
+  },
+  "fishbowl": {
+   "rect": [
+    35,
+    85,
+    10,
+    11
+   ],
+   "anchor": [
+    4,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "figure"
+   ]
+  },
+  "hourglass": {
+   "rect": [
+    10,
+    97,
+    8,
+    10
+   ],
+   "anchor": [
+    3,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ]
+  },
+  "speaker": {
+   "rect": [
+    199,
+    97,
+    9,
+    9
+   ],
+   "anchor": [
+    4,
+    7
+   ],
+   "slot": "surface",
+   "tags": [
+    "tech"
+   ]
+  },
+  "top-cat": {
+   "rect": [
+    231,
+    97,
+    11,
+    8
+   ],
+   "anchor": [
+    5,
+    7
+   ],
+   "slot": "monitorTop",
+   "tags": [
+    "figure",
+    "toy"
+   ]
+  },
+  "top-alien": {
+   "rect": [
+    209,
+    97,
+    9,
+    9
+   ],
+   "anchor": [
+    4,
+    8
+   ],
+   "slot": "monitorTop",
+   "tags": [
+    "figure",
+    "toy"
+   ]
+  },
+  "top-bear": {
+   "rect": [
+    282,
+    97,
+    8,
+    8
+   ],
+   "anchor": [
+    3,
+    7
+   ],
+   "slot": "monitorTop",
+   "tags": [
+    "figure",
+    "toy"
+   ]
+  },
+  "top-plant": {
+   "rect": [
+    336,
+    97,
+    7,
+    8
+   ],
+   "anchor": [
+    3,
+    7
+   ],
+   "slot": "monitorTop",
+   "tags": [
+    "plant"
+   ]
+  },
+  "top-duck": {
+   "rect": [
+    383,
+    97,
+    9,
+    7
+   ],
+   "anchor": [
+    4,
+    6
+   ],
+   "slot": "monitorTop",
+   "tags": [
+    "figure",
+    "toy"
+   ]
+  },
+  "top-ghost": {
+   "rect": [
+    344,
+    97,
+    7,
+    8
+   ],
+   "anchor": [
+    3,
+    7
+   ],
+   "slot": "monitorTop",
+   "tags": [
+    "figure",
+    "toy"
+   ]
+  },
+  "webcam": {
+   "rect": [
+    393,
+    97,
+    8,
+    7
+   ],
+   "anchor": [
+    3,
+    6
+   ],
+   "slot": "monitorTop",
+   "tags": [
+    "tech"
+   ]
+  },
+  "sticker-star": {
+   "rect": [
+    420,
+    97,
+    7,
+    7
+   ],
+   "anchor": [
+    3,
+    6
+   ],
+   "slot": "bezel",
+   "tags": [
+    "sticker"
+   ]
+  },
+  "sticker-heart": {
+   "rect": [
+    428,
+    97,
+    7,
+    7
+   ],
+   "anchor": [
+    3,
+    6
+   ],
+   "slot": "bezel",
+   "tags": [
+    "sticker"
+   ]
+  },
+  "sticker-cat": {
+   "rect": [
+    402,
+    97,
+    8,
+    7
+   ],
+   "anchor": [
+    3,
+    6
+   ],
+   "slot": "bezel",
+   "tags": [
+    "sticker"
+   ]
+  },
+  "sticker-bolt": {
+   "rect": [
+    352,
+    97,
+    7,
+    8
+   ],
+   "anchor": [
+    3,
+    7
+   ],
+   "slot": "bezel",
+   "tags": [
+    "sticker"
+   ]
+  },
+  "sticker-smile": {
+   "rect": [
+    411,
+    97,
+    8,
+    7
+   ],
+   "anchor": [
+    3,
+    6
+   ],
+   "slot": "bezel",
+   "tags": [
+    "sticker"
+   ]
+  },
+  "sticker-moon": {
+   "rect": [
+    468,
+    97,
+    6,
+    7
+   ],
+   "anchor": [
+    2,
+    6
+   ],
+   "slot": "bezel",
+   "tags": [
+    "sticker"
+   ]
+  },
+  "sticker-flower": {
+   "rect": [
+    436,
+    97,
+    7,
+    7
+   ],
+   "anchor": [
+    3,
+    6
+   ],
+   "slot": "bezel",
+   "tags": [
+    "sticker"
+   ]
+  },
+  "sticker-rainbow": {
+   "rect": [
+    475,
+    97,
+    9,
+    6
+   ],
+   "anchor": [
+    4,
+    5
+   ],
+   "slot": "bezel",
+   "tags": [
+    "sticker"
+   ]
+  },
+  "sticker-mushroom": {
+   "rect": [
+    444,
+    97,
+    7,
+    7
+   ],
+   "anchor": [
+    3,
+    6
+   ],
+   "slot": "bezel",
+   "tags": [
+    "sticker"
+   ]
+  },
+  "sticker-sparkle": {
+   "rect": [
+    452,
+    97,
+    7,
+    7
+   ],
+   "anchor": [
+    3,
+    6
+   ],
+   "slot": "bezel",
+   "tags": [
+    "sticker"
+   ]
+  },
+  "sticker-skull": {
+   "rect": [
+    460,
+    97,
+    7,
+    7
+   ],
+   "anchor": [
+    3,
+    6
+   ],
+   "slot": "bezel",
+   "tags": [
+    "sticker"
+   ]
+  },
+  "note-yellow": {
+   "rect": [
+    291,
+    97,
+    8,
+    8
+   ],
+   "anchor": [
+    3,
+    7
+   ],
+   "slot": "monitorEdge",
+   "tags": [
+    "note"
+   ]
+  },
+  "note-pink": {
+   "rect": [
+    300,
+    97,
+    8,
+    8
+   ],
+   "anchor": [
+    3,
+    7
+   ],
+   "slot": "monitorEdge",
+   "tags": [
+    "note"
+   ]
+  },
+  "note-blue": {
+   "rect": [
+    309,
+    97,
+    8,
+    8
+   ],
+   "anchor": [
+    3,
+    7
+   ],
+   "slot": "monitorEdge",
+   "tags": [
+    "note"
+   ]
+  },
+  "note-green": {
+   "rect": [
+    318,
+    97,
+    8,
+    8
+   ],
+   "anchor": [
+    3,
+    7
+   ],
+   "slot": "monitorEdge",
+   "tags": [
+    "note"
+   ]
+  },
+  "p-scout": {
+   "rect": [
+    46,
+    85,
+    10,
+    11
+   ],
+   "anchor": [
+    4,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ],
+   "personal": "scout"
+  },
+  "p-worker-low": {
+   "rect": [
+    431,
+    85,
+    10,
+    10
+   ],
+   "anchor": [
+    4,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ],
+   "personal": "worker-low"
+  },
+  "p-worker": {
+   "rect": [
+    479,
+    68,
+    7,
+    12
+   ],
+   "anchor": [
+    3,
+    10
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ],
+   "personal": "worker"
+  },
+  "p-worker-high": {
+   "rect": [
+    362,
+    85,
+    12,
+    10
+   ],
+   "anchor": [
+    5,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ],
+   "personal": "worker-high"
+  },
+  "p-architect": {
+   "rect": [
+    243,
+    97,
+    11,
+    8
+   ],
+   "anchor": [
+    5,
+    6
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ],
+   "personal": "architect"
+  },
+  "p-architect-high": {
+   "rect": [
+    442,
+    85,
+    10,
+    10
+   ],
+   "anchor": [
+    4,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ],
+   "personal": "architect-high"
+  },
+  "p-explore": {
+   "rect": [
+    57,
+    85,
+    10,
+    11
+   ],
+   "anchor": [
+    4,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ],
+   "personal": "explore"
+  },
+  "p-plan": {
+   "rect": [
+    121,
+    85,
+    9,
+    11
+   ],
+   "anchor": [
+    4,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ],
+   "personal": "plan"
+  },
+  "p-code-critic": {
+   "rect": [
+    68,
+    85,
+    10,
+    11
+   ],
+   "anchor": [
+    4,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ],
+   "personal": "code-critic"
+  },
+  "p-security-reviewer": {
+   "rect": [
+    0,
+    97,
+    9,
+    10
+   ],
+   "anchor": [
+    4,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ],
+   "personal": "security-reviewer"
+  },
+  "p-performance-reviewer": {
+   "rect": [
+    79,
+    85,
+    10,
+    11
+   ],
+   "anchor": [
+    4,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ],
+   "personal": "performance-reviewer"
+  },
+  "p-i18n-reviewer": {
+   "rect": [
+    375,
+    85,
+    11,
+    10
+   ],
+   "anchor": [
+    5,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ],
+   "personal": "i18n-reviewer"
+  },
+  "p-a11y-reviewer": {
+   "rect": [
+    90,
+    85,
+    10,
+    11
+   ],
+   "anchor": [
+    4,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ],
+   "personal": "a11y-reviewer"
+  },
+  "p-frontend": {
+   "rect": [
+    85,
+    97,
+    11,
+    9
+   ],
+   "anchor": [
+    5,
+    7
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ],
+   "personal": "frontend"
+  },
+  "p-backend": {
+   "rect": [
+    453,
+    85,
+    10,
+    10
+   ],
+   "anchor": [
+    4,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ],
+   "personal": "backend"
+  },
+  "p-app": {
+   "rect": [
+    202,
+    85,
+    7,
+    11
+   ],
+   "anchor": [
+    3,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ],
+   "personal": "app"
+  },
+  "p-default": {
+   "rect": [
+    168,
+    85,
+    8,
+    11
+   ],
+   "anchor": [
+    3,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "personal"
+   ],
+   "personal": "default"
+  },
+  "lead-nameplate": {
+   "rect": [
+    360,
+    97,
+    11,
+    7
+   ],
+   "anchor": [
+    5,
+    5
+   ],
+   "slot": "surface",
+   "tags": [
+    "lead"
+   ]
+  },
+  "lead-vase": {
+   "rect": [
+    131,
+    85,
+    9,
+    11
+   ],
+   "anchor": [
+    4,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "lead",
+    "plant"
+   ]
+  },
+  "lead-trophies": {
+   "rect": [
+    210,
+    85,
+    18,
+    10
+   ],
+   "anchor": [
+    8,
+    8
+   ],
+   "slot": "surface",
+   "tags": [
+    "lead",
+    "personal"
+   ]
+  },
+  "lead-bell": {
+   "rect": [
+    327,
+    97,
+    8,
+    8
+   ],
+   "anchor": [
+    3,
+    6
+   ],
+   "slot": "surface",
+   "tags": [
+    "lead"
+   ]
+  },
+  "lead-reports": {
+   "rect": [
+    12,
+    85,
+    11,
+    11
+   ],
+   "anchor": [
+    5,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "lead",
+    "book"
+   ]
+  },
+  "lead-fountain-pen": {
+   "rect": [
+    177,
+    85,
+    8,
+    11
+   ],
+   "anchor": [
+    3,
+    9
+   ],
+   "slot": "surface",
+   "tags": [
+    "lead"
+   ]
+  },
+  "screen-code-dark-studio2-desk": {
+   "rect": [
+    436,
+    30,
+    26,
+    17
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-dark"
+   ],
+   "design": "studio2",
+   "kind": "desk",
+   "content": "code-dark"
+  },
+  "screen-code-light-studio2-desk": {
+   "rect": [
+    463,
+    30,
+    26,
+    17
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-light"
+   ],
+   "design": "studio2",
+   "kind": "desk",
+   "content": "code-light"
+  },
+  "screen-dashboard-studio2-desk": {
+   "rect": [
+    0,
+    50,
+    26,
+    17
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "dashboard"
+   ],
+   "design": "studio2",
+   "kind": "desk",
+   "content": "dashboard"
+  },
+  "screen-canvas-studio2-desk": {
+   "rect": [
+    27,
+    50,
+    26,
+    17
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "canvas"
+   ],
+   "design": "studio2",
+   "kind": "desk",
+   "content": "canvas"
+  },
+  "screen-terminal-studio2-desk": {
+   "rect": [
+    54,
+    50,
+    26,
+    17
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "terminal"
+   ],
+   "design": "studio2",
+   "kind": "desk",
+   "content": "terminal"
+  },
+  "screen-document-studio2-desk": {
+   "rect": [
+    81,
+    50,
+    26,
+    17
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "document"
+   ],
+   "design": "studio2",
+   "kind": "desk",
+   "content": "document"
+  },
+  "screen-game-studio2-desk": {
+   "rect": [
+    108,
+    50,
+    26,
+    17
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "game"
+   ],
+   "design": "studio2",
+   "kind": "desk",
+   "content": "game"
+  },
+  "screen-call-studio2-desk": {
+   "rect": [
+    135,
+    50,
+    26,
+    17
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "call"
+   ],
+   "design": "studio2",
+   "kind": "desk",
+   "content": "call"
+  },
+  "screen-code-dark-studio2-lead-desk": {
+   "rect": [
+    204,
+    30,
+    28,
+    17
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-dark"
+   ],
+   "design": "studio2",
+   "kind": "lead-desk",
+   "content": "code-dark"
+  },
+  "screen-code-light-studio2-lead-desk": {
+   "rect": [
+    233,
+    30,
+    28,
+    17
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-light"
+   ],
+   "design": "studio2",
+   "kind": "lead-desk",
+   "content": "code-light"
+  },
+  "screen-dashboard-studio2-lead-desk": {
+   "rect": [
+    262,
+    30,
+    28,
+    17
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "dashboard"
+   ],
+   "design": "studio2",
+   "kind": "lead-desk",
+   "content": "dashboard"
+  },
+  "screen-canvas-studio2-lead-desk": {
+   "rect": [
+    291,
+    30,
+    28,
+    17
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "canvas"
+   ],
+   "design": "studio2",
+   "kind": "lead-desk",
+   "content": "canvas"
+  },
+  "screen-terminal-studio2-lead-desk": {
+   "rect": [
+    320,
+    30,
+    28,
+    17
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "terminal"
+   ],
+   "design": "studio2",
+   "kind": "lead-desk",
+   "content": "terminal"
+  },
+  "screen-document-studio2-lead-desk": {
+   "rect": [
+    349,
+    30,
+    28,
+    17
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "document"
+   ],
+   "design": "studio2",
+   "kind": "lead-desk",
+   "content": "document"
+  },
+  "screen-game-studio2-lead-desk": {
+   "rect": [
+    378,
+    30,
+    28,
+    17
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "game"
+   ],
+   "design": "studio2",
+   "kind": "lead-desk",
+   "content": "game"
+  },
+  "screen-call-studio2-lead-desk": {
+   "rect": [
+    407,
+    30,
+    28,
+    17
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "call"
+   ],
+   "design": "studio2",
+   "kind": "lead-desk",
+   "content": "call"
+  },
+  "screen-code-dark-lounge-desk": {
+   "rect": [
+    216,
+    0,
+    25,
+    28
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-dark"
+   ],
+   "design": "lounge",
+   "kind": "desk",
+   "content": "code-dark"
+  },
+  "screen-code-light-lounge-desk": {
+   "rect": [
+    242,
+    0,
+    25,
+    28
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-light"
+   ],
+   "design": "lounge",
+   "kind": "desk",
+   "content": "code-light"
+  },
+  "screen-dashboard-lounge-desk": {
+   "rect": [
+    268,
+    0,
+    25,
+    28
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "dashboard"
+   ],
+   "design": "lounge",
+   "kind": "desk",
+   "content": "dashboard"
+  },
+  "screen-canvas-lounge-desk": {
+   "rect": [
+    294,
+    0,
+    25,
+    28
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "canvas"
+   ],
+   "design": "lounge",
+   "kind": "desk",
+   "content": "canvas"
+  },
+  "screen-terminal-lounge-desk": {
+   "rect": [
+    320,
+    0,
+    25,
+    28
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "terminal"
+   ],
+   "design": "lounge",
+   "kind": "desk",
+   "content": "terminal"
+  },
+  "screen-document-lounge-desk": {
+   "rect": [
+    346,
+    0,
+    25,
+    28
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "document"
+   ],
+   "design": "lounge",
+   "kind": "desk",
+   "content": "document"
+  },
+  "screen-game-lounge-desk": {
+   "rect": [
+    372,
+    0,
+    25,
+    28
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "game"
+   ],
+   "design": "lounge",
+   "kind": "desk",
+   "content": "game"
+  },
+  "screen-call-lounge-desk": {
+   "rect": [
+    398,
+    0,
+    25,
+    28
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "call"
+   ],
+   "design": "lounge",
+   "kind": "desk",
+   "content": "call"
+  },
+  "screen-code-dark-lounge-lead-desk": {
+   "rect": [
+    0,
+    0,
+    26,
+    29
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-dark"
+   ],
+   "design": "lounge",
+   "kind": "lead-desk",
+   "content": "code-dark"
+  },
+  "screen-code-light-lounge-lead-desk": {
+   "rect": [
+    27,
+    0,
+    26,
+    29
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-light"
+   ],
+   "design": "lounge",
+   "kind": "lead-desk",
+   "content": "code-light"
+  },
+  "screen-dashboard-lounge-lead-desk": {
+   "rect": [
+    54,
+    0,
+    26,
+    29
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "dashboard"
+   ],
+   "design": "lounge",
+   "kind": "lead-desk",
+   "content": "dashboard"
+  },
+  "screen-canvas-lounge-lead-desk": {
+   "rect": [
+    81,
+    0,
+    26,
+    29
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "canvas"
+   ],
+   "design": "lounge",
+   "kind": "lead-desk",
+   "content": "canvas"
+  },
+  "screen-terminal-lounge-lead-desk": {
+   "rect": [
+    108,
+    0,
+    26,
+    29
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "terminal"
+   ],
+   "design": "lounge",
+   "kind": "lead-desk",
+   "content": "terminal"
+  },
+  "screen-document-lounge-lead-desk": {
+   "rect": [
+    135,
+    0,
+    26,
+    29
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "document"
+   ],
+   "design": "lounge",
+   "kind": "lead-desk",
+   "content": "document"
+  },
+  "screen-game-lounge-lead-desk": {
+   "rect": [
+    162,
+    0,
+    26,
+    29
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "game"
+   ],
+   "design": "lounge",
+   "kind": "lead-desk",
+   "content": "game"
+  },
+  "screen-call-lounge-lead-desk": {
+   "rect": [
+    189,
+    0,
+    26,
+    29
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "call"
+   ],
+   "design": "lounge",
+   "kind": "lead-desk",
+   "content": "call"
+  },
+  "screen-code-dark-library-desk": {
+   "rect": [
+    100,
+    68,
+    24,
+    15
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-dark"
+   ],
+   "design": "library",
+   "kind": "desk",
+   "content": "code-dark"
+  },
+  "screen-code-light-library-desk": {
+   "rect": [
+    125,
+    68,
+    24,
+    15
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-light"
+   ],
+   "design": "library",
+   "kind": "desk",
+   "content": "code-light"
+  },
+  "screen-dashboard-library-desk": {
+   "rect": [
+    150,
+    68,
+    24,
+    15
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "dashboard"
+   ],
+   "design": "library",
+   "kind": "desk",
+   "content": "dashboard"
+  },
+  "screen-canvas-library-desk": {
+   "rect": [
+    175,
+    68,
+    24,
+    15
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "canvas"
+   ],
+   "design": "library",
+   "kind": "desk",
+   "content": "canvas"
+  },
+  "screen-terminal-library-desk": {
+   "rect": [
+    200,
+    68,
+    24,
+    15
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "terminal"
+   ],
+   "design": "library",
+   "kind": "desk",
+   "content": "terminal"
+  },
+  "screen-document-library-desk": {
+   "rect": [
+    225,
+    68,
+    24,
+    15
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "document"
+   ],
+   "design": "library",
+   "kind": "desk",
+   "content": "document"
+  },
+  "screen-game-library-desk": {
+   "rect": [
+    250,
+    68,
+    24,
+    15
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "game"
+   ],
+   "design": "library",
+   "kind": "desk",
+   "content": "game"
+  },
+  "screen-call-library-desk": {
+   "rect": [
+    275,
+    68,
+    24,
+    15
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "call"
+   ],
+   "design": "library",
+   "kind": "desk",
+   "content": "call"
+  },
+  "screen-code-dark-library-lead-desk": {
+   "rect": [
+    410,
+    50,
+    24,
+    16
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-dark"
+   ],
+   "design": "library",
+   "kind": "lead-desk",
+   "content": "code-dark"
+  },
+  "screen-code-light-library-lead-desk": {
+   "rect": [
+    435,
+    50,
+    24,
+    16
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-light"
+   ],
+   "design": "library",
+   "kind": "lead-desk",
+   "content": "code-light"
+  },
+  "screen-dashboard-library-lead-desk": {
+   "rect": [
+    460,
+    50,
+    24,
+    16
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "dashboard"
+   ],
+   "design": "library",
+   "kind": "lead-desk",
+   "content": "dashboard"
+  },
+  "screen-canvas-library-lead-desk": {
+   "rect": [
+    485,
+    50,
+    24,
+    16
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "canvas"
+   ],
+   "design": "library",
+   "kind": "lead-desk",
+   "content": "canvas"
+  },
+  "screen-terminal-library-lead-desk": {
+   "rect": [
+    0,
+    68,
+    24,
+    16
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "terminal"
+   ],
+   "design": "library",
+   "kind": "lead-desk",
+   "content": "terminal"
+  },
+  "screen-document-library-lead-desk": {
+   "rect": [
+    25,
+    68,
+    24,
+    16
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "document"
+   ],
+   "design": "library",
+   "kind": "lead-desk",
+   "content": "document"
+  },
+  "screen-game-library-lead-desk": {
+   "rect": [
+    50,
+    68,
+    24,
+    16
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "game"
+   ],
+   "design": "library",
+   "kind": "lead-desk",
+   "content": "game"
+  },
+  "screen-call-library-lead-desk": {
+   "rect": [
+    75,
+    68,
+    24,
+    16
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "call"
+   ],
+   "design": "library",
+   "kind": "lead-desk",
+   "content": "call"
+  },
+  "screen-code-dark-greenhouse-desk": {
+   "rect": [
+    162,
+    50,
+    30,
+    16
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-dark"
+   ],
+   "design": "greenhouse",
+   "kind": "desk",
+   "content": "code-dark"
+  },
+  "screen-code-light-greenhouse-desk": {
+   "rect": [
+    193,
+    50,
+    30,
+    16
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-light"
+   ],
+   "design": "greenhouse",
+   "kind": "desk",
+   "content": "code-light"
+  },
+  "screen-dashboard-greenhouse-desk": {
+   "rect": [
+    224,
+    50,
+    30,
+    16
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "dashboard"
+   ],
+   "design": "greenhouse",
+   "kind": "desk",
+   "content": "dashboard"
+  },
+  "screen-canvas-greenhouse-desk": {
+   "rect": [
+    255,
+    50,
+    30,
+    16
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "canvas"
+   ],
+   "design": "greenhouse",
+   "kind": "desk",
+   "content": "canvas"
+  },
+  "screen-terminal-greenhouse-desk": {
+   "rect": [
+    286,
+    50,
+    30,
+    16
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "terminal"
+   ],
+   "design": "greenhouse",
+   "kind": "desk",
+   "content": "terminal"
+  },
+  "screen-document-greenhouse-desk": {
+   "rect": [
+    317,
+    50,
+    30,
+    16
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "document"
+   ],
+   "design": "greenhouse",
+   "kind": "desk",
+   "content": "document"
+  },
+  "screen-game-greenhouse-desk": {
+   "rect": [
+    348,
+    50,
+    30,
+    16
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "game"
+   ],
+   "design": "greenhouse",
+   "kind": "desk",
+   "content": "game"
+  },
+  "screen-call-greenhouse-desk": {
+   "rect": [
+    379,
+    50,
+    30,
+    16
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "call"
+   ],
+   "design": "greenhouse",
+   "kind": "desk",
+   "content": "call"
+  },
+  "screen-code-dark-greenhouse-lead-desk": {
+   "rect": [
+    424,
+    0,
+    33,
+    19
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-dark"
+   ],
+   "design": "greenhouse",
+   "kind": "lead-desk",
+   "content": "code-dark"
+  },
+  "screen-code-light-greenhouse-lead-desk": {
+   "rect": [
+    458,
+    0,
+    33,
+    19
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-light"
+   ],
+   "design": "greenhouse",
+   "kind": "lead-desk",
+   "content": "code-light"
+  },
+  "screen-dashboard-greenhouse-lead-desk": {
+   "rect": [
+    0,
+    30,
+    33,
+    19
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "dashboard"
+   ],
+   "design": "greenhouse",
+   "kind": "lead-desk",
+   "content": "dashboard"
+  },
+  "screen-canvas-greenhouse-lead-desk": {
+   "rect": [
+    34,
+    30,
+    33,
+    19
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "canvas"
+   ],
+   "design": "greenhouse",
+   "kind": "lead-desk",
+   "content": "canvas"
+  },
+  "screen-terminal-greenhouse-lead-desk": {
+   "rect": [
+    68,
+    30,
+    33,
+    19
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "terminal"
+   ],
+   "design": "greenhouse",
+   "kind": "lead-desk",
+   "content": "terminal"
+  },
+  "screen-document-greenhouse-lead-desk": {
+   "rect": [
+    102,
+    30,
+    33,
+    19
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "document"
+   ],
+   "design": "greenhouse",
+   "kind": "lead-desk",
+   "content": "document"
+  },
+  "screen-game-greenhouse-lead-desk": {
+   "rect": [
+    136,
+    30,
+    33,
+    19
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "game"
+   ],
+   "design": "greenhouse",
+   "kind": "lead-desk",
+   "content": "game"
+  },
+  "screen-call-greenhouse-lead-desk": {
+   "rect": [
+    170,
+    30,
+    33,
+    19
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "call"
+   ],
+   "design": "greenhouse",
+   "kind": "lead-desk",
+   "content": "call"
+  },
+  "screen-code-dark-lobby-desk": {
+   "rect": [
+    485,
+    97,
+    14,
+    4
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-dark"
+   ],
+   "design": "lobby",
+   "kind": "desk",
+   "content": "code-dark"
+  },
+  "screen-code-light-lobby-desk": {
+   "rect": [
+    0,
+    108,
+    14,
+    4
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-light"
+   ],
+   "design": "lobby",
+   "kind": "desk",
+   "content": "code-light"
+  },
+  "screen-dashboard-lobby-desk": {
+   "rect": [
+    15,
+    108,
+    14,
+    4
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "dashboard"
+   ],
+   "design": "lobby",
+   "kind": "desk",
+   "content": "dashboard"
+  },
+  "screen-canvas-lobby-desk": {
+   "rect": [
+    30,
+    108,
+    14,
+    4
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "canvas"
+   ],
+   "design": "lobby",
+   "kind": "desk",
+   "content": "canvas"
+  },
+  "screen-terminal-lobby-desk": {
+   "rect": [
+    45,
+    108,
+    14,
+    4
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "terminal"
+   ],
+   "design": "lobby",
+   "kind": "desk",
+   "content": "terminal"
+  },
+  "screen-document-lobby-desk": {
+   "rect": [
+    60,
+    108,
+    14,
+    4
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "document"
+   ],
+   "design": "lobby",
+   "kind": "desk",
+   "content": "document"
+  },
+  "screen-game-lobby-desk": {
+   "rect": [
+    75,
+    108,
+    14,
+    4
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "game"
+   ],
+   "design": "lobby",
+   "kind": "desk",
+   "content": "game"
+  },
+  "screen-call-lobby-desk": {
+   "rect": [
+    90,
+    108,
+    14,
+    4
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "call"
+   ],
+   "design": "lobby",
+   "kind": "desk",
+   "content": "call"
+  },
+  "screen-code-dark-lobby-desk-b": {
+   "rect": [
+    229,
+    85,
+    14,
+    10
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-dark"
+   ],
+   "design": "lobby",
+   "kind": "desk-b",
+   "content": "code-dark"
+  },
+  "screen-code-light-lobby-desk-b": {
+   "rect": [
+    244,
+    85,
+    14,
+    10
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "code-light"
+   ],
+   "design": "lobby",
+   "kind": "desk-b",
+   "content": "code-light"
+  },
+  "screen-dashboard-lobby-desk-b": {
+   "rect": [
+    259,
+    85,
+    14,
+    10
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "dashboard"
+   ],
+   "design": "lobby",
+   "kind": "desk-b",
+   "content": "dashboard"
+  },
+  "screen-canvas-lobby-desk-b": {
+   "rect": [
+    274,
+    85,
+    14,
+    10
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "canvas"
+   ],
+   "design": "lobby",
+   "kind": "desk-b",
+   "content": "canvas"
+  },
+  "screen-terminal-lobby-desk-b": {
+   "rect": [
+    289,
+    85,
+    14,
+    10
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "terminal"
+   ],
+   "design": "lobby",
+   "kind": "desk-b",
+   "content": "terminal"
+  },
+  "screen-document-lobby-desk-b": {
+   "rect": [
+    304,
+    85,
+    14,
+    10
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "document"
+   ],
+   "design": "lobby",
+   "kind": "desk-b",
+   "content": "document"
+  },
+  "screen-game-lobby-desk-b": {
+   "rect": [
+    319,
+    85,
+    14,
+    10
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "game"
+   ],
+   "design": "lobby",
+   "kind": "desk-b",
+   "content": "game"
+  },
+  "screen-call-lobby-desk-b": {
+   "rect": [
+    334,
+    85,
+    14,
+    10
+   ],
+   "anchor": [
+    0,
+    0
+   ],
+   "slot": "screen",
+   "tags": [
+    "screen",
+    "call"
+   ],
+   "design": "lobby",
+   "kind": "desk-b",
+   "content": "call"
+  }
+ },
+ "desks": {
+  "studio2": {
+   "desk": {
+    "surface": [
+     [
+      23,
+      25
+     ],
+     [
+      24,
+      16
+     ],
+     [
+      60,
+      25
+     ],
+     [
+      67,
+      19
+     ],
+     [
+      75,
+      25
+     ],
+     [
+      75,
+      15
+     ]
+    ],
+    "monitorTop": [
+     [
+      42,
+      0
+     ]
+    ],
+    "bezel": [
+     [
+      33,
+      17
+     ],
+     [
+      33,
+      8
+     ],
+     [
+      51,
+      17
+     ],
+     [
+      51,
+      8
+     ]
+    ],
+    "monitorEdge": [
+     [
+      28,
+      14
+     ],
+     [
+      56,
+      12
+     ]
+    ],
+    "screen": [
+     29,
+     1,
+     26,
+     17
+    ]
+   },
+   "lead-desk": {
+    "surface": [
+     [
+      34,
+      19
+     ],
+     [
+      34,
+      27
+     ],
+     [
+      75,
+      20
+     ],
+     [
+      84,
+      27
+     ],
+     [
+      93,
+      21
+     ],
+     [
+      88,
+      15
+     ]
+    ],
+    "monitorTop": [
+     [
+      55,
+      0
+     ]
+    ],
+    "bezel": [
+     [
+      45,
+      17
+     ],
+     [
+      45,
+      8
+     ],
+     [
+      65,
+      17
+     ],
+     [
+      65,
+      8
+     ]
+    ],
+    "monitorEdge": [
+     [
+      40,
+      14
+     ],
+     [
+      69,
+      12
+     ]
+    ],
+    "screen": [
+     41,
+     1,
+     28,
+     17
+    ]
+   }
+  },
+  "lounge": {
+   "desk": {
+    "surface": [
+     [
+      14,
+      20
+     ],
+     [
+      20,
+      23
+     ],
+     [
+      47,
+      36
+     ],
+     [
+      55,
+      40
+     ],
+     [
+      62,
+      44
+     ],
+     [
+      83,
+      35
+     ]
+    ],
+    "monitorTop": [
+     [
+      40,
+      12
+     ]
+    ],
+    "bezel": [
+     [
+      32,
+      21
+     ],
+     [
+      38,
+      24
+     ],
+     [
+      45,
+      27
+     ]
+    ],
+    "monitorEdge": [
+     [
+      27,
+      17
+     ],
+     [
+      51,
+      28
+     ]
+    ],
+    "screen": [
+     27,
+     6,
+     25,
+     28
+    ]
+   },
+   "lead-desk": {
+    "surface": [
+     [
+      22,
+      23
+     ],
+     [
+      30,
+      27
+     ],
+     [
+      38,
+      31
+     ],
+     [
+      63,
+      43
+     ],
+     [
+      72,
+      49
+     ],
+     [
+      82,
+      48
+     ]
+    ],
+    "monitorTop": [
+     [
+      54,
+      17
+     ]
+    ],
+    "bezel": [
+     [
+      46,
+      26
+     ],
+     [
+      53,
+      30
+     ],
+     [
+      60,
+      34
+     ]
+    ],
+    "monitorEdge": [
+     [
+      41,
+      20
+     ],
+     [
+      66,
+      32
+     ]
+    ],
+    "screen": [
+     41,
+     10,
+     26,
+     29
+    ]
+   }
+  },
+  "library": {
+   "desk": {
+    "surface": [
+     [
+      7,
+      24
+     ],
+     [
+      13,
+      19
+     ],
+     [
+      19,
+      25
+     ],
+     [
+      56,
+      25
+     ],
+     [
+      56,
+      18
+     ]
+    ],
+    "monitorTop": [
+     [
+      37,
+      0
+     ]
+    ],
+    "bezel": [
+     [
+      29,
+      16
+     ],
+     [
+      29,
+      8
+     ],
+     [
+      45,
+      16
+     ],
+     [
+      45,
+      8
+     ]
+    ],
+    "monitorEdge": [
+     [
+      24,
+      12
+     ],
+     [
+      49,
+      10
+     ]
+    ],
+    "screen": [
+     25,
+     2,
+     24,
+     15
+    ]
+   },
+   "lead-desk": {
+    "surface": [
+     [
+      6,
+      24
+     ],
+     [
+      32,
+      22
+     ],
+     [
+      34,
+      16
+     ],
+     [
+      72,
+      23
+     ],
+     [
+      74,
+      17
+     ],
+     [
+      97,
+      23
+     ]
+    ],
+    "monitorTop": [
+     [
+      53,
+      0
+     ]
+    ],
+    "bezel": [
+     [
+      45,
+      17
+     ],
+     [
+      45,
+      8
+     ],
+     [
+      62,
+      17
+     ],
+     [
+      62,
+      8
+     ]
+    ],
+    "monitorEdge": [
+     [
+      41,
+      13
+     ],
+     [
+      66,
+      11
+     ]
+    ],
+    "screen": [
+     42,
+     2,
+     24,
+     16
+    ]
+   }
+  },
+  "greenhouse": {
+   "desk": {
+    "surface": [
+     [
+      7,
+      26
+     ],
+     [
+      14,
+      20
+     ],
+     [
+      20,
+      27
+     ],
+     [
+      60,
+      27
+     ],
+     [
+      59,
+      20
+     ]
+    ],
+    "monitorTop": [
+     [
+      39,
+      0
+     ]
+    ],
+    "bezel": [
+     [
+      30,
+      17
+     ],
+     [
+      30,
+      9
+     ],
+     [
+      51,
+      17
+     ],
+     [
+      51,
+      9
+     ]
+    ],
+    "monitorEdge": [
+     [
+      23,
+      13
+     ],
+     [
+      55,
+      11
+     ]
+    ],
+    "screen": [
+     24,
+     2,
+     30,
+     16
+    ]
+   },
+   "lead-desk": {
+    "surface": [
+     [
+      5,
+      26
+     ],
+     [
+      31,
+      27
+     ],
+     [
+      75,
+      25
+     ],
+     [
+      77,
+      19
+     ],
+     [
+      79,
+      29
+     ]
+    ],
+    "monitorTop": [
+     [
+      52,
+      0
+     ]
+    ],
+    "bezel": [
+     [
+      41,
+      18
+     ],
+     [
+      41,
+      9
+     ],
+     [
+      63,
+      18
+     ],
+     [
+      63,
+      9
+     ]
+    ],
+    "monitorEdge": [
+     [
+      35,
+      14
+     ],
+     [
+      69,
+      12
+     ]
+    ],
+    "screen": [
+     36,
+     2,
+     33,
+     19
+    ]
+   }
+  },
+  "lobby": {
+   "desk": {
+    "surface": [
+     [
+      8,
+      8
+     ],
+     [
+      15,
+      6
+     ],
+     [
+      46,
+      8
+     ],
+     [
+      54,
+      5
+     ],
+     [
+      70,
+      7
+     ]
+    ],
+    "monitorTop": [
+     [
+      30,
+      3
+     ]
+    ],
+    "bezel": [
+     [
+      28,
+      8
+     ],
+     [
+      33,
+      8
+     ]
+    ],
+    "monitorEdge": [
+     [
+      22,
+      6
+     ],
+     [
+      38,
+      6
+     ]
+    ],
+    "screen": [
+     23,
+     4,
+     14,
+     4
+    ]
+   },
+   "desk-b": {
+    "surface": [
+     [
+      30,
+      13
+     ],
+     [
+      38,
+      10
+     ],
+     [
+      45,
+      13
+     ],
+     [
+      51,
+      9
+     ],
+     [
+      28,
+      9
+     ]
+    ],
+    "monitorTop": [
+     [
+      62,
+      0
+     ]
+    ],
+    "bezel": [
+     [
+      57,
+      8
+     ],
+     [
+      66,
+      8
+     ]
+    ],
+    "monitorEdge": [
+     [
+      54,
+      6
+     ],
+     [
+      69,
+      5
+     ]
+    ],
+    "screen": [
+     55,
+     1,
+     14,
+     10
+    ]
+   }
+  }
+ }
+}
