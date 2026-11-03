@@ -28,7 +28,7 @@
 .fxw-f { inset: 0; background: var(--fxw-flash-c); opacity: 0; }
 
 /* the soft light of a monitor at night, falling on the seated one's face, upper body and the desk around the screen: one pre-drawn radial gradient per working seat, shown by opacity only. The back of the monitor is cut out by a static clip-path (config glow.holes), so the panel stays dark. */
-.fxw-glow { position: absolute; border-radius: 50%; pointer-events: none; background: radial-gradient(ellipse at center, rgba(130, 176, 255, .55), rgba(130, 176, 255, .22) 45%, rgba(130, 176, 255, 0) 72%); opacity: 0; transition: opacity 400ms ease-in-out; }
+.fxw-glow { position: absolute; border-radius: 50%; pointer-events: none; background: radial-gradient(ellipse at center, rgba(130, 176, 255, .38), rgba(130, 176, 255, .15) 45%, rgba(130, 176, 255, 0) 72%); opacity: 0; transition: opacity 400ms ease-in-out; }
 
 @media (prefers-reduced-motion: reduce) {
   .fxw-l { animation: none !important; transition: none !important; }
