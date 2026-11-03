@@ -255,7 +255,8 @@ test('config: ui.fx and ui.officeLife exist, every area on its own lines, string
   assert.equal(cfg.ui.weather.fxSwitch, '화려한 효과');
   assert.equal(cfg.ui.weather.sfxSwitch, '효과음');
   const text = read('config.json');
-  for (const a of ['weather', 'chars', 'events', 'led', 'hit']) assert.match(text, new RegExp(`"${a}": \\{\\n\\s+"enabled": true\\n\\s+\\}`), `${a} is written on several lines`);
+  assert.match(text, /"weather": \{\n\s+"enabled": true,\n/, 'weather has its own numbers on several lines');
+  for (const a of ['chars', 'events', 'led', 'hit']) assert.match(text, new RegExp(`"${a}": \\{\\n\\s+"enabled": true\\n\\s+\\}`), `${a} is written on several lines`);
   assert.match(text, /"officeLife": \{\n\s+"enabled": true\n\s+\},/);
 });
 
