@@ -118,7 +118,8 @@ export function cardFields(who, entry, cfg, lobbyLabels, now, type = '') {
   const isCat = who.rank === 'cat';
   const role = isCat ? L.catRole : who.role;
   const floor = who.floorNo > 0 ? fill(lobbyLabels.floorLabel, { n: who.floorNo }) : L.empty;
-  const memo = [isCat ? role : fill(L.memoRole, { role, rank: lobbyLabels.rank[who.rank] ?? '' })];
+  const rank = lobbyLabels.rank[who.rank] ?? '';
+  const memo = [isCat || rank === role ? role : fill(L.memoRole, { role, rank })]; // a lead's role and rank are both 팀장: say it once
   if (!isCat && who.state) {
     const state = stateLabel(who, lobbyLabels);
     memo.push(who.startedAt > 0 ? fill(L.memoState, { state, dur: fmtDuration(now - who.startedAt, lobbyLabels) }) : state);
