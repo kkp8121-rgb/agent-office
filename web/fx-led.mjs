@@ -52,7 +52,7 @@ export function init(ctx) {
   const cfg = ctx.ui.fx.led;
   if (!cfg?.enabled) return;
   const { fx } = ctx;
-  /** @type {null | {wall: object, obs: MutationObserver, texts: Map<Node, string>, tickers: Set<Element>, anims: Map<Element, Animation>, vals: Set<Element>}} */
+  /** @type {null | {wall: object, obs: MutationObserver, texts: Map<Node, string>, tickers: Set<Element>, anims: Map<Element, {anim: Animation, over: number}>, blinks: Map<Node, Animation>, vals: Set<Element>}} */
   let att = null;
 
   const active = () => !!att && ctx.floorActive(ctx.lobby());
@@ -70,27 +70,31 @@ export function init(ctx) {
   }
 
   function stopMarquee(inner) {
-    att.anims.get(inner)?.cancel();
+    att.anims.get(inner)?.anim.cancel();
     att.anims.delete(inner);
     inner.parentElement.removeAttribute('data-mq');
   }
 
-  /** Measures one ticker line and starts, keeps or stops its marquee. Only runs when its text changed or the lobby came into view. */
+  /** Measures one ticker line and starts, keeps or stops its marquee. Only runs when its text changed or the lobby came into view.
+   *  A line that still overflows by the same px keeps its running animation (no restart, no attribute churn). */
   function updateMarquee(inner) {
     const box = inner.parentElement;
-    const plan = marqueePlan(overflowPx(inner.offsetWidth, box.clientWidth, cfg.marquee.minOverflow), cfg.marquee);
-    stopMarquee(inner);
+    const over = overflowPx(inner.offsetWidth, box.clientWidth, cfg.marquee.minOverflow);
+    const cur = att.anims.get(inner);
+    if (cur && over > 0 && cur.over === over) return;
+    const plan = marqueePlan(over, cfg.marquee);
+    if (cur) stopMarquee(inner);
     if (!plan) return;
     setAttr(box, 'data-mq', 'on');
     const anim = inner.animate(plan.keyframes, { duration: plan.durationMs, iterations: Infinity, direction: 'alternate', easing: 'linear' });
-    att.anims.set(inner, anim);
+    att.anims.set(inner, { anim, over });
     if (!active()) anim.pause();
   }
 
   function syncActive() {
     if (!att) return;
     const on = active();
-    for (const a of att.anims.values()) {
+    for (const { anim: a } of att.anims.values()) {
       if (on && a.playState === 'paused') a.play();
       else if (!on && a.playState === 'running') a.pause();
     }
@@ -114,7 +118,10 @@ export function init(ctx) {
       const text = r.textContent;
       const prev = att.texts.get(r);
       att.texts.set(r, text);
-      if (on && textChanged(prev, text)) r.animate(blinkFrames(cfg.blink.count, cfg.blink.min), { duration: cfg.blink.ms, easing: 'linear' });
+      // a number that is still blinking is not restarted: bursts of changes cost one short-lived layer, not a new one each time
+      if (on && textChanged(prev, text) && att.blinks.get(r)?.playState !== 'running') {
+        att.blinks.set(r, r.animate(blinkFrames(cfg.blink.count, cfg.blink.min), { duration: cfg.blink.ms, easing: 'linear' }));
+      }
     }
   }
 
@@ -124,7 +131,7 @@ export function init(ctx) {
     const w = lb.wall;
     const vals = [...Object.values(w.cells ?? {}), w.idxVal, ...Object.values(w.sysVal ?? {})].filter(Boolean);
     const tickers = (w.tickers ?? []).filter(Boolean);
-    att = { wall: w, obs: new MutationObserver(onMutations), texts: new Map(vals.map((n) => [n, n.textContent])), tickers: new Set(tickers), anims: new Map(), vals: new Set(vals) };
+    att = { wall: w, obs: new MutationObserver(onMutations), texts: new Map(vals.map((n) => [n, n.textContent])), tickers: new Set(tickers), anims: new Map(), blinks: new Map(), vals: new Set(vals) };
     for (const n of [...vals, ...tickers]) att.obs.observe(n, { childList: true, characterData: true });
     refresh();
   }

@@ -1,15 +1,14 @@
 /* Effects area "led" (the 1F lobby LED status wall). Scope rules under html.fx-on; animate only transform and opacity. */
 
 /* the LED look: all static (nothing here is animated by CSS); the blink and the marquee are Web Animations of opacity / transform started by fx-led.mjs */
-/* a soft glow around each panel and a faint dot grid laid over it: 3 px cells whose gaps are drawn as a slightly darker mesh */
+/* a soft inner glow and a faint dot grid: the 3 px cells' gaps are drawn as a slightly darker mesh. Everything is one background and one
+   static shadow of the panel itself (no pseudo-element overlay and no outer glow: those made every panel repaint a second and third layer) */
 html.fx-on .led {
-  box-shadow: inset 0 0 0 1px var(--led-bezel), inset 0 0 9px rgba(70, 140, 255, .22), 0 0 6px rgba(60, 130, 255, .4);
-}
-html.fx-on .led::after {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
   background:
     linear-gradient(rgba(2, 8, 24, .16) 1px, transparent 1px) 0 0 / 100% 3px,
-    linear-gradient(90deg, rgba(2, 8, 24, .16) 1px, transparent 1px) 0 0 / 3px 100%;
+    linear-gradient(90deg, rgba(2, 8, 24, .16) 1px, transparent 1px) 0 0 / 3px 100%,
+    radial-gradient(circle at 50% 50%, var(--led-dots) 0 .7px, transparent 1.1px) 0 0 / 3px 3px, var(--led-bg);
+  box-shadow: inset 0 0 0 1px var(--led-bezel), inset 0 0 9px rgba(70, 140, 255, .22);
 }
 /* CPU / memory colour steps of the board header (thresholds: config ui.fx.led.load.steps) */
 html.fx-on .led .sv { font-weight: 700; }
