@@ -178,14 +178,15 @@ export function liftFrames(p, H) {
 }
 
 /**
- * The flight: a stretch along the throw velocity that relaxes, plus the type's spin over the whole flight (about the body's middle, `spin` turns,
- * turning the way it was thrown). Frames share one transform list: rotate(spin) rotate(a) scale(sx, sy) rotate(-a).
+ * The flight: a stretch along the throw velocity that relaxes, plus the type's spin over the whole flight (`spin` turns, the way it was thrown).
+ * Everything turns about the body's middle (`H.throw.spinMidPx` above the feet), not about the feet. Frames share one transform list:
+ * translate(0, -mid) rotate(spin) rotate(a) scale(sx, sy) rotate(-a) translate(0, mid).
  */
 export function flightFrames(p, vx, vy, ms, H) {
   const a = Math.atan2(vy, vx) * (180 / Math.PI);
   const T = H.throw;
   const spin = (vx < 0 ? -1 : 1) * 360 * p.spin;
-  const f = (turn, sx, sy) => `rotate(${r3(turn)}deg) rotate(${r3(a)}deg) scale(${r3(sx)}, ${r3(sy)}) rotate(${r3(-a)}deg)`;
+  const f = (turn, sx, sy) => `translate(0px, ${-T.spinMidPx}px) rotate(${r3(turn)}deg) rotate(${r3(a)}deg) scale(${r3(sx)}, ${r3(sy)}) rotate(${r3(-a)}deg) translate(0px, ${T.spinMidPx}px)`;
   return {
     frames: [
       { offset: 0, transform: f(0, T.stretch[0], T.stretch[1]), easing: 'ease-out' },

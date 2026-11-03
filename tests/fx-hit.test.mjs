@@ -109,14 +109,16 @@ test('lift, flight, landing, bounce and head shake: transform-only keyframes tha
   const ff = flightFrames(H.types.dramatic, 600, -200, 800, H);
   assert.equal(ff.ms, 800);
   assert.ok(ff.frames[0].transform.includes('scale(1.3, 0.8)'));
-  assert.ok(ff.frames.at(-1).transform.startsWith('rotate(1080deg)'));
-  assert.ok(flightFrames(H.types.tough, -600, 0, 500, H).frames.at(-1).transform.startsWith('rotate(0deg)'));
-  assert.ok(flightFrames(H.types.flinch, -600, 0, 500, H).frames.at(-1).transform.startsWith('rotate(-360deg)'));
+  const mid = H.throw.spinMidPx;
+  assert.ok(ff.frames.every((f) => f.transform.startsWith(`translate(0px, ${-mid}px) `) && f.transform.endsWith(`translate(0px, ${mid}px)`)), 'turns about the body middle');
+  assert.ok(ff.frames.at(-1).transform.includes(') rotate(1080deg) rotate('));
+  assert.ok(flightFrames(H.types.tough, -600, 0, 500, H).frames.at(-1).transform.includes(') rotate(0deg) rotate('));
+  assert.ok(flightFrames(H.types.flinch, -600, 0, 500, H).frames.at(-1).transform.includes(') rotate(-360deg) rotate('));
   for (const k of [landFrames(H.types.tough, H), bounceFrames(H.types.bubbly, H), headShakeFrames(H)]) {
     assert.ok(k.ms > 0);
     assert.equal(k.frames.at(-1).transform, REST);
   }
-  assert.ok(landFrames(H.types.tough, H).frames[0].transform.includes('scale(1.19'));
+  assert.ok(landFrames(H.types.tough, H).frames[0].transform.includes('scale(1.07'));
 });
 
 // ---- combo ----

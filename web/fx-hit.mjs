@@ -180,12 +180,13 @@ export function init(ctx) {
     }
   }
 
-  function comboCounter(rec, f, n) {
+  function comboCounter(rec, f, n, dir) {
     const view = comboView(n, H);
     if (!view) return;
     const C = H.combo;
     combos.get(rec)?.anim.cancel();
-    const [x, y] = f.head;
+    const [hx, y] = f.head;
+    const x = hx - dir * C.sidePx; // on the side that was hit, clear of the speech bubble above the head
     const item = fly(f.floor, 'combo', view.text, x, y - C.gapPx, [
       { offset: 0, transform: `translate(0px, 0px) scale(${view.scale * 0.5})`, opacity: 0 },
       { offset: 0.15, transform: `translate(0px, ${px(-C.gapPx * 0.4)}) scale(${view.scale * 1.2})`, opacity: 1 },
@@ -306,7 +307,7 @@ export function init(ctx) {
       if (level >= H.shake.fromLevel && !reduced()) shakeFloor(f.floor);
       extras(rec, f, T, level, persona);
     }
-    comboCounter(rec, f, combo);
+    comboCounter(rec, f, combo, dir);
     const P = rec.isCat ? ctx.ui.cat.pet : ctx.ui.poke;
     if (comboSpeaks(combo, P.maxLevel)) ctx.sayFor(rec, ctx.line(rec.isCat ? 'catCombo' : 'combo', undefined, rec), P.sayMs);
   }
@@ -344,14 +345,13 @@ export function init(ctx) {
     ping('whoosh', persona, 1);
   }
 
-  /** The landing look runs once the office has put the character down (a microtask later): the dust sits at the real feet, the office's own thump gives way. */
+  /** The landing look runs once the office has put the character down (a microtask later): the dust sits at the real feet, the type's own squash rides on top of the office's thump. */
   function onDown({ rec }, thrown) {
     stopWiggle(rec);
     if (thrown) stopHit(rec);
     if (!active(rec)) return;
     queueMicrotask(() => {
       if (!ctx.fx.fxOn() || !active(rec)) return;
-      rec.body.classList.remove('thump');
       const persona = personaOf(personas, rec);
       const T = H.types[typeOf(rec, persona)];
       if (!T) return;
