@@ -29,23 +29,22 @@ export function deskSlots(data, design, kind) {
   return s;
 }
 
-/** The placement of item `id` with its anchor on `point` (a screen fills its rect, so `point` is the rect's corner). */
+/** The placement of item `id` with its anchor on `point`. */
 function place(data, id, slot, point) {
   const it = data.items[id];
   const [rx, ry, w, h] = it.rect;
   const [ax, ay] = it.anchor;
-  return slot === 'screen' ? { id, slot, point, x: point[0], y: point[1], w, h, rx, ry } : { id, slot, point, x: point[0] - ax, y: point[1] - ay, w, h, rx, ry };
+  return { id, slot, point, x: point[0] - ax, y: point[1] - ay, w, h, rx, ry };
 }
 
 export const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
-/** Item ids by slot: base ones only (personal items are swapped in later), lead ones only for a lead desk, screens of this design. */
-function pools(data, design, lead) {
-  const out = { surface: [], monitorTop: [], bezel: [], monitorEdge: [], screen: [] };
+/** Item ids by slot: base ones only (personal items are swapped in later), lead ones only for a lead desk. */
+function pools(data, lead) {
+  const out = { surface: [], monitorTop: [], bezel: [], monitorEdge: [] };
   for (const [id, it] of Object.entries(data.items)) {
     if (isPersonalItem(it) || !out[it.slot]) continue;
     if (it.tags?.includes('lead') && !lead) continue;
-    if (it.slot === 'screen' && it.design !== design) continue;
     out[it.slot].push(id);
   }
   return out;
@@ -55,7 +54,7 @@ function pools(data, design, lead) {
 function build(data, cfg, desk, design, rng) {
   const slots = deskSlots(data, design, desk.kind);
   const lead = isLeadKind(desk.kind);
-  const pool = pools(data, design, lead);
+  const pool = pools(data, lead);
   const items = [];
   const used = new Set();
   const tags = new Set();
@@ -66,7 +65,7 @@ function build(data, cfg, desk, design, rng) {
     if (wantTag) order.sort((a, b) => Number(!data.items[a].tags?.includes(wantTag)) - Number(!data.items[b].tags?.includes(wantTag)));
     for (const id of order) {
       const p = place(data, id, slot, point);
-      if (items.some((q) => q.slot !== 'screen' && overlaps(p, q))) continue;
+      if (items.some((q) => overlaps(p, q))) continue;
       items.push(p);
       used.add(id);
       for (const t of data.items[id].tags ?? []) tags.add(t);
@@ -84,10 +83,12 @@ function build(data, cfg, desk, design, rng) {
   for (const pt of shuffled(rng, slots.monitorTop ?? []).slice(0, intIn(rng, cfg.monitorTop))) put(pool.monitorTop, 'monitorTop', pt);
   const stickerPts = shuffled(rng, [...(slots.bezel ?? []).map((p) => ['bezel', p]), ...(slots.monitorEdge ?? []).map((p) => ['monitorEdge', p])]);
   for (const [slot, pt] of stickerPts.slice(0, intIn(rng, cfg.stickers))) put(pool[slot], slot, pt);
-  if (slots.screen) {
-    const fit = pool.screen.filter((id) => data.items[id].rect[2] === slots.screen[2] && data.items[id].rect[3] === slots.screen[3]);
-    const id = shuffled(rng, fit)[0];
-    if (id) items.push(place(data, id, 'screen', [slots.screen[0], slots.screen[1]]));
+  // the monitor's back is plain, so every monitor carries at least one thing: a topper, a sticker or a note
+  const onMonitor = () => items.some((q) => q.slot !== 'surface');
+  const monitorPts = shuffled(rng, [...(slots.monitorTop ?? []).map((p) => ['monitorTop', p]), ...stickerPts]);
+  for (const [slot, pt] of monitorPts) {
+    if (onMonitor()) break;
+    put(pool[slot], slot, pt);
   }
   return { id: desk.id, kind: desk.kind, flipX: !!desk.flipX, items, personal };
 }
@@ -132,7 +133,7 @@ export function withPersonal(plan, data, spriteKey) {
   const id = plan.personal >= 0 && spriteKey ? personalFor(data, spriteKey) : null;
   if (!id) return plan.items;
   const swapped = place(data, id, 'surface', plan.items[plan.personal].point);
-  if (plan.items.some((q, i) => i !== plan.personal && q.slot !== 'screen' && overlaps(swapped, q))) return plan.items;
+  if (plan.items.some((q, i) => i !== plan.personal && overlaps(swapped, q))) return plan.items;
   return plan.items.map((q, i) => (i === plan.personal ? swapped : q));
 }
 

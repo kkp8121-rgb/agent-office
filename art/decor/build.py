@@ -2,7 +2,7 @@
 
   python art/decor/build.py
 
-Props are drawn at native pixel size (sprites.py: ASCII rows, screens.py: procedural screens), given a selective outline,
+Props are drawn at native pixel size (sprites.py: ASCII rows), given a selective outline,
 a left-lit bevel and a contact shadow here, packed into one transparent atlas, and described together with the measured
 desk slots (DESKS below: pixels from the top-left of the desk sprite as drawn in the design's objects.png, unflipped).
 Also writes art/decor/contact-sheet.png and art/decor/preview-<design>.png (3 combinations per desk kind, 1x and 3x).
@@ -17,46 +17,45 @@ from PIL import Image, ImageDraw
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE)
-import screens  # noqa: E402
 import sprites  # noqa: E402
 
 OUT_DIR = os.path.join(ROOT, "assets", "decor")
 ATLAS_W = 512
 
 # ---------------------------------------------------------------------------------------------------------------
-# Measured desk slots. Points are bottom-centre anchors of the item that goes there; screen = [x, y, w, h].
-# `shear`: the lounge draws its monitors in 2:1 isometric, so its screens are sheared quads inside their bounding rect.
+# Measured desk slots. Points are bottom-centre anchors of the item that goes there. There is no screen slot: the seated
+# character faces the monitor, so the viewer sees the monitor's back and nothing is drawn on it.
 # ---------------------------------------------------------------------------------------------------------------
 DESKS = {
     "studio2": {
         "desk": dict(surface=[[23, 25], [24, 16], [60, 25], [67, 19], [75, 25], [75, 15]], monitorTop=[[42, 0]],
-                     bezel=[[33, 17], [33, 8], [51, 17], [51, 8]], monitorEdge=[[28, 14], [56, 12]], screen=[29, 1, 26, 17]),
+                     bezel=[[33, 17], [33, 8], [51, 17], [51, 8]], monitorEdge=[[28, 14], [56, 12]]),
         "lead-desk": dict(surface=[[34, 19], [34, 27], [75, 20], [84, 27], [93, 21], [88, 15]], monitorTop=[[55, 0]],
-                          bezel=[[45, 17], [45, 8], [65, 17], [65, 8]], monitorEdge=[[40, 14], [69, 12]], screen=[41, 1, 28, 17]),
+                          bezel=[[45, 17], [45, 8], [65, 17], [65, 8]], monitorEdge=[[40, 14], [69, 12]]),
     },
     "lounge": {
         "desk": dict(surface=[[14, 20], [20, 23], [47, 36], [55, 40], [62, 44], [83, 35]], monitorTop=[[40, 12]],
-                     bezel=[[32, 21], [38, 24], [45, 27]], monitorEdge=[[27, 17], [51, 28]], screen=[27, 6, 25, 28], shear=16),
+                     bezel=[[32, 21], [38, 24], [45, 27]], monitorEdge=[[27, 17], [51, 28]]),
         "lead-desk": dict(surface=[[22, 23], [30, 27], [38, 31], [63, 43], [72, 49], [82, 48]], monitorTop=[[54, 17]],
-                          bezel=[[46, 26], [53, 30], [60, 34]], monitorEdge=[[41, 20], [66, 32]], screen=[41, 10, 26, 29], shear=17),
+                          bezel=[[46, 26], [53, 30], [60, 34]], monitorEdge=[[41, 20], [66, 32]]),
     },
     "library": {
         "desk": dict(surface=[[7, 24], [13, 19], [19, 25], [56, 25], [56, 18]], monitorTop=[[37, 0]],
-                     bezel=[[29, 16], [29, 8], [45, 16], [45, 8]], monitorEdge=[[24, 12], [49, 10]], screen=[25, 2, 24, 15]),
+                     bezel=[[29, 16], [29, 8], [45, 16], [45, 8]], monitorEdge=[[24, 12], [49, 10]]),
         "lead-desk": dict(surface=[[6, 24], [32, 22], [34, 16], [72, 23], [74, 17], [97, 23]], monitorTop=[[53, 0]],
-                          bezel=[[45, 17], [45, 8], [62, 17], [62, 8]], monitorEdge=[[41, 13], [66, 11]], screen=[42, 2, 24, 16]),
+                          bezel=[[45, 17], [45, 8], [62, 17], [62, 8]], monitorEdge=[[41, 13], [66, 11]]),
     },
     "greenhouse": {
         "desk": dict(surface=[[7, 26], [14, 20], [20, 27], [60, 27], [59, 20]], monitorTop=[[39, 0]],
-                     bezel=[[30, 17], [30, 9], [51, 17], [51, 9]], monitorEdge=[[23, 13], [55, 11]], screen=[24, 2, 30, 16]),
+                     bezel=[[30, 17], [30, 9], [51, 17], [51, 9]], monitorEdge=[[23, 13], [55, 11]]),
         "lead-desk": dict(surface=[[5, 26], [31, 27], [75, 25], [77, 19], [79, 29]], monitorTop=[[52, 0]],
-                          bezel=[[41, 18], [41, 9], [63, 18], [63, 9]], monitorEdge=[[35, 14], [69, 12]], screen=[36, 2, 33, 19]),
+                          bezel=[[41, 18], [41, 9], [63, 18], [63, 9]], monitorEdge=[[35, 14], [69, 12]]),
     },
     "lobby": {
         "desk": dict(surface=[[8, 8], [15, 6], [46, 8], [54, 5], [70, 7]], monitorTop=[[30, 3]],
-                     bezel=[[28, 8], [33, 8]], monitorEdge=[[22, 6], [38, 6]], screen=[23, 4, 14, 4]),
+                     bezel=[[28, 8], [33, 8]], monitorEdge=[[22, 6], [38, 6]]),
         "desk-b": dict(surface=[[30, 13], [38, 10], [45, 13], [51, 9], [28, 9]], monitorTop=[[62, 0]],
-                       bezel=[[57, 8], [66, 8]], monitorEdge=[[54, 6], [69, 5]], screen=[55, 1, 14, 10]),
+                       bezel=[[57, 8], [66, 8]], monitorEdge=[[54, 6], [69, 5]]),
     },
 }
 ORDER = ["studio2", "lounge", "library", "greenhouse", "lobby"]
@@ -137,26 +136,11 @@ def build_items():
         if spec.get("personal"):
             meta["personal"] = spec["personal"]
         items[id_] = (im, anchor, meta)
-    cache = {}
-    for design in ORDER:
-        for kind, d in DESKS[design].items():
-            x, y, w, h = d["screen"]
-            cw, ch = (w, d["shear"]) if d.get("shear") else (w, h)
-            for content in screens.CONTENTS:
-                key = (content, cw, ch, bool(d.get("shear")))
-                if key not in cache:
-                    im = screens.screen(content, cw, ch)
-                    if d.get("shear"):
-                        im = screens.shear(im)
-                        assert im.size == (w, h), (design, kind, im.size, (w, h))
-                    cache[key] = im
-                items[f"screen-{content}-{design}-{kind}"] = (cache[key], [0, 0], {
-                    "slot": "screen", "tags": ["screen", content], "design": design, "kind": kind, "content": content})
     return items
 
 
 def pack(items):
-    """Shelf packing; identical pixel buffers (shared screens) share one rect."""
+    """Shelf packing; identical pixel buffers share one rect."""
     uniq = {}
     for id_, (im, _a, _m) in items.items():
         uniq.setdefault((im.size, im.tobytes()), im)
@@ -186,7 +170,7 @@ def write_atlas(items):
     for design in ORDER:
         out["desks"][design] = {}
         for kind, d in DESKS[design].items():
-            out["desks"][design][kind] = {k: v for k, v in d.items() if k != "shear"}
+            out["desks"][design][kind] = dict(d)
     with open(os.path.join(OUT_DIR, "decor.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(out, f, ensure_ascii=False, indent=1)
         f.write("\n")
@@ -197,12 +181,7 @@ def write_atlas(items):
 # review sheets
 # ---------------------------------------------------------------------------------------------------------------
 def contact_sheet(items):
-    cell_items = [(i, v) for i, v in items.items() if not i.startswith("screen-")]
-    shown = {}
-    for i, v in items.items():  # one screen per content and size, labelled once
-        if i.startswith("screen-"):
-            shown.setdefault((v[2]["content"], v[0].size), (i, v))
-    cell_items += [(f"{k[0]} {k[1][0]}x{k[1][1]}", v[1]) for k, v in shown.items()]
+    cell_items = list(items.items())
     S = 4
     pad = 6
     bg = (196, 192, 184, 255)
@@ -250,20 +229,18 @@ def desk_crop(design, kind):
 
 
 def compose(design, kind, combo, items, margin=(16, 14)):
-    """combo: dict(surface=[(point index, id)...], top=id|None, bezel=[(i,id)], edge=[(i,id)], screen=id|None)."""
+    """combo: dict(surface=[(point index, id)...], top=id|None, bezel=[(i,id)], edge=[(i,id)])."""
     desk = desk_crop(design, kind)
     d = DESKS[design][kind]
     mx, my = margin
     im = Image.new("RGBA", (desk.width + mx * 2, desk.height + my + 6), (0, 0, 0, 0))
     im.alpha_composite(desk, (mx, my))
 
-    def put(id_, pt, topleft=False):
+    def put(id_, pt):
         sprite, anchor, _m = items[id_]
-        px_, py_ = (pt[0] - 0, pt[1] - 0) if topleft else (pt[0] - anchor[0], pt[1] - anchor[1])
+        px_, py_ = pt[0] - anchor[0], pt[1] - anchor[1]
         im.alpha_composite(sprite, (mx + px_, my + py_)) if (mx + px_ >= 0 and my + py_ >= 0) else None
 
-    if combo.get("screen"):
-        put(combo["screen"], d["screen"][:2], topleft=True)
     for i, id_ in sorted(combo.get("bezel", []), key=lambda t: d["bezel"][t[0]][1]):
         put(id_, d["bezel"][i])
     for i, id_ in combo.get("edge", []):
@@ -284,7 +261,6 @@ def make_combos(design, kind, items, seed):
     tops = [i for i, v in items.items() if v[2]["slot"] == "monitorTop"]
     bez = [i for i, v in items.items() if v[2]["slot"] == "bezel"]
     notes = [i for i, v in items.items() if v[2]["slot"] == "monitorEdge"]
-    scr = [f"screen-{c}-{design}-{kind}" for c in screens.CONTENTS]
     combos = []
     for n in range(3):
         k = 3 if len(d["surface"]) >= 5 else 2
@@ -300,8 +276,7 @@ def make_combos(design, kind, items, seed):
                 surf.append((i, pool.pop(rnd.randrange(len(pool)))))
         combos.append(dict(surface=surf, top=rnd.choice(tops) if n != 1 else None,
                            bezel=[] if n != 1 else [(i, rnd.choice(bez)) for i in rnd.sample(range(len(d["bezel"])), min(3, len(d["bezel"])))],
-                           edge=[(rnd.randrange(len(d["monitorEdge"])), rnd.choice(notes))],
-                           screen=rnd.choice(scr) if n != 1 else None))
+                           edge=[(rnd.randrange(len(d["monitorEdge"])), rnd.choice(notes))]))
     return combos
 
 
@@ -335,7 +310,7 @@ def main():
     atlas, out = write_atlas(items)
     contact_sheet(items)
     previews(items)
-    print(f"items {len(items)}  atlas {atlas.size}  screens {sum(1 for i in items if i.startswith('screen-'))}")
+    print(f"items {len(items)}  atlas {atlas.size}")
 
 
 if __name__ == "__main__":

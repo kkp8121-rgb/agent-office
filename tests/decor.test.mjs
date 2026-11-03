@@ -31,12 +31,24 @@ t('every design and desk kind has slots, every referenced item exists', () => {
     const kinds = Object.keys(rawOf(design).kinds).filter((k) => k.includes('desk'));
     for (const kind of kinds) {
       const s = deskSlots(data, design, kind);
-      assert.ok(s.surface.length >= 1 && s.screen, `${design}/${kind}`);
-      const screens = Object.values(data.items).filter((it) => it.slot === 'screen' && it.design === design && it.rect[2] === s.screen[2] && it.rect[3] === s.screen[3]);
-      assert.ok(screens.length >= 1, `${design}/${kind} has a screen picture of ${s.screen[2]}x${s.screen[3]}`);
+      assert.ok(s.surface.length >= 1 && s.monitorTop?.length >= 1, `${design}/${kind}`);
     }
   }
   for (const design of DESIGNS) for (const p of plan(design).flatMap((d) => d.items)) assert.ok(data.items[p.id], p.id);
+});
+
+t('no screen anywhere: the monitor is seen from behind, so decor.json has no screen item or slot and no desk gets one', () => {
+  assert.equal(Object.values(data.items).filter((it) => it.slot === 'screen' || it.tags?.includes('screen')).length, 0);
+  for (const [design, kinds] of Object.entries(data.desks)) for (const [kind, s] of Object.entries(kinds)) assert.ok(!('screen' in s) && !('shear' in s), `${design}/${kind}`);
+  for (const design of DESIGNS) for (const p of plan(design)) assert.ok(p.items.every((i) => i.slot !== 'screen'), `${design} ${p.id}`);
+});
+
+t('every monitor carries at least one item (topper, sticker or note), for every design and the lobby', () => {
+  for (const design of DESIGNS) {
+    for (const p of plan(design, design === 'lobby' ? 1 : 3)) assert.ok(p.items.some((i) => ['monitorTop', 'bezel', 'monitorEdge'].includes(i.slot)), `${design} ${p.id}`);
+  }
+  // also with the stickers and toppers switched off in the config, the rule still puts one on
+  for (const p of planFloor({ design: 'studio2', floor: 2, desks: desksOf('studio2'), data, cfg: { ...C, monitorTop: [0, 0], stickers: [0, 0] } })) assert.ok(p.items.some((i) => i.slot !== 'surface'), p.id);
 });
 
 t('no two desks of a floor are alike, for every design and the 40 desks of the lobby', () => {
@@ -57,7 +69,7 @@ t('the sets are stable: same floor same desks, another floor or design another s
   assert.deepEqual(plan('lobby', 1).slice(0, 5), plan('lobby', 1).slice(0, 5));
 });
 
-t('a desk gets 2-4 surface items, 0-1 monitor topper, 0-2 stickers and exactly one screen of the right size', () => {
+t('a desk gets 2-4 surface items, 0-1 monitor topper and 0-2 stickers', () => {
   for (const design of DESIGNS) {
     for (const p of plan(design)) {
       const slots = deskSlots(data, design, p.kind);
@@ -65,10 +77,6 @@ t('a desk gets 2-4 surface items, 0-1 monitor topper, 0-2 stickers and exactly o
       assert.ok(count('surface') >= Math.min(C.surface[0], slots.surface.length) && count('surface') <= C.surface[1], `${design} ${p.id} surface ${count('surface')}`);
       assert.ok(count('monitorTop') <= C.monitorTop[1]);
       assert.ok(count('bezel') + count('monitorEdge') <= C.stickers[1]);
-      assert.equal(count('screen'), 1);
-      const [s] = p.items.filter((i) => i.slot === 'screen');
-      assert.deepEqual([s.x, s.y, s.w, s.h], slots.screen);
-      assert.equal(data.items[s.id].design, design);
       for (const i of p.items) assert.equal(data.items[i.id].slot, i.slot);
     }
   }
@@ -79,8 +87,7 @@ t('props of one desk never overlap, also with a personal item swapped in', () =>
   for (const design of DESIGNS) {
     for (const p of plan(design)) {
       for (const items of [p.items, ...keys.map((k) => withPersonal(p, data, k))]) {
-        const solid = items.filter((i) => i.slot !== 'screen');
-        solid.forEach((a, i) => solid.slice(i + 1).forEach((b) => assert.ok(!overlaps(a, b), `${design} ${p.id}: ${a.id} / ${b.id}`)));
+        items.forEach((a, i) => items.slice(i + 1).forEach((b) => assert.ok(!overlaps(a, b), `${design} ${p.id}: ${a.id} / ${b.id}`)));
         assert.equal(new Set(items.map((i) => i.id)).size, items.length);
       }
     }

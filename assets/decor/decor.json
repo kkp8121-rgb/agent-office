@@ -4,8 +4,8 @@
  "items": {
   "fig-bear": {
    "rect": [
-    354,
-    68,
+    54,
+    0,
     10,
     13
    ],
@@ -21,8 +21,8 @@
   },
   "fig-cat": {
    "rect": [
-    408,
-    68,
+    108,
+    0,
     10,
     12
    ],
@@ -38,8 +38,8 @@
   },
   "fig-bunny": {
    "rect": [
-    300,
-    68,
+    0,
+    0,
     9,
     14
    ],
@@ -55,8 +55,8 @@
   },
   "fig-penguin": {
    "rect": [
-    376,
-    68,
+    76,
+    0,
     9,
     13
    ],
@@ -72,8 +72,8 @@
   },
   "fig-dino": {
    "rect": [
-    487,
-    68,
+    187,
+    0,
     12,
     11
    ],
@@ -89,8 +89,8 @@
   },
   "fig-owl": {
    "rect": [
-    441,
-    68,
+    141,
+    0,
     9,
     12
    ],
@@ -106,8 +106,8 @@
   },
   "fig-fox": {
    "rect": [
-    396,
-    68,
+    96,
+    0,
     11,
     12
    ],
@@ -123,8 +123,8 @@
   },
   "fig-frog": {
    "rect": [
-    97,
-    97,
+    181,
+    15,
     10,
     9
    ],
@@ -140,8 +140,8 @@
   },
   "fig-ghost": {
    "rect": [
-    451,
-    68,
+    151,
+    0,
     9,
     12
    ],
@@ -157,8 +157,8 @@
   },
   "fig-astronaut": {
    "rect": [
-    386,
-    68,
+    86,
+    0,
     9,
     13
    ],
@@ -174,8 +174,8 @@
   },
   "toy-robot": {
    "rect": [
-    310,
-    68,
+    10,
+    0,
     9,
     14
    ],
@@ -192,8 +192,8 @@
   },
   "fig-bobblehead": {
    "rect": [
-    320,
-    68,
+    20,
+    0,
     9,
     14
    ],
@@ -210,8 +210,8 @@
   },
   "plush-heart": {
    "rect": [
-    387,
-    85,
+    479,
+    0,
     10,
     10
    ],
@@ -227,8 +227,8 @@
   },
   "rubber-duck": {
    "rect": [
-    500,
-    68,
+    200,
+    0,
     11,
     11
    ],
@@ -244,8 +244,8 @@
   },
   "lucky-cat": {
    "rect": [
-    365,
-    68,
+    65,
+    0,
     10,
     13
    ],
@@ -262,8 +262,8 @@
   },
   "toy-rocket": {
    "rect": [
-    471,
-    68,
+    171,
+    0,
     7,
     12
    ],
@@ -279,8 +279,8 @@
   },
   "toy-blocks": {
    "rect": [
-    108,
-    97,
+    192,
+    15,
     10,
     9
    ],
@@ -295,8 +295,8 @@
   },
   "rubik-cube": {
    "rect": [
-    24,
-    85,
+    236,
+    0,
     10,
     11
    ],
@@ -311,8 +311,8 @@
   },
   "dice-red": {
    "rect": [
-    464,
-    85,
+    44,
+    15,
     9,
     10
    ],
@@ -327,8 +327,8 @@
   },
   "game-controller": {
    "rect": [
-    34,
-    97,
+    118,
+    15,
     12,
     9
    ],
@@ -344,8 +344,8 @@
   },
   "plant-cactus": {
    "rect": [
-    330,
-    68,
+    30,
+    0,
     9,
     14
    ],
@@ -360,8 +360,8 @@
   },
   "plant-succulent": {
    "rect": [
-    398,
-    85,
+    490,
+    0,
     10,
     10
    ],
@@ -376,8 +376,8 @@
   },
   "plant-tulips": {
    "rect": [
-    101,
-    85,
+    313,
+    0,
     9,
     11
    ],
@@ -392,8 +392,8 @@
   },
   "plant-bonsai": {
    "rect": [
-    340,
-    68,
+    40,
+    0,
     13,
     13
    ],
@@ -408,8 +408,8 @@
   },
   "plant-sprout": {
    "rect": [
-    19,
-    97,
+    103,
+    15,
     7,
     10
    ],
@@ -424,8 +424,8 @@
   },
   "mug-red": {
    "rect": [
-    119,
-    97,
+    203,
+    15,
     9,
     9
    ],
@@ -440,8 +440,8 @@
   },
   "mug-blue": {
    "rect": [
-    129,
-    97,
+    213,
+    15,
     9,
     9
    ],
@@ -456,8 +456,8 @@
   },
   "mug-green": {
    "rect": [
-    139,
-    97,
+    223,
+    15,
     9,
     9
    ],
@@ -472,8 +472,8 @@
   },
   "mug-white": {
    "rect": [
-    149,
-    97,
+    233,
+    15,
     9,
     9
    ],
@@ -488,8 +488,8 @@
   },
   "mug-yellow": {
    "rect": [
-    159,
-    97,
+    243,
+    15,
     9,
     9
    ],
@@ -504,8 +504,8 @@
   },
   "mug-teal": {
    "rect": [
-    169,
-    97,
+    253,
+    15,
     9,
     9
    ],
@@ -520,8 +520,8 @@
   },
   "mug-violet": {
    "rect": [
-    179,
-    97,
+    263,
+    15,
     9,
     9
    ],
@@ -536,8 +536,8 @@
   },
   "teacup": {
    "rect": [
-    73,
-    97,
+    157,
+    15,
     11,
     9
    ],
@@ -552,8 +552,8 @@
   },
   "cup-takeout": {
    "rect": [
-    141,
-    85,
+    353,
+    0,
     8,
     11
    ],
@@ -569,8 +569,8 @@
   },
   "cup-takeout-green": {
    "rect": [
-    150,
-    85,
+    362,
+    0,
     8,
     11
    ],
@@ -586,8 +586,8 @@
   },
   "drink-iced": {
    "rect": [
-    27,
-    97,
+    111,
+    15,
     6,
     10
    ],
@@ -603,8 +603,8 @@
   },
   "pen-cup": {
    "rect": [
-    474,
-    85,
+    54,
+    15,
     9,
     10
    ],
@@ -620,8 +620,8 @@
   },
   "candle-pink": {
    "rect": [
-    186,
-    85,
+    398,
+    0,
     7,
     11
    ],
@@ -637,8 +637,8 @@
   },
   "candle-teal": {
    "rect": [
-    194,
-    85,
+    406,
+    0,
     7,
     11
    ],
@@ -654,8 +654,8 @@
   },
   "book-stack-a": {
    "rect": [
-    47,
-    97,
+    131,
+    15,
     12,
     9
    ],
@@ -670,8 +670,8 @@
   },
   "book-stack-b": {
    "rect": [
+    212,
     0,
-    85,
     11,
     11
    ],
@@ -686,8 +686,8 @@
   },
   "photo-frame": {
    "rect": [
-    189,
-    97,
+    273,
+    15,
     9,
     9
    ],
@@ -703,8 +703,8 @@
   },
   "photo-frame-pair": {
    "rect": [
-    219,
-    97,
+    303,
+    15,
     11,
     8
    ],
@@ -720,8 +720,8 @@
   },
   "desk-calendar": {
    "rect": [
-    484,
-    85,
+    64,
+    15,
     9,
     10
    ],
@@ -736,8 +736,8 @@
   },
   "sticky-pad-yellow": {
    "rect": [
-    255,
-    97,
+    339,
+    15,
     8,
     8
    ],
@@ -752,8 +752,8 @@
   },
   "sticky-pad-pink": {
    "rect": [
-    264,
-    97,
+    348,
+    15,
     8,
     8
    ],
@@ -768,8 +768,8 @@
   },
   "sticky-pad-blue": {
    "rect": [
-    273,
-    97,
+    357,
+    15,
     8,
     8
    ],
@@ -784,8 +784,8 @@
   },
   "stapler": {
    "rect": [
-    372,
-    97,
+    456,
+    15,
     10,
     7
    ],
@@ -800,8 +800,8 @@
   },
   "alarm-clock": {
    "rect": [
-    419,
-    68,
+    119,
+    0,
     10,
     12
    ],
@@ -816,8 +816,8 @@
   },
   "trophy-small": {
    "rect": [
-    159,
-    85,
+    371,
+    0,
     8,
     11
    ],
@@ -832,8 +832,8 @@
   },
   "globe-desk": {
    "rect": [
-    430,
-    68,
+    130,
+    0,
     10,
     12
    ],
@@ -848,8 +848,8 @@
   },
   "fan-desk": {
    "rect": [
-    461,
-    68,
+    161,
+    0,
     9,
     12
    ],
@@ -864,8 +864,8 @@
   },
   "headphones": {
    "rect": [
-    60,
-    97,
+    144,
+    15,
     12,
     9
    ],
@@ -881,8 +881,8 @@
   },
   "snack-chips": {
    "rect": [
-    494,
-    85,
+    74,
+    15,
     9,
     10
    ],
@@ -897,8 +897,8 @@
   },
   "cookie-jar": {
    "rect": [
-    111,
-    85,
+    323,
+    0,
     9,
     11
    ],
@@ -913,8 +913,8 @@
   },
   "lamp-red": {
    "rect": [
-    409,
-    85,
+    501,
+    0,
     10,
     10
    ],
@@ -929,8 +929,8 @@
   },
   "lamp-green": {
    "rect": [
-    420,
-    85,
+    0,
+    15,
     10,
     10
    ],
@@ -945,8 +945,8 @@
   },
   "aquarium": {
    "rect": [
-    349,
-    85,
+    441,
+    0,
     12,
     10
    ],
@@ -962,8 +962,8 @@
   },
   "fishbowl": {
    "rect": [
-    35,
-    85,
+    247,
+    0,
     10,
     11
    ],
@@ -978,8 +978,8 @@
   },
   "hourglass": {
    "rect": [
-    10,
-    97,
+    94,
+    15,
     8,
     10
    ],
@@ -994,8 +994,8 @@
   },
   "speaker": {
    "rect": [
-    199,
-    97,
+    283,
+    15,
     9,
     9
    ],
@@ -1010,8 +1010,8 @@
   },
   "top-cat": {
    "rect": [
-    231,
-    97,
+    315,
+    15,
     11,
     8
    ],
@@ -1027,8 +1027,8 @@
   },
   "top-alien": {
    "rect": [
-    209,
-    97,
+    293,
+    15,
     9,
     9
    ],
@@ -1044,8 +1044,8 @@
   },
   "top-bear": {
    "rect": [
-    282,
-    97,
+    366,
+    15,
     8,
     8
    ],
@@ -1061,8 +1061,8 @@
   },
   "top-plant": {
    "rect": [
-    336,
-    97,
+    420,
+    15,
     7,
     8
    ],
@@ -1077,8 +1077,8 @@
   },
   "top-duck": {
    "rect": [
-    383,
-    97,
+    467,
+    15,
     9,
     7
    ],
@@ -1094,8 +1094,8 @@
   },
   "top-ghost": {
    "rect": [
-    344,
-    97,
+    428,
+    15,
     7,
     8
    ],
@@ -1111,8 +1111,8 @@
   },
   "webcam": {
    "rect": [
-    393,
-    97,
+    477,
+    15,
     8,
     7
    ],
@@ -1127,8 +1127,8 @@
   },
   "sticker-star": {
    "rect": [
-    420,
-    97,
+    504,
+    15,
     7,
     7
    ],
@@ -1143,8 +1143,8 @@
   },
   "sticker-heart": {
    "rect": [
-    428,
-    97,
+    0,
+    26,
     7,
     7
    ],
@@ -1159,8 +1159,8 @@
   },
   "sticker-cat": {
    "rect": [
-    402,
-    97,
+    486,
+    15,
     8,
     7
    ],
@@ -1175,8 +1175,8 @@
   },
   "sticker-bolt": {
    "rect": [
-    352,
-    97,
+    436,
+    15,
     7,
     8
    ],
@@ -1191,8 +1191,8 @@
   },
   "sticker-smile": {
    "rect": [
-    411,
-    97,
+    495,
+    15,
     8,
     7
    ],
@@ -1207,8 +1207,8 @@
   },
   "sticker-moon": {
    "rect": [
-    468,
-    97,
+    40,
+    26,
     6,
     7
    ],
@@ -1223,8 +1223,8 @@
   },
   "sticker-flower": {
    "rect": [
-    436,
-    97,
+    8,
+    26,
     7,
     7
    ],
@@ -1239,8 +1239,8 @@
   },
   "sticker-rainbow": {
    "rect": [
-    475,
-    97,
+    47,
+    26,
     9,
     6
    ],
@@ -1255,8 +1255,8 @@
   },
   "sticker-mushroom": {
    "rect": [
-    444,
-    97,
+    16,
+    26,
     7,
     7
    ],
@@ -1271,8 +1271,8 @@
   },
   "sticker-sparkle": {
    "rect": [
-    452,
-    97,
+    24,
+    26,
     7,
     7
    ],
@@ -1287,8 +1287,8 @@
   },
   "sticker-skull": {
    "rect": [
-    460,
-    97,
+    32,
+    26,
     7,
     7
    ],
@@ -1303,8 +1303,8 @@
   },
   "note-yellow": {
    "rect": [
-    291,
-    97,
+    375,
+    15,
     8,
     8
    ],
@@ -1319,8 +1319,8 @@
   },
   "note-pink": {
    "rect": [
-    300,
-    97,
+    384,
+    15,
     8,
     8
    ],
@@ -1335,8 +1335,8 @@
   },
   "note-blue": {
    "rect": [
-    309,
-    97,
+    393,
+    15,
     8,
     8
    ],
@@ -1351,8 +1351,8 @@
   },
   "note-green": {
    "rect": [
-    318,
-    97,
+    402,
+    15,
     8,
     8
    ],
@@ -1367,8 +1367,8 @@
   },
   "p-scout": {
    "rect": [
-    46,
-    85,
+    258,
+    0,
     10,
     11
    ],
@@ -1384,8 +1384,8 @@
   },
   "p-worker-low": {
    "rect": [
-    431,
-    85,
+    11,
+    15,
     10,
     10
    ],
@@ -1401,8 +1401,8 @@
   },
   "p-worker": {
    "rect": [
-    479,
-    68,
+    179,
+    0,
     7,
     12
    ],
@@ -1418,8 +1418,8 @@
   },
   "p-worker-high": {
    "rect": [
-    362,
-    85,
+    454,
+    0,
     12,
     10
    ],
@@ -1435,8 +1435,8 @@
   },
   "p-architect": {
    "rect": [
-    243,
-    97,
+    327,
+    15,
     11,
     8
    ],
@@ -1452,8 +1452,8 @@
   },
   "p-architect-high": {
    "rect": [
-    442,
-    85,
+    22,
+    15,
     10,
     10
    ],
@@ -1469,8 +1469,8 @@
   },
   "p-explore": {
    "rect": [
-    57,
-    85,
+    269,
+    0,
     10,
     11
    ],
@@ -1486,8 +1486,8 @@
   },
   "p-plan": {
    "rect": [
-    121,
-    85,
+    333,
+    0,
     9,
     11
    ],
@@ -1503,8 +1503,8 @@
   },
   "p-code-critic": {
    "rect": [
-    68,
-    85,
+    280,
+    0,
     10,
     11
    ],
@@ -1520,8 +1520,8 @@
   },
   "p-security-reviewer": {
    "rect": [
-    0,
-    97,
+    84,
+    15,
     9,
     10
    ],
@@ -1537,8 +1537,8 @@
   },
   "p-performance-reviewer": {
    "rect": [
-    79,
-    85,
+    291,
+    0,
     10,
     11
    ],
@@ -1554,8 +1554,8 @@
   },
   "p-i18n-reviewer": {
    "rect": [
-    375,
-    85,
+    467,
+    0,
     11,
     10
    ],
@@ -1571,8 +1571,8 @@
   },
   "p-a11y-reviewer": {
    "rect": [
-    90,
-    85,
+    302,
+    0,
     10,
     11
    ],
@@ -1588,8 +1588,8 @@
   },
   "p-frontend": {
    "rect": [
-    85,
-    97,
+    169,
+    15,
     11,
     9
    ],
@@ -1605,8 +1605,8 @@
   },
   "p-backend": {
    "rect": [
-    453,
-    85,
+    33,
+    15,
     10,
     10
    ],
@@ -1622,8 +1622,8 @@
   },
   "p-app": {
    "rect": [
-    202,
-    85,
+    414,
+    0,
     7,
     11
    ],
@@ -1639,8 +1639,8 @@
   },
   "p-default": {
    "rect": [
-    168,
-    85,
+    380,
+    0,
     8,
     11
    ],
@@ -1656,8 +1656,8 @@
   },
   "lead-nameplate": {
    "rect": [
-    360,
-    97,
+    444,
+    15,
     11,
     7
    ],
@@ -1672,8 +1672,8 @@
   },
   "lead-vase": {
    "rect": [
-    131,
-    85,
+    343,
+    0,
     9,
     11
    ],
@@ -1689,8 +1689,8 @@
   },
   "lead-trophies": {
    "rect": [
-    210,
-    85,
+    422,
+    0,
     18,
     10
    ],
@@ -1706,8 +1706,8 @@
   },
   "lead-bell": {
    "rect": [
-    327,
-    97,
+    411,
+    15,
     8,
     8
    ],
@@ -1722,8 +1722,8 @@
   },
   "lead-reports": {
    "rect": [
-    12,
-    85,
+    224,
+    0,
     11,
     11
    ],
@@ -1739,8 +1739,8 @@
   },
   "lead-fountain-pen": {
    "rect": [
-    177,
-    85,
+    389,
+    0,
     8,
     11
    ],
@@ -1752,1606 +1752,6 @@
    "tags": [
     "lead"
    ]
-  },
-  "screen-code-dark-studio2-desk": {
-   "rect": [
-    436,
-    30,
-    26,
-    17
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-dark"
-   ],
-   "design": "studio2",
-   "kind": "desk",
-   "content": "code-dark"
-  },
-  "screen-code-light-studio2-desk": {
-   "rect": [
-    463,
-    30,
-    26,
-    17
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-light"
-   ],
-   "design": "studio2",
-   "kind": "desk",
-   "content": "code-light"
-  },
-  "screen-dashboard-studio2-desk": {
-   "rect": [
-    0,
-    50,
-    26,
-    17
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "dashboard"
-   ],
-   "design": "studio2",
-   "kind": "desk",
-   "content": "dashboard"
-  },
-  "screen-canvas-studio2-desk": {
-   "rect": [
-    27,
-    50,
-    26,
-    17
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "canvas"
-   ],
-   "design": "studio2",
-   "kind": "desk",
-   "content": "canvas"
-  },
-  "screen-terminal-studio2-desk": {
-   "rect": [
-    54,
-    50,
-    26,
-    17
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "terminal"
-   ],
-   "design": "studio2",
-   "kind": "desk",
-   "content": "terminal"
-  },
-  "screen-document-studio2-desk": {
-   "rect": [
-    81,
-    50,
-    26,
-    17
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "document"
-   ],
-   "design": "studio2",
-   "kind": "desk",
-   "content": "document"
-  },
-  "screen-game-studio2-desk": {
-   "rect": [
-    108,
-    50,
-    26,
-    17
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "game"
-   ],
-   "design": "studio2",
-   "kind": "desk",
-   "content": "game"
-  },
-  "screen-call-studio2-desk": {
-   "rect": [
-    135,
-    50,
-    26,
-    17
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "call"
-   ],
-   "design": "studio2",
-   "kind": "desk",
-   "content": "call"
-  },
-  "screen-code-dark-studio2-lead-desk": {
-   "rect": [
-    204,
-    30,
-    28,
-    17
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-dark"
-   ],
-   "design": "studio2",
-   "kind": "lead-desk",
-   "content": "code-dark"
-  },
-  "screen-code-light-studio2-lead-desk": {
-   "rect": [
-    233,
-    30,
-    28,
-    17
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-light"
-   ],
-   "design": "studio2",
-   "kind": "lead-desk",
-   "content": "code-light"
-  },
-  "screen-dashboard-studio2-lead-desk": {
-   "rect": [
-    262,
-    30,
-    28,
-    17
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "dashboard"
-   ],
-   "design": "studio2",
-   "kind": "lead-desk",
-   "content": "dashboard"
-  },
-  "screen-canvas-studio2-lead-desk": {
-   "rect": [
-    291,
-    30,
-    28,
-    17
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "canvas"
-   ],
-   "design": "studio2",
-   "kind": "lead-desk",
-   "content": "canvas"
-  },
-  "screen-terminal-studio2-lead-desk": {
-   "rect": [
-    320,
-    30,
-    28,
-    17
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "terminal"
-   ],
-   "design": "studio2",
-   "kind": "lead-desk",
-   "content": "terminal"
-  },
-  "screen-document-studio2-lead-desk": {
-   "rect": [
-    349,
-    30,
-    28,
-    17
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "document"
-   ],
-   "design": "studio2",
-   "kind": "lead-desk",
-   "content": "document"
-  },
-  "screen-game-studio2-lead-desk": {
-   "rect": [
-    378,
-    30,
-    28,
-    17
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "game"
-   ],
-   "design": "studio2",
-   "kind": "lead-desk",
-   "content": "game"
-  },
-  "screen-call-studio2-lead-desk": {
-   "rect": [
-    407,
-    30,
-    28,
-    17
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "call"
-   ],
-   "design": "studio2",
-   "kind": "lead-desk",
-   "content": "call"
-  },
-  "screen-code-dark-lounge-desk": {
-   "rect": [
-    216,
-    0,
-    25,
-    28
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-dark"
-   ],
-   "design": "lounge",
-   "kind": "desk",
-   "content": "code-dark"
-  },
-  "screen-code-light-lounge-desk": {
-   "rect": [
-    242,
-    0,
-    25,
-    28
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-light"
-   ],
-   "design": "lounge",
-   "kind": "desk",
-   "content": "code-light"
-  },
-  "screen-dashboard-lounge-desk": {
-   "rect": [
-    268,
-    0,
-    25,
-    28
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "dashboard"
-   ],
-   "design": "lounge",
-   "kind": "desk",
-   "content": "dashboard"
-  },
-  "screen-canvas-lounge-desk": {
-   "rect": [
-    294,
-    0,
-    25,
-    28
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "canvas"
-   ],
-   "design": "lounge",
-   "kind": "desk",
-   "content": "canvas"
-  },
-  "screen-terminal-lounge-desk": {
-   "rect": [
-    320,
-    0,
-    25,
-    28
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "terminal"
-   ],
-   "design": "lounge",
-   "kind": "desk",
-   "content": "terminal"
-  },
-  "screen-document-lounge-desk": {
-   "rect": [
-    346,
-    0,
-    25,
-    28
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "document"
-   ],
-   "design": "lounge",
-   "kind": "desk",
-   "content": "document"
-  },
-  "screen-game-lounge-desk": {
-   "rect": [
-    372,
-    0,
-    25,
-    28
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "game"
-   ],
-   "design": "lounge",
-   "kind": "desk",
-   "content": "game"
-  },
-  "screen-call-lounge-desk": {
-   "rect": [
-    398,
-    0,
-    25,
-    28
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "call"
-   ],
-   "design": "lounge",
-   "kind": "desk",
-   "content": "call"
-  },
-  "screen-code-dark-lounge-lead-desk": {
-   "rect": [
-    0,
-    0,
-    26,
-    29
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-dark"
-   ],
-   "design": "lounge",
-   "kind": "lead-desk",
-   "content": "code-dark"
-  },
-  "screen-code-light-lounge-lead-desk": {
-   "rect": [
-    27,
-    0,
-    26,
-    29
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-light"
-   ],
-   "design": "lounge",
-   "kind": "lead-desk",
-   "content": "code-light"
-  },
-  "screen-dashboard-lounge-lead-desk": {
-   "rect": [
-    54,
-    0,
-    26,
-    29
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "dashboard"
-   ],
-   "design": "lounge",
-   "kind": "lead-desk",
-   "content": "dashboard"
-  },
-  "screen-canvas-lounge-lead-desk": {
-   "rect": [
-    81,
-    0,
-    26,
-    29
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "canvas"
-   ],
-   "design": "lounge",
-   "kind": "lead-desk",
-   "content": "canvas"
-  },
-  "screen-terminal-lounge-lead-desk": {
-   "rect": [
-    108,
-    0,
-    26,
-    29
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "terminal"
-   ],
-   "design": "lounge",
-   "kind": "lead-desk",
-   "content": "terminal"
-  },
-  "screen-document-lounge-lead-desk": {
-   "rect": [
-    135,
-    0,
-    26,
-    29
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "document"
-   ],
-   "design": "lounge",
-   "kind": "lead-desk",
-   "content": "document"
-  },
-  "screen-game-lounge-lead-desk": {
-   "rect": [
-    162,
-    0,
-    26,
-    29
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "game"
-   ],
-   "design": "lounge",
-   "kind": "lead-desk",
-   "content": "game"
-  },
-  "screen-call-lounge-lead-desk": {
-   "rect": [
-    189,
-    0,
-    26,
-    29
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "call"
-   ],
-   "design": "lounge",
-   "kind": "lead-desk",
-   "content": "call"
-  },
-  "screen-code-dark-library-desk": {
-   "rect": [
-    100,
-    68,
-    24,
-    15
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-dark"
-   ],
-   "design": "library",
-   "kind": "desk",
-   "content": "code-dark"
-  },
-  "screen-code-light-library-desk": {
-   "rect": [
-    125,
-    68,
-    24,
-    15
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-light"
-   ],
-   "design": "library",
-   "kind": "desk",
-   "content": "code-light"
-  },
-  "screen-dashboard-library-desk": {
-   "rect": [
-    150,
-    68,
-    24,
-    15
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "dashboard"
-   ],
-   "design": "library",
-   "kind": "desk",
-   "content": "dashboard"
-  },
-  "screen-canvas-library-desk": {
-   "rect": [
-    175,
-    68,
-    24,
-    15
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "canvas"
-   ],
-   "design": "library",
-   "kind": "desk",
-   "content": "canvas"
-  },
-  "screen-terminal-library-desk": {
-   "rect": [
-    200,
-    68,
-    24,
-    15
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "terminal"
-   ],
-   "design": "library",
-   "kind": "desk",
-   "content": "terminal"
-  },
-  "screen-document-library-desk": {
-   "rect": [
-    225,
-    68,
-    24,
-    15
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "document"
-   ],
-   "design": "library",
-   "kind": "desk",
-   "content": "document"
-  },
-  "screen-game-library-desk": {
-   "rect": [
-    250,
-    68,
-    24,
-    15
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "game"
-   ],
-   "design": "library",
-   "kind": "desk",
-   "content": "game"
-  },
-  "screen-call-library-desk": {
-   "rect": [
-    275,
-    68,
-    24,
-    15
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "call"
-   ],
-   "design": "library",
-   "kind": "desk",
-   "content": "call"
-  },
-  "screen-code-dark-library-lead-desk": {
-   "rect": [
-    410,
-    50,
-    24,
-    16
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-dark"
-   ],
-   "design": "library",
-   "kind": "lead-desk",
-   "content": "code-dark"
-  },
-  "screen-code-light-library-lead-desk": {
-   "rect": [
-    435,
-    50,
-    24,
-    16
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-light"
-   ],
-   "design": "library",
-   "kind": "lead-desk",
-   "content": "code-light"
-  },
-  "screen-dashboard-library-lead-desk": {
-   "rect": [
-    460,
-    50,
-    24,
-    16
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "dashboard"
-   ],
-   "design": "library",
-   "kind": "lead-desk",
-   "content": "dashboard"
-  },
-  "screen-canvas-library-lead-desk": {
-   "rect": [
-    485,
-    50,
-    24,
-    16
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "canvas"
-   ],
-   "design": "library",
-   "kind": "lead-desk",
-   "content": "canvas"
-  },
-  "screen-terminal-library-lead-desk": {
-   "rect": [
-    0,
-    68,
-    24,
-    16
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "terminal"
-   ],
-   "design": "library",
-   "kind": "lead-desk",
-   "content": "terminal"
-  },
-  "screen-document-library-lead-desk": {
-   "rect": [
-    25,
-    68,
-    24,
-    16
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "document"
-   ],
-   "design": "library",
-   "kind": "lead-desk",
-   "content": "document"
-  },
-  "screen-game-library-lead-desk": {
-   "rect": [
-    50,
-    68,
-    24,
-    16
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "game"
-   ],
-   "design": "library",
-   "kind": "lead-desk",
-   "content": "game"
-  },
-  "screen-call-library-lead-desk": {
-   "rect": [
-    75,
-    68,
-    24,
-    16
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "call"
-   ],
-   "design": "library",
-   "kind": "lead-desk",
-   "content": "call"
-  },
-  "screen-code-dark-greenhouse-desk": {
-   "rect": [
-    162,
-    50,
-    30,
-    16
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-dark"
-   ],
-   "design": "greenhouse",
-   "kind": "desk",
-   "content": "code-dark"
-  },
-  "screen-code-light-greenhouse-desk": {
-   "rect": [
-    193,
-    50,
-    30,
-    16
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-light"
-   ],
-   "design": "greenhouse",
-   "kind": "desk",
-   "content": "code-light"
-  },
-  "screen-dashboard-greenhouse-desk": {
-   "rect": [
-    224,
-    50,
-    30,
-    16
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "dashboard"
-   ],
-   "design": "greenhouse",
-   "kind": "desk",
-   "content": "dashboard"
-  },
-  "screen-canvas-greenhouse-desk": {
-   "rect": [
-    255,
-    50,
-    30,
-    16
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "canvas"
-   ],
-   "design": "greenhouse",
-   "kind": "desk",
-   "content": "canvas"
-  },
-  "screen-terminal-greenhouse-desk": {
-   "rect": [
-    286,
-    50,
-    30,
-    16
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "terminal"
-   ],
-   "design": "greenhouse",
-   "kind": "desk",
-   "content": "terminal"
-  },
-  "screen-document-greenhouse-desk": {
-   "rect": [
-    317,
-    50,
-    30,
-    16
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "document"
-   ],
-   "design": "greenhouse",
-   "kind": "desk",
-   "content": "document"
-  },
-  "screen-game-greenhouse-desk": {
-   "rect": [
-    348,
-    50,
-    30,
-    16
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "game"
-   ],
-   "design": "greenhouse",
-   "kind": "desk",
-   "content": "game"
-  },
-  "screen-call-greenhouse-desk": {
-   "rect": [
-    379,
-    50,
-    30,
-    16
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "call"
-   ],
-   "design": "greenhouse",
-   "kind": "desk",
-   "content": "call"
-  },
-  "screen-code-dark-greenhouse-lead-desk": {
-   "rect": [
-    424,
-    0,
-    33,
-    19
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-dark"
-   ],
-   "design": "greenhouse",
-   "kind": "lead-desk",
-   "content": "code-dark"
-  },
-  "screen-code-light-greenhouse-lead-desk": {
-   "rect": [
-    458,
-    0,
-    33,
-    19
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-light"
-   ],
-   "design": "greenhouse",
-   "kind": "lead-desk",
-   "content": "code-light"
-  },
-  "screen-dashboard-greenhouse-lead-desk": {
-   "rect": [
-    0,
-    30,
-    33,
-    19
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "dashboard"
-   ],
-   "design": "greenhouse",
-   "kind": "lead-desk",
-   "content": "dashboard"
-  },
-  "screen-canvas-greenhouse-lead-desk": {
-   "rect": [
-    34,
-    30,
-    33,
-    19
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "canvas"
-   ],
-   "design": "greenhouse",
-   "kind": "lead-desk",
-   "content": "canvas"
-  },
-  "screen-terminal-greenhouse-lead-desk": {
-   "rect": [
-    68,
-    30,
-    33,
-    19
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "terminal"
-   ],
-   "design": "greenhouse",
-   "kind": "lead-desk",
-   "content": "terminal"
-  },
-  "screen-document-greenhouse-lead-desk": {
-   "rect": [
-    102,
-    30,
-    33,
-    19
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "document"
-   ],
-   "design": "greenhouse",
-   "kind": "lead-desk",
-   "content": "document"
-  },
-  "screen-game-greenhouse-lead-desk": {
-   "rect": [
-    136,
-    30,
-    33,
-    19
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "game"
-   ],
-   "design": "greenhouse",
-   "kind": "lead-desk",
-   "content": "game"
-  },
-  "screen-call-greenhouse-lead-desk": {
-   "rect": [
-    170,
-    30,
-    33,
-    19
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "call"
-   ],
-   "design": "greenhouse",
-   "kind": "lead-desk",
-   "content": "call"
-  },
-  "screen-code-dark-lobby-desk": {
-   "rect": [
-    485,
-    97,
-    14,
-    4
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-dark"
-   ],
-   "design": "lobby",
-   "kind": "desk",
-   "content": "code-dark"
-  },
-  "screen-code-light-lobby-desk": {
-   "rect": [
-    0,
-    108,
-    14,
-    4
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-light"
-   ],
-   "design": "lobby",
-   "kind": "desk",
-   "content": "code-light"
-  },
-  "screen-dashboard-lobby-desk": {
-   "rect": [
-    15,
-    108,
-    14,
-    4
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "dashboard"
-   ],
-   "design": "lobby",
-   "kind": "desk",
-   "content": "dashboard"
-  },
-  "screen-canvas-lobby-desk": {
-   "rect": [
-    30,
-    108,
-    14,
-    4
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "canvas"
-   ],
-   "design": "lobby",
-   "kind": "desk",
-   "content": "canvas"
-  },
-  "screen-terminal-lobby-desk": {
-   "rect": [
-    45,
-    108,
-    14,
-    4
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "terminal"
-   ],
-   "design": "lobby",
-   "kind": "desk",
-   "content": "terminal"
-  },
-  "screen-document-lobby-desk": {
-   "rect": [
-    60,
-    108,
-    14,
-    4
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "document"
-   ],
-   "design": "lobby",
-   "kind": "desk",
-   "content": "document"
-  },
-  "screen-game-lobby-desk": {
-   "rect": [
-    75,
-    108,
-    14,
-    4
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "game"
-   ],
-   "design": "lobby",
-   "kind": "desk",
-   "content": "game"
-  },
-  "screen-call-lobby-desk": {
-   "rect": [
-    90,
-    108,
-    14,
-    4
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "call"
-   ],
-   "design": "lobby",
-   "kind": "desk",
-   "content": "call"
-  },
-  "screen-code-dark-lobby-desk-b": {
-   "rect": [
-    229,
-    85,
-    14,
-    10
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-dark"
-   ],
-   "design": "lobby",
-   "kind": "desk-b",
-   "content": "code-dark"
-  },
-  "screen-code-light-lobby-desk-b": {
-   "rect": [
-    244,
-    85,
-    14,
-    10
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "code-light"
-   ],
-   "design": "lobby",
-   "kind": "desk-b",
-   "content": "code-light"
-  },
-  "screen-dashboard-lobby-desk-b": {
-   "rect": [
-    259,
-    85,
-    14,
-    10
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "dashboard"
-   ],
-   "design": "lobby",
-   "kind": "desk-b",
-   "content": "dashboard"
-  },
-  "screen-canvas-lobby-desk-b": {
-   "rect": [
-    274,
-    85,
-    14,
-    10
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "canvas"
-   ],
-   "design": "lobby",
-   "kind": "desk-b",
-   "content": "canvas"
-  },
-  "screen-terminal-lobby-desk-b": {
-   "rect": [
-    289,
-    85,
-    14,
-    10
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "terminal"
-   ],
-   "design": "lobby",
-   "kind": "desk-b",
-   "content": "terminal"
-  },
-  "screen-document-lobby-desk-b": {
-   "rect": [
-    304,
-    85,
-    14,
-    10
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "document"
-   ],
-   "design": "lobby",
-   "kind": "desk-b",
-   "content": "document"
-  },
-  "screen-game-lobby-desk-b": {
-   "rect": [
-    319,
-    85,
-    14,
-    10
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "game"
-   ],
-   "design": "lobby",
-   "kind": "desk-b",
-   "content": "game"
-  },
-  "screen-call-lobby-desk-b": {
-   "rect": [
-    334,
-    85,
-    14,
-    10
-   ],
-   "anchor": [
-    0,
-    0
-   ],
-   "slot": "screen",
-   "tags": [
-    "screen",
-    "call"
-   ],
-   "design": "lobby",
-   "kind": "desk-b",
-   "content": "call"
   }
  },
  "desks": {
@@ -3416,12 +1816,6 @@
       56,
       12
      ]
-    ],
-    "screen": [
-     29,
-     1,
-     26,
-     17
     ]
    },
    "lead-desk": {
@@ -3484,12 +1878,6 @@
       69,
       12
      ]
-    ],
-    "screen": [
-     41,
-     1,
-     28,
-     17
     ]
    }
   },
@@ -3550,12 +1938,6 @@
       51,
       28
      ]
-    ],
-    "screen": [
-     27,
-     6,
-     25,
-     28
     ]
    },
    "lead-desk": {
@@ -3614,12 +1996,6 @@
       66,
       32
      ]
-    ],
-    "screen": [
-     41,
-     10,
-     26,
-     29
     ]
    }
   },
@@ -3680,12 +2056,6 @@
       49,
       10
      ]
-    ],
-    "screen": [
-     25,
-     2,
-     24,
-     15
     ]
    },
    "lead-desk": {
@@ -3748,12 +2118,6 @@
       66,
       11
      ]
-    ],
-    "screen": [
-     42,
-     2,
-     24,
-     16
     ]
    }
   },
@@ -3814,12 +2178,6 @@
       55,
       11
      ]
-    ],
-    "screen": [
-     24,
-     2,
-     30,
-     16
     ]
    },
    "lead-desk": {
@@ -3878,12 +2236,6 @@
       69,
       12
      ]
-    ],
-    "screen": [
-     36,
-     2,
-     33,
-     19
     ]
    }
   },
@@ -3936,12 +2288,6 @@
       38,
       6
      ]
-    ],
-    "screen": [
-     23,
-     4,
-     14,
-     4
     ]
    },
    "desk-b": {
@@ -3992,12 +2338,6 @@
       69,
       5
      ]
-    ],
-    "screen": [
-     55,
-     1,
-     14,
-     10
     ]
    }
   }

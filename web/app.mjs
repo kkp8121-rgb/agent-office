@@ -1985,10 +1985,9 @@ function buildNavDebug(frec, sc) {
 function mountProp(dp, i, p) {
   const lp = localPlacement(p, dp.desk, dp.nodes);
   const d = dp.els[i] ?? (dp.els[i] = el('div', 'dc'));
-  d.classList.toggle('scr', p.slot === 'screen'); // a screen stays mirrored with its monitor (web/decor.css)
   d.dataset.desk = dp.id; // which desk it belongs to (a desk cut into strips holds its props in several nodes)
   Object.assign(d.style, {
-    left: `${lp.x}px`, top: `${lp.y}px`, width: `${p.w}px`, height: `${p.h}px`, backgroundPosition: `${-p.rx}px ${-p.ry}px`, zIndex: p.slot === 'screen' ? '1' : String(10 + Math.round(p.y + p.h)),
+    left: `${lp.x}px`, top: `${lp.y}px`, width: `${p.w}px`, height: `${p.h}px`, backgroundPosition: `${-p.rx}px ${-p.ry}px`, zIndex: String(10 + Math.round(p.y + p.h)),
   });
   if (d.parentElement !== dp.divs[lp.node]) dp.divs[lp.node].append(d);
 }

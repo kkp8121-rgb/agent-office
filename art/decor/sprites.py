@@ -550,8 +550,8 @@ wwwww
 w.w.w""")
 add("webcam", "monitorTop", ["tech"], """
 .KKKK.
-KKbbKK
-KKbuKK
+KkkkkK
+KkKKkK
 .KKKK.
 ..SS..""")
 
