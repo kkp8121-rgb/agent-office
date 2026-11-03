@@ -72,7 +72,7 @@ function readBody(req, max) {
   });
 }
 
-export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConnect, weather, sysload } = {}) {
+export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConnect, weather, sysload, personas } = {}) {
   const clients = new Set(); // open SSE responses
   let lastStateJson = null; // last floors JSON sent; null = send the next state in full
 
@@ -212,6 +212,7 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
       scenes, sitSprites, sitHeight: cfg.sitHeight, nav: cfg.nav, depth: cfg.depth,
       lobby: cfg.lobby?.enabled ? { design: cfg.lobby.design } : null,
       weather: { enabled: Boolean(weather?.enabled), city: cfg.weather?.city ?? '' },
+      personas: personas ?? {},
     };
   }
 

@@ -1,5 +1,6 @@
 // Entry point: node server/main.mjs [--open]
 import { spawn } from 'node:child_process';
+import path from 'node:path';
 import { loadConfig, pollDelayMs } from './config.mjs';
 import { Office } from './office.mjs';
 import { Poller } from './poller.mjs';
@@ -8,6 +9,7 @@ import { DETACHED_OPTIONS } from './launch.mjs';
 import { loadSaved, saveSaved } from './hidden.mjs';
 import { createWeather } from './weather.mjs';
 import { createSysLoad } from './sysload.mjs';
+import { loadPersonas, personaLimits } from './persona.mjs';
 
 const EXIT_PORT_BUSY = 2;
 
@@ -59,7 +61,9 @@ function wake() {
   inflight = round();
 }
 
-const server = createServer(cfg, office, { onSavedChange: saveIfChanged, onShutdown: shutdown, onSseConnect: wake, weather, sysload });
+// persona.json (the lines work writes it, never this server); AGENT_OFFICE_PERSONA_FILE points a check at another file
+const personas = loadPersonas(process.env.AGENT_OFFICE_PERSONA_FILE || path.join(cfg.root, 'persona.json'), personaLimits(cfg));
+const server = createServer(cfg, office, { onSavedChange: saveIfChanged, onShutdown: shutdown, onSseConnect: wake, weather, sysload, personas });
 
 server.on('error', (e) => {
   if (e.code === 'EADDRINUSE') {

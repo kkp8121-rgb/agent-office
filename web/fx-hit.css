@@ -1,1 +1,25 @@
-/* Effects area "hit" (persona-based click, grab, throw and snack reactions with hit feel and sound). Scope rules under html.fx-on; animate only transform and opacity. */
+/* Effects area "hit" (persona-based click, grab, throw and snack reactions with hit feel and sound). Scope rules under html.fx-on; animate only transform and opacity.
+   Everything here is a STATIC style: the particles and the white flash are animated from script (WAAPI, transform / opacity only), never by these rules. */
+
+/* a particle on the floor's effects layer (web/fx-hit.mjs): placed by left/top at its birth, centred on that point by `translate` (a separate property, so the animated transform does not fight it) */
+.fx-on .fx-layer .fxh {
+  position: absolute; left: 0; top: 0; translate: -50% -50%; opacity: 0; pointer-events: none; white-space: nowrap;
+  font-weight: 800; line-height: 1; color: var(--c, #ffcf4d); font-size: 13px;
+}
+.fx-on .fx-layer .fxh.glyph { text-shadow: 1px 0 #fff, -1px 0 #fff, 0 1px #fff, 0 -1px #fff; }
+.fx-on .fx-layer .fxh.word {
+  color: var(--c, #fff); font-size: 13px;
+  text-shadow: 2px 0 #3a2a14, -2px 0 #3a2a14, 0 2px #3a2a14, 0 -2px #3a2a14, 1px 1px #3a2a14, -1px -1px #3a2a14, 1px -1px #3a2a14, -1px 1px #3a2a14;
+}
+.fx-on .fx-layer .fxh.combo {
+  padding: 1px 6px; border-radius: 7px; border: 2px solid #fff; color: #fff; background: var(--c, #ff6a4d); font-size: 13px;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, .35); box-shadow: 1px 1px 0 rgba(0, 0, 0, .3);
+}
+.fx-on .fx-layer .fxh.puff { width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff 0 40%, #e4e2dc 100%); border: 1px solid #9d968a; }
+.fx-on .fx-layer .fxh.puff.dust { background: #efe4cc; border-color: #c8b890; }
+.fx-on .fx-layer .fxh.blush { width: 9px; height: 5px; border-radius: 50%; background: #ff9fb8; }
+.fx-on .fx-layer .fxh.drop { width: 6px; height: 9px; border-radius: 50% 50% 50% 50% / 65% 65% 35% 35%; background: #7ec8ff; border: 1px solid #3f8fcc; }
+
+/* the white flash of a hard hit: a copy of the character's picture (made by fx-hit.mjs), whitened ONCE by a static filter, laid over it; only its opacity is animated */
+.fx-on .flip > .spr.fxw { position: absolute; inset: 0; opacity: 0; pointer-events: none; animation: none; }
+.fx-on .flip > .spr.fxw img { filter: brightness(0) invert(1); }
