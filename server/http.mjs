@@ -6,6 +6,7 @@ import { stat } from 'node:fs/promises';
 import { extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { isSafeId } from './sessions.mjs';
 import { INDEX_HTML, LOG_HTML } from './pages.mjs';
+import { loadCards } from './cards.mjs';
 
 const TYPES = {
   '.js': 'text/javascript; charset=utf-8',
@@ -199,6 +200,8 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
     // no sprites folder: nobody sits
   }
 
+  const cards = loadCards(join(cfg.root, 'cards.json'), cfg.ui.card.limits); // read once at start-up, like the seated pictures
+
   function uiConfig() {
     const roles = {};
     // Codex roles reuse the Claude sprite keys, so they must not overwrite the Claude names here.
@@ -212,6 +215,7 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
       scenes, sitSprites, sitHeight: cfg.sitHeight, nav: cfg.nav, depth: cfg.depth,
       lobby: cfg.lobby?.enabled ? { design: cfg.lobby.design } : null,
       weather: { enabled: Boolean(weather?.enabled), city: cfg.weather?.city ?? '' },
+      cards,
     };
   }
 

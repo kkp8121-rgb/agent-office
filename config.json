@@ -78,6 +78,24 @@
           "officeLife": {
             "enabled": true
           },
+          "card": {
+            "enabled": true,
+            "limits": { "age": 10, "birthplace": 14, "hair": 10, "eye": 10, "height": 10, "weight": 14, "skillsMin": 2, "skillsMax": 4, "skill": 16, "bio": 120 },
+            "typeLabels": {
+              "flinch": "깜짝형", "angry": "버럭형", "dodge": "요리조리형", "proud": "당당형", "lazy": "느긋형",
+              "bubbly": "발랄형", "tough": "씩씩형", "dramatic": "호들갑형", "shy": "수줍음형", "goofy": "엉뚱형"
+            },
+            "labels": {
+              "name": "이름", "age": "나이", "birthplace": "출신", "residence": "사는 곳", "hair": "머리색", "eye": "눈 색", "height": "키", "weight": "몸무게",
+              "signature": "서명", "skills": "특기·능력", "bio": "약력", "memo": "메모", "empty": "-",
+              "tagLabel": "{name} 캐릭터 카드 열기", "close": "닫기", "closeLabel": "캐릭터 카드 닫기", "gone": "퇴근",
+              "catRole": "사무실 고양이", "lobbyName": "1층 로비", "memoRole": "{role} · {rank}", "memoState": "{state} · 근무 {dur}", "memoFloor": "{floor} 소속",
+              "idPhoto": "증명사진", "bodyPhoto": "전신 사진"
+            },
+            "layout": { "width": 560, "height": 680, "margin": 16, "minScale": 0.3 },
+            "photo": { "idScale": 3, "bodyScale": 2, "catIdScale": 5, "catBodyScale": 2 },
+            "motion": { "openMs": 340, "closeMs": 240, "folderMs": 200, "sheetDelayMs": 70, "photoDelayMs": 150, "backdropMs": 160, "riseFolderPx": 56, "risePx": 70 }
+          },
           "lines": {
             "lift": ["앗!", "으앗, 뭐죠?", "어어어?", "떴다 떴어!", "잠깐만요!", "저 들렸어요!", "어, 어, 어?", "하늘이 보여요!", "누가 절 들었어요?", "으헉!"],
             "liftLead": ["나 팀장인데?!", "이게 무슨 일이죠?", "팀장을 들다니!", "어머, 내려놔요!", "저기요, 저 팀장인데요?", "이거 놔요~!", "팀장 대접이 이래요?", "아니, 이럴 수가!", "내 결재는 어쩌고!", "당장 내려놔요!"],
