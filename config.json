@@ -16,7 +16,7 @@
   "ui": { "pip": { "width": 420, "height": 640 }, "rotate": { "seconds": 15 },
           "board": { "todos": "할 일 {done}/{total}", "phases": "단계 {n}/{total}", "phasesOpen": "단계 {n}", "agents": "직원 {total}명", "more": "…외 {n}개" },
           "follow": { "windowSeconds": 30, "eventWeight": 1, "phaseWeight": 5, "workingWeight": 2, "minScore": 2, "switchMargin": 4, "switchRatio": 1.5, "minDwellSeconds": 20, "throttleMs": 1000,
-                      "label": "활발한 곳 따라가기", "title": "가장 활발한 층으로 화면을 자동으로 옮겨 가며 보기 (전체 화면·작은 창에서도 동작)", "marker": "따라가는 중" }, "grab": { "holdMs": 300, "movePx": 6, "bubbleAfterMs": [2500, 6000], "dizzyMs": 1500, "restRadiusPx": 80 }, "bubbleMaxChars": 16, "bubbleFullMax": 3, "logDomCap": 300,
+                      "label": "활발한 곳 따라가기", "title": "가장 활발한 층으로 화면을 자동으로 옮겨 가며 보기 (전체 화면·작은 창에서도 동작)", "marker": "따라가는 중" }, "grab": { "holdMs": 300, "movePx": 6, "bubbleAfterMs": [2500, 6000], "dizzyMs": 1500, "restRadiusPx": 80 }, "bubbleMaxChars": 16, "bubbleFullMax": 3, "bubbleClear": { "checkMs": 120, "gapPx": 2, "maxLifts": 3 }, "logDomCap": 300,
           "poke": { "resetMs": 1500, "sayMs": 1900, "steamMs": 2400, "maxLevel": 4 },
           "throw": { "minSpeedPxS": 800, "windowMs": 110, "staleMs": 60, "maxSamples": 8, "distPerSpeed": 0.3, "minDistPx": 70, "maxDistPx": 400,
                      "maxBounces": 3, "bounceKeep": 0.8, "flyPxPerSec": 480, "minFlyMs": 500, "arcPx": 46, "wallLiftPx": 14, "dizzyMs": 2800 },

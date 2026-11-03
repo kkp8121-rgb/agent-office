@@ -14,6 +14,7 @@ import { chooseCatAct, openPoint, otherFloor } from './cat.mjs';
 import { legVars } from './walk.mjs';
 import { boardCapacity, boardFrame, boardSheet, itemWindow, quadFrame, sheetKey } from './board.mjs';
 import { assignSpots, clipPhase, moodKind, patDue } from './meeting.mjs';
+import { clearBubbles } from './bubbles.mjs';
 import { lightAt, msToNextChange, placeSeason, seasonOn } from './season.mjs';
 import { pickAt, snackOutcome } from './snack.mjs';
 import { CHOICES as WX_CHOICES, buildWeather, effectKind, loadChoice, saveChoice, setWeatherKind, statusLine } from './weather.mjs';
@@ -1985,6 +1986,38 @@ function limitBubbles(recs, max) {
   });
 }
 
+/**
+ * Speech bubbles never sit on top of each other (greeters side by side, a chatting pair, a walker passing a desk, a crowd at the door):
+ * every `ui.bubbleClear.checkMs` the shown bubbles of each floor on show are checked; the lower-ranked one gives way (web/bubbles.mjs):
+ * a text line moves up above the other, a folded 「…」 marker hides (style.css `--lift`, `.shy`).
+ */
+function clearBubbleOverlap() {
+  const C = ui.ui.bubbleClear;
+  if (!paused()) {
+    const win = floorsEl.ownerDocument.defaultView;
+    for (const floor of floorsEl.children) {
+      if (!floor.offsetParent) continue; // a floor off show
+      const items = [];
+      for (const b of floor.querySelectorAll('.bub')) {
+        const cs = win.getComputedStyle(b);
+        if (cs.display === 'none' || cs.visibility === 'hidden') continue; // `.shy` hides by opacity, so a hidden marker is still seen here
+        const r = b.getBoundingClientRect();
+        const k = r.width / b.offsetWidth || 1; // the floors' zoom
+        const lift = (Number.parseFloat(b.style.getPropertyValue('--lift')) || 0) * k;
+        const kind = ['grab', 'say', 'dot'].find((c) => b.classList.contains(c)) ?? 'txt';
+        items.push({ id: b, kind, x: r.x, y: r.y + lift, w: r.width, h: r.height, k });
+      }
+      const placed = clearBubbles(items, C);
+      for (const { id: b, k } of items) {
+        const { lift, hide } = placed.get(b);
+        b.style.setProperty('--lift', `${lift / k}px`);
+        b.classList.toggle('shy', hide);
+      }
+    }
+  }
+  clockTimers.setTimeout(clearBubbleOverlap, C.checkMs);
+}
+
 function renderFloor(fv, elm) {
   const rec = floorRecs.get(fv.sessionId);
   rec.status = fv.status;
@@ -3323,6 +3356,7 @@ async function init() {
   setupScenes();
   applyTime();
   initWeather();
+  clearBubbleOverlap();
   connEl.hidden = true;
   if (document.hidden) document.body.classList.add('paused');
   else connect();

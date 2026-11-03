@@ -205,7 +205,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .agt.sitting.odd .bub { bottom: 72px; }
 .agt.sitting.odd .bub.dot { bottom: 56px; }
 .bub.empty { display: none; }
+/* bubbles that would cover each other (app.mjs clearBubbleOverlap): the lower-ranked text line moves up (--lift), a folded marker hides */
+.bub { --lift: 0px; translate: 0 calc(var(--lift) * -1); } /* own default: the :root --lift (held character height) must not be inherited */
 .bub.dot { padding: 0 5px; min-width: 22px; text-align: center; font-size: 12px; font-weight: 800; line-height: 1.1; letter-spacing: 1px; visibility: hidden; pointer-events: auto; cursor: help; }
+.bub.shy { opacity: 0; pointer-events: none; }
 /* the folded bubble says what it is: hovering it shows the full words in a small popup (app.mjs setBubble puts them in data-full; the girl carries them as her title) */
 .bub.dot:hover::before {
   content: attr(data-full); position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); white-space: nowrap;
