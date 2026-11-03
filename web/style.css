@@ -292,11 +292,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 @keyframes swing { from { transform: rotate(-10deg); } to { transform: rotate(10deg); } }
 @keyframes thump {
-  0% { translate: 0 calc(var(--lift) * -1); scale: 1 1; }
-  30% { translate: 0 0; scale: 1.22 .76; }
-  55% { translate: 0 -10px; scale: .94 1.08; }
-  78% { translate: 0 0; scale: 1.07 .93; }
-  100% { translate: 0 0; scale: 1 1; }
+  0% { transform: translateY(calc(var(--lift) * -1)) scale(1, 1); }
+  30% { transform: translateY(0) scale(1.22, .76); }
+  55% { transform: translateY(-10px) scale(.94, 1.08); }
+  78% { transform: translateY(0) scale(1.07, .93); }
+  100% { transform: translateY(0) scale(1, 1); }
 }
 @keyframes orbit {
   from { transform: rotate(0deg) translateX(19px) rotate(0deg); }
@@ -345,8 +345,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ag.cat.walking .spr { animation: none; } /* the cat has its own two frames, no bob */
 .ag.cat.walking .spr img.stand { animation: cat-a .36s steps(1) infinite; }
 .ag.cat.walking .spr img.cw2 { display: block; animation: cat-b .36s steps(1) infinite; }
-@keyframes cat-a { 0% { visibility: visible; } 50% { visibility: hidden; } }
-@keyframes cat-b { 0% { visibility: hidden; } 50% { visibility: visible; } }
+@keyframes cat-a { 0% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes cat-b { 0% { opacity: 0; } 50% { opacity: 1; } }
 .ag.cat-sit .spr img.stand, .ag.cat-sleep .spr img.stand, .ag.cat.held .spr img.stand { display: none; }
 .ag.cat-sit .spr img.csit, .ag.cat-sleep .spr img.cslp, .ag.cat.held .spr img.chld { display: block; }
 .ag.cat-sleep .zz { display: block; bottom: 16px; left: 8px; }

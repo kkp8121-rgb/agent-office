@@ -218,7 +218,7 @@ test('app.mjs emits exactly the documented events, each with the documented fiel
     'high-five': '{ a: guest, b: host }',
     'meeting-start': '{ floor: frec, title: phase }',
     state: '{ rec, from, to: av.state }',
-    pose: '{ rec, seated: sit }',
+    pose: '{ rec, seated: sit, animate }',
     daylight: '{ phase: next }',
     sysload: '{ cpu: sysLoad.cpu, mem: sysLoad.mem }',
   };

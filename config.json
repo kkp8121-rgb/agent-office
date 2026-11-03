@@ -63,7 +63,11 @@
               "enabled": true
             },
             "chars": {
-              "enabled": true
+              "enabled": true,
+              "legCycleMs": 400, "stepsPerCycle": 2, "settleMs": 90,
+              "bob": { "upPx": 2, "landX": 1.04, "landY": 0.96, "airX": 0.98, "airY": 1.03 },
+              "sit": { "ms": 340, "fromPx": 5, "dipAt": 0.55, "dipPx": 1.5, "squashX": 1.06, "squashY": 0.92 },
+              "stand": { "ms": 240, "hopAt": 0.45, "dipPx": 1.5, "hopPx": 3, "squashX": 1.06, "squashY": 0.92, "stretchX": 0.96, "stretchY": 1.05 }
             },
             "events": {
               "enabled": true
