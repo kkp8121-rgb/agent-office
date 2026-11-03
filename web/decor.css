@@ -1,0 +1,4 @@
+/* Desk props (web/decor.mjs): small pictures from the decor atlas, children of a desk's node so they share its depth and mirror. */
+.dc { position: absolute; background-image: var(--decor); background-repeat: no-repeat; image-rendering: pixelated; pointer-events: none; }
+/* a mirrored desk node mirrors its children too: the picture is turned back (its place was already computed for the mirror) */
+.obj.flip > .dc { transform: scaleX(-1); }
