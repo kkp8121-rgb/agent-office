@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "node server/launch.mjs",
+    "shortcut": "node server/shortcut.mjs",
     "test": "node --import ./tests/helpers/no-outbound.mjs --test --test-timeout=30000 tests/*.test.mjs"
   }
 }

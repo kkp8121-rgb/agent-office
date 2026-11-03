@@ -11,12 +11,14 @@
   "workflow": { "scriptHeadBytes": 65536, "journalLineBytes": 8192, "doneQuietMs": 180000 },
   "codex": { "enabled": true, "headBytes": 262144, "idleKeepMs": 1800000, "execKeepMs": 60000, "cwdMaxChars": 500, "indexMaxBytes": 4194304 },
   "launch": { "healthTimeoutMs": 800 },
+  "shortcut": { "name": "에이전트 사무실", "icon": "assets/icon.ico", "windowStyle": 7 },
   "server": { "ssePingMs": 25000, "maxBodyBytes": 1024 },
   "weather": { "enabled": true, "city": "서울", "latitude": 37.5665, "longitude": 126.978, "refreshMinutes": 30, "staleMinutes": 180, "timeoutSeconds": 10, "backoffMinutes": [5, 15, 30] },
+  "sysload": { "enabled": true, "intervalSeconds": 3 },
   "ui": { "pip": { "width": 420, "height": 640 }, "rotate": { "seconds": 15 },
           "board": { "todos": "할 일 {done}/{total}", "phases": "단계 {n}/{total}", "phasesOpen": "단계 {n}", "agents": "직원 {total}명", "more": "…외 {n}개" },
           "follow": { "windowSeconds": 30, "eventWeight": 1, "phaseWeight": 5, "workingWeight": 2, "minScore": 2, "switchMargin": 4, "switchRatio": 1.5, "minDwellSeconds": 20, "throttleMs": 1000,
-                      "label": "활발한 곳 따라가기", "title": "가장 활발한 층으로 화면을 자동으로 옮겨 가며 보기 (전체 화면·작은 창에서도 동작)", "marker": "따라가는 중" }, "grab": { "holdMs": 300, "movePx": 6, "bubbleAfterMs": [2500, 6000], "dizzyMs": 1500, "restRadiusPx": 80 }, "bubbleMaxChars": 16, "bubbleFullMax": 3, "bubbleClear": { "checkMs": 120, "gapPx": 2, "maxLifts": 3 }, "logDomCap": 300,
+                      "label": "활발한 곳 따라가기", "title": "가장 활발한 층으로 화면을 자동으로 옮겨 가며 보기 (전체 화면·작은 창에서도 동작)", "marker": "따라가는 중" }, "grab": { "holdMs": 300, "movePx": 6, "bubbleAfterMs": [2500, 6000], "dizzyMs": 1500, "restRadiusPx": 80 }, "bubbleMaxChars": 16, "bubbleFullMax": 3, "bubbleClear": { "checkMs": 120, "gapPx": 2, "maxLifts": 3, "lobbyRecheckMs": 2000 }, "logDomCap": 300,
           "poke": { "resetMs": 1500, "sayMs": 1900, "steamMs": 2400, "maxLevel": 4 },
           "throw": { "minSpeedPxS": 800, "windowMs": 110, "staleMs": 60, "maxSamples": 8, "distPerSpeed": 0.3, "minDistPx": 70, "maxDistPx": 400,
                      "maxBounces": 3, "bounceKeep": 0.8, "flyPxPerSec": 480, "minFlyMs": 500, "arcPx": 46, "wallLiftPx": 14, "dizzyMs": 2800 },
@@ -28,7 +30,7 @@
           "season": { "halloween": { "from": [10, 24], "to": [10, 31] }, "christmas": { "from": [12, 18], "to": [12, 26] }, "lunar": { "daysBefore": 2, "daysAfter": 2 } },
           "daylight": { "sunset": [17, 19], "night": [19, 6] },
           "lobby": {
-            "tab": "1층 · 로비 (모든 팀장·직원)", "tabText": "1", "sign": "1F 로비", "signLine": "모든 층의 팀장·직원 {n}명", "wallLabel": "로비 현황판", "empty": "아직 출근한 직원이 없습니다",
+            "tab": "1층 · 로비 (모든 팀장·직원)", "tabText": "1", "sign": "1F 로비", "signLine": "모든 층의 팀장·직원 {n}명", "wallLabel": "로비 현황판", "sysText": "CPU {cpu}% · 메모리 {mem}%", "empty": "아직 출근한 직원이 없습니다",
             "head": { "working": "근무 중", "waiting": "대기", "reports": "보고", "projects": "진행 중 프로젝트", "fails": "실패 ({m}분)", "sleepy": "졸음" },
             "state": { "working": "근무 중", "thinking": "생각 중", "idle": "대기", "enter": "대기", "stale": "졸음", "done": "보고 완료", "leaving": "퇴근 중" },
             "rank": { "lead": "팀장", "staff": "직원", "project": "프로젝트 직원" },
@@ -36,7 +38,14 @@
             "indexTitle": "층별 활동 지수", "officeIndex": "사무실 지수", "boardTitle": "직원 현황판", "newsTitle": "업무 일지",
             "page": "{p}/{n}", "moreFloors": "…외 {n}층", "moreOnWall": "+{n}명은 현황판에서", "floorLabel": "{n}층", "minutes": "{m}분", "hours": "{h}시간 {m}분",
             "days": ["일", "월", "화", "수", "목", "금", "토"],
-            "deltaSeconds": 60, "failMinutes": 10, "pageSeconds": 6, "titleMax": 10, "newsMax": 28, "newsCount": 3
+            "deltaSeconds": 60, "failMinutes": 10, "pageSeconds": 6, "titleMax": 10, "newsMax": 28, "newsCount": 3,
+            "life": {
+              "enabled": true, "tickMinMs": 1000, "firstDelayMs": [2000, 25000],
+              "fidgetEveryMs": [20000, 70000],
+              "fidgets": { "standing": ["look", "lean", "stretch", "hop"] },
+              "strollEveryMs": { "working": [180000, 420000], "thinking": [60000, 160000], "idle": [30000, 90000] },
+              "stayMs": [3000, 8000], "maxAway": 3, "strollPx": [70, 210], "strollGapPx": 60, "strollTries": 6, "phaseS": 6
+            }
           },
           "origin": { "claudeApp": "Claude 앱", "codexWork": "Codex 앱 · Work", "codexApp": "Codex 앱" }, "untitled": "새 대화",
           "reportsTitle": "일을 끝내고 결과를 넘긴 직원 {n}명 (사무실이 켜진 뒤로)",

@@ -72,7 +72,7 @@ function readBody(req, max) {
   });
 }
 
-export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConnect, weather } = {}) {
+export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConnect, weather, sysload } = {}) {
   const clients = new Set(); // open SSE responses
   let lastStateJson = null; // last floors JSON sent; null = send the next state in full
 
@@ -105,10 +105,16 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
     res.on('close', () => {
       clients.delete(res);
       weather?.disconnect();
+      sysload?.disconnect();
     });
     if (weather?.enabled) { // the weather source runs only while a page is connected
       res.write(frame('weather', weather.current()));
       weather.connect();
+    }
+    if (sysload?.enabled) { // the CPU / memory sampler runs only while a page is connected
+      const v = sysload.current();
+      if (v) res.write(frame('sysload', v));
+      sysload.connect();
     }
     onSseConnect?.();
   }
@@ -139,6 +145,10 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
 
   weather?.subscribe((field) => { // only when the kind changes: a small field, never the raw answer
     for (const res of clients) res.write(frame('weather', field));
+  });
+
+  sysload?.subscribe((v) => { // integer percents, only when a value changed
+    for (const res of clients) res.write(frame('sysload', v));
   });
 
   Object.defineProperty(server, 'sseClients', { get: () => clients.size });

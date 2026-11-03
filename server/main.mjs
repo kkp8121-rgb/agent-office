@@ -7,6 +7,7 @@ import { createServer } from './http.mjs';
 import { DETACHED_OPTIONS } from './launch.mjs';
 import { loadSaved, saveSaved } from './hidden.mjs';
 import { createWeather } from './weather.mjs';
+import { createSysLoad } from './sysload.mjs';
 
 const EXIT_PORT_BUSY = 2;
 
@@ -16,6 +17,7 @@ const office = new Office(cfg, loadSaved(dataDir));
 const poller = new Poller(cfg, office);
 // The only outbound connection (see README: Weather). AGENT_OFFICE_WEATHER_URL points it at a local fake server for checks.
 const weather = createWeather(cfg.weather, { baseUrl: process.env.AGENT_OFFICE_WEATHER_URL || undefined });
+const sysload = createSysLoad(cfg.sysload); // PC-wide CPU % and memory %: sampled only while a page is connected
 
 // ---- persistence: only when the saved part changed (hide/rename, or hide records dropped at session end) ----
 
@@ -57,7 +59,7 @@ function wake() {
   inflight = round();
 }
 
-const server = createServer(cfg, office, { onSavedChange: saveIfChanged, onShutdown: shutdown, onSseConnect: wake, weather });
+const server = createServer(cfg, office, { onSavedChange: saveIfChanged, onShutdown: shutdown, onSseConnect: wake, weather, sysload });
 
 server.on('error', (e) => {
   if (e.code === 'EADDRINUSE') {

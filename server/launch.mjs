@@ -45,7 +45,7 @@ export async function launch(cfg, { spawn: spawnFn, probe: probeFn = probe, noBr
   if (action === 'open') {
     if (!noBrowser) spawnFn('cmd', ['/c', 'start', '', url]);
   } else if (action === 'start') {
-    const args = ['/c', 'start', SERVER_WINDOW_TITLE, '/min', 'node', join(cfg.root, 'server', 'main.mjs')];
+    const args = ['/c', 'start', SERVER_WINDOW_TITLE, '/min', process.execPath, join(cfg.root, 'server', 'main.mjs')];
     if (!noBrowser) args.push('--open');
     spawnFn('cmd', args);
   } else {

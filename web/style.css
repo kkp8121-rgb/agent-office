@@ -574,14 +574,27 @@ body.paused .wx-a, body.paused .wx-b, body.paused .wx-f { animation-play-state: 
 #settings-panel .wx-credit { color: var(--credit); font-size: 11px; }
 #settings-panel #settings-close { margin-top: 8px; }
 
-/* ---- lobby (1F): the figures stand still, the screens of the back wall are the status wall (app.mjs "lobby") ---- */
+/* ---- lobby (1F): the figures stay at their desks (and stroll now and then), the screens of the back wall are the status wall (app.mjs "lobby") ---- */
 .floor.lobby {
   --led-bg: #06122b; --led-dots: rgba(90, 150, 255, .07); --led-num: #7fd3ff; --led-ink: #eef4ff; --led-name: #ffa53d;
   --led-up: #ff4d3a; --led-down: #3d8bff; --led-flat: #b9c4d8; --led-bezel: #02060f;
 }
 .floor.lobby.crop { overflow: hidden; border-radius: 8px; }
-/* no figure keeps an animation running: breathing, working and the zZ are off, only the finite ones (a newcomer's fade, a report's jump) play */
-.floor.lobby .st-idle .spr, .floor.lobby .st-enter .spr, .floor.lobby .st-thinking .spr, .floor.lobby .st-working .spr, .floor.lobby .zz { animation: none; }
+/* lobby life: every figure moves a little in the way of its state, from the pictures it already has (one transform on .spr, nothing per frame in script).
+   idle/enter: breathing; thinking: a slow head tilt; working: a small typing bob; stale: dozing (a slow nod and the zZ); done: the report jump (above).
+   --ph (set once per figure, app.mjs initLobbyLife) starts each one somewhere else in its cycle so the crowd is never in step. */
+.floor.lobby .st-idle .spr, .floor.lobby .st-enter .spr { animation: breathe 3.2s ease-in-out var(--ph, 0s) infinite; }
+.floor.lobby .st-thinking .spr { animation: lobby-think 4.6s ease-in-out var(--ph, 0s) infinite; }
+.floor.lobby .st-working .spr { animation: lobby-type .9s ease-in-out var(--ph, 0s) infinite; }
+.floor.lobby .st-stale .spr { animation: lobby-doze 5.4s ease-in-out var(--ph, 0s) infinite; }
+.floor.lobby .zz { animation-delay: var(--ph, 0s); }
+.floor.lobby .walking .spr { animation: stride .4s ease-in-out infinite; } /* a stroll: the walking legs (the floors' own) */
+@keyframes lobby-think { 0%, 100% { transform: rotate(0); } 22% { transform: rotate(-2.4deg); } 50% { transform: rotate(-2.4deg) translateY(-1px); } 72% { transform: rotate(2.4deg); } 90% { transform: rotate(0); } }
+@keyframes lobby-type { 0%, 100% { transform: translateY(0); } 25% { transform: translateY(1px) scale(1.012, .988); } 60% { transform: translateY(0) scale(.994, 1.008); } }
+@keyframes lobby-doze { 0%, 100% { transform: rotate(0); } 45% { transform: rotate(-1deg); } 70% { transform: rotate(-5deg) translateY(1px); } 85% { transform: rotate(-1.5deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .floor.lobby .spr, .floor.lobby .zz { animation: none !important; }
+}
 .floor.lobby .body { cursor: pointer; touch-action: auto; }
 .floor.lobby .ag.leaving, .floor.lobby .agt.leaving .tag { opacity: .55; }
 /* a lobby name tag: the floor number on a chip in the team colour (tells same-name 직원 of different floors apart), a small ★ for a 팀장 */
@@ -607,7 +620,8 @@ body.paused .wx-a, body.paused .wx-b, body.paused .wx-f { animation-play-state: 
 .led [data-dir="up"] { color: var(--led-up); }
 .led [data-dir="down"] { color: var(--led-down); }
 .led [data-dir="flat"] { color: var(--led-flat); }
-.led-hd { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; height: 10px; }
+.led-hd { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; height: 10px; position: relative; }
+.led-hd .sys { position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap; color: var(--led-flat); font-style: normal; }
 .led-hd b { color: var(--led-name); font-weight: 800; }
 .led-hd .pg { margin-left: auto; color: var(--led-flat); }
 .led-hd .clk { display: flex; gap: 4px; align-items: baseline; color: var(--led-flat); }

@@ -95,3 +95,10 @@ test('launch: foreign app on the port -> spawns nothing, Korean message names th
   assert.equal(calls.length, 0);
   assert.match(logs[0], /포트 47999 을/);
 });
+
+test('launch: the server window runs the node that runs the launcher, not "node" from PATH', async () => {
+  const calls = [];
+  await launch(cfg, { spawn: (c, a) => calls.push(a), probe: fakeProbe({ up: false }) });
+  assert.equal(calls[0][calls[0].indexOf('/min') + 1], process.execPath);
+  assert.ok(!calls[0].includes('node'));
+});

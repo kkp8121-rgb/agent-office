@@ -6,6 +6,7 @@ import { createNav } from './nav.mjs';
 import { charZ, objectNodes, splitWalk } from './depth.mjs';
 import { fitZoom } from './pip.mjs';
 import { LOBBY_ID, orderFloors, nextFloor, fallbackFloor, fitBox, pruneEvents, activityScore, busiestFloor, chooseFollow, viewOrder } from './view.mjs';
+import { canStroll, nextStrollAt, scaleLife, strollTarget } from './lobbylife.mjs';
 import { assignLobbySeats, backRowSeats, changeOf, clockParts, employeeRows, headline, indexRows, lobbyRoster, msToNextMinute, newsText, officeScore, pageCount, pageRows, pushSample, tableCapacity } from './lobby.mjs';
 import { dropPoint, restSpotNear, shouldLift } from './grab.mjs';
 import { daypart, nextPoke, openBox, pickLine, playPartner, throwPath, throwVelocity } from './play.mjs';
@@ -77,6 +78,7 @@ const PROVIDER_TEXT = { claude: 'Claude', codex: 'Codex' };
 const originText = (fv) => ui.ui.origin[fv.origin] ?? PROVIDER_TEXT[fv.provider] ?? fv.provider;
 
 let ui = null; // /api/ui
+let sysLoad = null; // the last `sysload` event {cpu, mem} (integer percents), or null before the first one
 let es = null; // EventSource (kept after close() so readyState stays inspectable)
 let retryTimer = 0;
 let lastNow = Date.now(); // server clock of the latest state
@@ -249,7 +251,7 @@ function setLegVars(spr, key) {
   spr.style.setProperty('--sp', v.sp);
 }
 
-/** `still`: a lobby figure: no walking legs, no grabbing, no walk listeners (it is placed, never moves). */
+/** `still`: a lobby figure: no grabbing, no walking legs until its first stroll, and it is created placed (transition 0ms: nothing may slide into its place, see lobbyFigure). */
 function createChar(av, stage, startAt, sc, isCat = false, still = false) {
   const root = el('div', 'ag');
   const bubTxt = el('div', 'bub txt empty');
@@ -292,11 +294,8 @@ function createChar(av, stage, startAt, sc, isCat = false, still = false) {
     spr.append(rec.sitImg);
   }
   recOf.set(root, rec);
-  if (still) {
-    stage.append(root, tagRoot);
-    return rec;
-  }
-  bindGrab(rec);
+  if (still) root.style.transitionDuration = tagRoot.style.transitionDuration = '0ms'; // else the CSS default (--walk-ms) animates any change of the computed transform, e.g. the fit zoom changing as the lobby is shown
+  else bindGrab(rec);
   // A walk is a chain of pieces; only a piece's own end moves it on.
   root.addEventListener('transitionend', (e) => {
     if (e.target !== root || e.propertyName !== 'transform') return;
@@ -1986,6 +1985,10 @@ function limitBubbles(recs, max) {
   });
 }
 
+/** The lobby bubbles that can show at all: style.css hides every folded marker and every bubble off the back row (`.floor.lobby .agt .bub.dot, .floor.lobby .agt:not(.back) .bub`); an empty one is display:none everywhere. */
+const lobbyBubbleMemo = { key: '', at: 0 };
+const LOBBY_BUBBLES = '.agt.back .bub:not(.dot):not(.empty)';
+
 /**
  * Speech bubbles never sit on top of each other (greeters side by side, a chatting pair, a walker passing a desk, a crowd at the door):
  * every `ui.bubbleClear.checkMs` the shown bubbles of each floor on show are checked; the lower-ranked one gives way (web/bubbles.mjs):
@@ -1996,9 +1999,25 @@ function clearBubbleOverlap() {
   if (!paused()) {
     const win = floorsEl.ownerDocument.defaultView;
     for (const floor of floorsEl.children) {
-      if (!floor.offsetParent) continue; // a floor off show
+      if (floor.hidden) continue; // a floor off show (the attribute, not offsetParent: that read forces a style recalculation under the running animations)
+      const bubs = floor.querySelectorAll(floor.classList.contains('lobby') ? LOBBY_BUBBLES : '.bub:not(.empty)');
+      if (bubs.length < 2) { // nothing to overlap, and the style and layout reads below would force a recalculation under the running animations
+        for (const b of bubs) {
+          b.style.setProperty('--lift', '0px');
+          b.classList.remove('shy');
+        }
+        lobbyBubbleMemo.key = ''; // the lobby's lifted bubbles were just put back: the next pass with two must read
+        continue;
+      }
+      if (floor.classList.contains('lobby')) { // its figures stand still but for the few on a stroll: read the layout again only when something changed, one of these figures is on a walk (a walk leaves its piece time on the tag layer until it ends), or every lobbyRecheckMs (a bubble that timed out by CSS)
+        const key = `${floorsEl.style.zoom}|${floor.className}|${Array.from(bubs, (b) => `${b.className}|${b.textContent}|${b.parentElement.className}|${b.parentElement.style.transform}|${b.parentElement.style.transitionDuration}`).join(';')}`;
+        const now = Date.now();
+        if (key === lobbyBubbleMemo.key && now - lobbyBubbleMemo.at < C.lobbyRecheckMs && !Array.from(bubs).some((b) => Number.parseFloat(b.parentElement.style.transitionDuration) > 0)) continue;
+        lobbyBubbleMemo.key = key;
+        lobbyBubbleMemo.at = now;
+      }
       const items = [];
-      for (const b of floor.querySelectorAll('.bub')) {
+      for (const b of bubs) {
         const cs = win.getComputedStyle(b);
         if (cs.display === 'none' || cs.visibility === 'hidden') continue; // `.shy` hides by opacity, so a hidden marker is still seen here
         const r = b.getBoundingClientRect();
@@ -2079,7 +2098,7 @@ function renderFloor(fv, elm) {
 
 // ---------- lobby (1F): every agent of every floor, and the status wall ----------
 // A synthetic floor built from the same snapshot the floors use (not a session, so it is not in floorRecs). Its figures are placed once
-// and never walk or play; the wall is real text laid on the screens of the room with one homography each (quadFrame: the wings are taller at the outer end), so it stays crisp
+// and never play (a figure only steps out for a short stroll now and then, see "lobby life"); the wall is real text laid on the screens of the room with one homography each (quadFrame: the wings are taller at the outer end), so it stays crisp
 // under the CSS zoom. It draws only while it is shown; hidden, a state frame just stores the floors and marks it dirty.
 
 const lobbyBtn = $('tab-lobby');
@@ -2125,7 +2144,9 @@ function buildWall(stage, raw) {
     wall.date = el('i', 'dt');
     wall.time = el('i', 'tm num');
     clk.append(wall.date, wall.time);
-    hd.append(el('b', '', L.boardTitle), wall.page, clk);
+    wall.sys = el('span', 'sys');
+    wall.sys.hidden = true; // until the first value
+    hd.append(el('b', '', L.boardTitle), wall.page, wall.sys, clk);
     const cap = Math.max(1, tableCapacity(center.frame.h, LED_ROW_PX, LED_PAD_PX) - 1); // the title line and the column line
     wall.rows = Array.from({ length: cap }, () => {
       const row = ledRow('lr', EMPLOYEE_COLS);
@@ -2228,7 +2249,9 @@ function createLobby() {
   lobby = {
     el: root, stage, scene: sc, off: true, dirty: false, floors: [], roster: [], seatMap: new Map(), chars: new Map(), populated: false, news: [],
     hist: new Map(), page: 0, pages: 1, pageAt: 0, timer: 0, wall, crop, cropped: false, writes: 0, boardLine, more, backRow: backRowSeats(sc.r.seats),
+    design: ui.lobby.design, life: DEBUG_AMBIENT ? scaleLife(L.life, 0.1) : L.life, clock: null,
   };
+  lobby.clock = makeLobbyClock(lobby);
   setText(lobbyBtn, L.tabText);
   setAttr(lobbyBtn, 'title', L.tab);
   setAttr(lobbyBtn, 'aria-label', L.tab);
@@ -2240,6 +2263,7 @@ function createLobby() {
       writes: () => lobby.writes,
       timer: () => lobby.timer !== 0,
       state: () => ({ off: lobby.off, dirty: lobby.dirty, chars: lobby.chars.size, roster: lobby.roster.length, page: lobby.page, pages: lobby.pages, timers: liveTimers.size, cropped: lobby.cropped }),
+      life: () => ({ away: lobbyAway().length, walking: [...lobby.chars.values()].filter((r) => r.walk).length }),
     };
   }
 }
@@ -2256,6 +2280,8 @@ function lobbyBox(mini) {
     lb.el.style.height = `${mini ? h : fh}px`;
     lb.stage.style.marginLeft = mini ? `${-x}px` : '';
     lb.stage.style.marginTop = mini ? `${-y}px` : '';
+    if (mini) stopLobbyLife(); // the figures are display:none in the crop: a walk would never get its transitionend
+    else startLobbyLife();
   }
   return mini ? [lb.crop.w, lb.crop.h] : lb.scene.r.size;
 }
@@ -2273,10 +2299,12 @@ function lobbyFigure(e, slot) {
   // the lobby always shows the standing picture (front view) behind a straight desk, so the face is seen: the figure is never switched to the seated one
   let p;
   let face;
+  let via = null; // where a seat's figure steps out to (the aisle in front of its desk); a standing spot has none
   if (slot.kind === 'seat') {
     const s = r.seats[slot.i];
     p = s.at;
     face = s.face;
+    via = s.approach;
   } else {
     const o = r.overflow[slot.i];
     p = o.at;
@@ -2296,10 +2324,17 @@ function lobbyFigure(e, slot) {
     lobbyRecOf.set(rec.tagRoot, rec);
     lb.chars.set(e.key, rec);
     if (lb.populated) for (const n of [rec.el, rec.tagRoot]) n.classList.add('enter-in');
+    initLobbyLife(rec, e);
   }
   rec.sid = e.sid;
-  if (rec.x !== p[0] || rec.y !== p[1]) placeAt(rec, p, false);
-  setFacing(rec, face);
+  const moved = !rec.home || rec.home.at[0] !== p[0] || rec.home.at[1] !== p[1];
+  rec.home = { at: p, via, face };
+  if (moved) { // a new place: it is there at once (never on the way), whatever stroll it was on
+    abortStroll(rec);
+    if (rec.x !== p[0] || rec.y !== p[1]) placeAt(rec, p, false);
+    setFacing(rec, face);
+  }
+  rec.floorStatus = e.floorStatus;
   setText(rec.tagFl, String(e.floorNo));
   if (rec.tagLead.hidden !== (e.rank !== 'lead')) rec.tagLead.hidden = e.rank !== 'lead';
   setText(rec.tagName, e.name);
@@ -2317,12 +2352,16 @@ function lobbyFigure(e, slot) {
   rec.el.classList.toggle('leaving', leaving);
   rec.tagRoot.classList.toggle('leaving', leaving);
   if (rec.state !== e.state) {
+    const first = !rec.state;
     if (rec.state) for (const n of [rec.el, rec.tagRoot]) n.classList.remove(`st-${rec.state}`);
     rec.state = e.state;
     for (const n of [rec.el, rec.tagRoot]) n.classList.add(`st-${e.state}`);
     rec.tagRoot.classList.toggle('done', e.state === 'done');
     if (e.state === 'done') rec.el.classList.add('arrived');
+    if (!first) scheduleStroll(rec); // the wait for the next stroll depends on the state
+    else if (!lb.off) freshLifeTimes(rec); // a new figure: its first gesture and stroll come after a short, different wait each
   }
+  if (rec.away && !canStroll(rec.state, rec.floorStatus)) abortStroll(rec); // fell asleep, reported or its floor is leaving: back to the desk
   setBubble(rec, e.bubble, e.since);
 }
 
@@ -2355,6 +2394,7 @@ function drawLobby() {
   }
   limitBubbles(lb.chars.values(), ui.ui.bubbleFullMax);
   lb.populated = true;
+  lb.clock.kick(); // new figures brought their own times
   put(lb.boardLine, lobbyFill(L.signLine, { n: lb.roster.length }));
   lb.more.hidden = unseated === 0;
   setText(lb.more, unseated ? lobbyFill(L.moreOnWall, { n: unseated }) : '');
@@ -2374,6 +2414,14 @@ function paintRow(row, r) {
   if (row.style.getPropertyValue('--c') !== color) row.style.setProperty('--c', color);
 }
 
+/** CPU / memory text in the middle of the board's header line; hidden until the first value. */
+function drawSys() {
+  const sys = lobby.wall.sys;
+  if (!sys) return;
+  sys.hidden = !sysLoad;
+  if (sysLoad) put(sys, ui.ui.lobby.sysText.replace('{cpu}', String(sysLoad.cpu)).replace('{mem}', String(sysLoad.mem)));
+}
+
 /** The whole wall at `now`: numbers, clock, employee page, floor index, news. Cells that did not change are not touched. */
 function drawWall(now) {
   const lb = lobby;
@@ -2385,6 +2433,7 @@ function drawWall(now) {
     for (const [key, node] of Object.entries(w.cells)) put(node, String(hc[key]));
     setAttr(w.cells.fails, 'data-alarm', hc.fails > 0 ? 'on' : 'off'); // red only while something failed in the window
   }
+  drawSys();
   const scores = followScores(now);
   const sample = (id, v) => {
     const s = lb.hist.get(id) ?? lb.hist.set(id, []).get(id);
@@ -2504,11 +2553,151 @@ function setLobbyOff(off) {
   lb.el.hidden = off;
   if (off) {
     clearLobbyTimer();
+    stopLobbyLife();
     lb.hist.clear();
     lb.page = 0;
     lb.pageAt = 0;
     lb.populated = false; // the next time it is shown its figures stand there, nobody fades in
-  } else drawLobby();
+  } else {
+    drawLobby();
+    startLobbyLife();
+  }
+}
+
+// ---------- lobby life: a fidget now and then, a stroll to the aisle and back ----------
+// Breathing, typing, the thinking tilt and dozing are CSS keyframes per state (style.css "lobby life"). Here are the two things that need a timer:
+// a short gesture (the floors' fidgets) and a stroll: the figure steps out of its desk into the aisle in front of its row, walks a few
+// steps sideways, stays a while and comes back. One clock (ambient.mjs) wakes only when somebody is due; at most life.maxAway walk at once,
+// never two in one aisle. Nothing runs per frame. Off while the lobby is hidden, the tab is hidden, or the viewer asks for less motion.
+
+const prefersLessMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const lobbyAway = () => [...lobby.chars.values()].filter((r) => r.away);
+
+function makeLobbyClock(lb) {
+  return createFloorClock({
+    amb: lb.life,
+    now: Date.now,
+    timers: clockTimers,
+    members: () => [...lb.chars.values()].filter((r) => r.m && r.state !== 'done').map((r) => r.m),
+    act: { fidget: (m) => lobbyFidget(m.rec), trip: (m) => lobbyStroll(m.rec), tripEnd: (m) => strollBack(m.rec) },
+    awayCount: () => lobbyAway().length,
+  });
+}
+
+/** A figure's own rhythm (seeded by its key) and its breathing phase: each one starts somewhere else in its cycle, so a crowd never moves in step. */
+function initLobbyLife(rec, e) {
+  const { life } = lobby;
+  rec.rng = rngFor(e.key);
+  rec.m = { id: e.key, rec, nextFidgetAt: Infinity, nextTripAt: Infinity, returnAt: 0 };
+  const phase = `-${(rec.rng() * life.phaseS).toFixed(2)}s`;
+  rec.el.style.setProperty('--ph', phase);
+  rec.tagRoot.style.setProperty('--ph', phase);
+}
+
+function freshLifeTimes(rec) {
+  const { life } = lobby;
+  rec.m.nextFidgetAt = Date.now() + between(rec.rng, life.firstDelayMs);
+  rec.m.returnAt = 0;
+  scheduleStroll(rec, true);
+}
+
+/** The next stroll time from the figure's state (never while asleep, reported or its floor is leaving); `fresh`: the lobby was just opened. */
+function scheduleStroll(rec, fresh = false) {
+  if (!rec.away) rec.m.nextTripAt = nextStrollAt(rec.rng, lobby.life, rec, Date.now(), fresh);
+}
+
+function lobbyFidget(rec) {
+  const { life } = lobby;
+  rec.m.nextFidgetAt = Date.now() + between(rec.rng, life.fidgetEveryMs);
+  if (rec.walk || rec.away || rec.state === 'done' || rec.state === 'stale') return; // a sleeper does not fidget
+  playFidget(rec, chooseFidget(rec.rng, false, life));
+}
+
+/** The polyline of a stroll leg. Out: desk -> aisle -> goal; back: where it stands -> aisle -> desk. Null when the grid has no route. */
+function strollRoute(rec, goal, out) {
+  const { at, via } = rec.home;
+  const from = [rec.x, rec.y];
+  const pts = out ? [from, ...(via ? [via] : [])] : [from];
+  const path = nav.path(lobby.design, pts[pts.length - 1], out ? goal : via ?? at);
+  if (!path) return null;
+  pts.pop();
+  pts.push(...path);
+  if (!out && via) pts.push(at);
+  return pts.filter((p, i) => i === 0 || !same(p, pts[i - 1]));
+}
+
+function lobbyStroll(rec) {
+  const lb = lobby;
+  scheduleStroll(rec); // the next one, whatever happens now
+  if (lb.off || rec.walk || rec.away || !canStroll(rec.state, rec.floorStatus)) return;
+  const { at, via } = rec.home;
+  const from = nav.snap(lb.design, via ?? at);
+  const keepClear = [];
+  const busyLanes = [];
+  for (const o of lb.chars.values()) {
+    if (o === rec) continue;
+    if (o.away) {
+      keepClear.push([o.x, o.y]);
+      busyLanes.push((o.home.via && nav.snap(lb.design, o.home.via)?.[1]) || o.home.at[1]);
+    } else if (!o.home.via) keepClear.push(o.home.at);
+  }
+  const goal = from && strollTarget(rec.rng, nav.grid(lb.design), from, lb.life, { keepClear, busyLanes, aisle: via !== null });
+  const pts = goal && strollRoute(rec, goal, true);
+  if (!pts) return;
+  if (!rec.legs.length) rec.legs = makeLegs(rec.spr, rec.sprite); // the legs are drawn only for those who ever walk
+  rec.away = true;
+  const ms = walkPath(rec, lb, pts, () => noSlide(rec));
+  rec.m.returnAt = Date.now() + ms + between(rec.rng, lb.life.stayMs);
+}
+
+/** A walk leaves the time of its last piece on the figure: a later zoom change (window resize, another floor and back) would slide it. A lobby figure stands with 0ms. */
+function noSlide(rec) {
+  rec.el.style.transitionDuration = rec.tagRoot.style.transitionDuration = '0ms';
+}
+
+/** The stay is over: back to the desk, then the next wait. */
+function strollBack(rec) {
+  rec.m.returnAt = 0;
+  const pts = strollRoute(rec, null, false);
+  if (!pts) return abortStroll(rec);
+  rec.m.nextTripAt = Infinity;
+  walkPath(rec, lobby, pts, () => {
+    rec.away = false;
+    noSlide(rec);
+    rec.el.style.zIndex = String(charZ(rec.home.at[1], ui.depth));
+    setFacing(rec, rec.home.face);
+    scheduleStroll(rec);
+    lobby.clock.kick();
+  });
+}
+
+/** Back at the desk at once (no walk): a new place, a state that does not stroll, the lobby or the tab hidden. */
+function abortStroll(rec) {
+  if (!rec.away && !rec.walk) return;
+  rec.walk = null;
+  rec.away = false;
+  rec.el.classList.remove('walking');
+  clearGestures(rec);
+  placeAt(rec, rec.home.at, false);
+  setFacing(rec, rec.home.face);
+  rec.m.returnAt = 0;
+  scheduleStroll(rec);
+}
+
+/** Starts the clock from fresh times, unless the viewer wants less motion or the whole thing is switched off in config.json. */
+function startLobbyLife() {
+  const lb = lobby;
+  if (!lb || lb.off || lb.cropped || paused() || !lb.life.enabled || prefersLessMotion()) return;
+  for (const rec of lb.chars.values()) freshLifeTimes(rec);
+  lb.clock.start();
+}
+
+/** Stops the clock and sends everyone who is out back to the desk at once. */
+function stopLobbyLife() {
+  const lb = lobby;
+  if (!lb) return;
+  lb.clock.stop();
+  for (const rec of lb.chars.values()) abortStroll(rec);
 }
 
 // ---------- session list ----------
@@ -2781,6 +2970,7 @@ function connect() {
   es.addEventListener('phase', (ev) => onPhase(JSON.parse(ev.data)));
   es.addEventListener('fail', (ev) => onFail(JSON.parse(ev.data)));
   es.addEventListener('weather', (ev) => onWeather(JSON.parse(ev.data)));
+  es.addEventListener('sysload', (ev) => { sysLoad = JSON.parse(ev.data); if (lobby?.wall) drawSys(); });
   es.addEventListener('error', () => {
     showConn('연결이 끊겼습니다. 다시 연결하는 중…');
     // The browser retries by itself unless the server refused the stream (then the state is CLOSED).
@@ -2793,6 +2983,7 @@ function pause() {
   clearRotate();
   clearFollowTimer();
   clearLobbyTimer();
+  stopLobbyLife();
   if (skyTimer) clockTimers.clearTimeout(skyTimer);
   skyTimer = 0;
   if (es) es.close();
@@ -2817,6 +3008,7 @@ async function resume() {
   catSync();
   armRotate();
   armLobby();
+  startLobbyLife();
   connect();
 }
 
