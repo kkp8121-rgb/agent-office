@@ -410,7 +410,7 @@ function setPose(rec, seated, animate) {
   rec.seated = sit;
   rec.el.classList.toggle('sitting', sit);
   rec.tagRoot.classList.toggle('sitting', sit);
-  emitFx('pose', { rec, seated: sit });
+  emitFx('pose', { rec, seated: sit, animate });
   if (animate) {
     clearGestures(rec);
     void rec.body.offsetWidth;
