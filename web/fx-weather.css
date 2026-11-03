@@ -1,1 +1,37 @@
-/* Effects area "weather" (window weather and room light). Scope rules under html.fx-on; animate only transform and opacity. */
+/* Effects area "weather" (window weather and room light). Scope rules under html.fx-on; animate only transform and opacity.
+   web/fx-weather.mjs builds .fxw (one per floor, after the plain .wx weather) while the effects are on. Everything that moves is a tile
+   layer that slides by transform, or a tint that fades by opacity. Numbers (tile sizes, speeds, opacities, fade time) arrive as custom properties. */
+
+.fxw { position: absolute; inset: 0; pointer-events: none; --fxw-dusk-c: rgba(255, 140, 50, .42); --fxw-night-c: rgba(14, 24, 74, .62); --fxw-flash-c: #e4ebff; }
+.stage.viewed .fxw { --fxw-dusk-c: rgba(255, 140, 50, .10); --fxw-night-c: rgba(14, 24, 74, .12); }
+.fxw-win { position: absolute; overflow: hidden; }
+.fxw-l, .fxw-tint, .fxw-f { position: absolute; }
+.fxw-l { background-repeat: repeat; image-rendering: auto; }
+.fxw-cloud, .fxw-fog { background-repeat: repeat-x; }
+.fxw-off { display: none; }
+
+/* the plain weather of weather.mjs and the plain glass tint are replaced on a floor that has this overlay (the wash of .wx stays) */
+.fx-on .stage:has(> .fxw) .wx-a, .fx-on .stage:has(> .fxw) .wx-b, .fx-on .stage:has(> .fxw) .wx-f { display: none !important; }
+.fx-on .stage:has(> .fxw) .sky polygon { fill: transparent !important; }
+
+/* sheets and banks: one slide per loop by the tile's own period, so the loop has no seam; windows are out of step by --fxw-p */
+.fxw-l { opacity: calc(var(--fxw-o, 1) * var(--fxw-dim, 1)); transition: opacity var(--fxw-fade, 0ms) ease-in-out; animation: fxw-slide var(--fxw-ms, 1000ms) linear infinite; animation-delay: calc(var(--fxw-p, 0) * var(--fxw-ms, 1000ms) * -1); }
+.fxw-c { opacity: var(--fxw-o, 1); }
+@keyframes fxw-slide { to { transform: translate(var(--fxw-dx, 0px), var(--fxw-dy, 0px)); } }
+
+/* the light: dusk and night tints cross-fade by opacity (the targets are set by the script from config) */
+.fxw-tint { inset: 0; opacity: 0; transition: opacity var(--fxw-fade, 0ms) ease-in-out; }
+.fxw-dusk { background: var(--fxw-dusk-c); opacity: var(--fxw-dusk, 0); }
+.fxw-night { background: var(--fxw-night-c); opacity: var(--fxw-night, 0); }
+
+/* lightning: the window's flash layer is lit by a script animation (opacity only), soft and never full-screen */
+.fxw-f { inset: 0; background: var(--fxw-flash-c); opacity: 0; }
+
+/* the soft glow of a monitor on a desk at night: one pre-drawn radial gradient per working seat, shown by opacity only */
+.fxw-glow { position: absolute; border-radius: 50%; pointer-events: none; background: radial-gradient(ellipse at center, rgba(130, 176, 255, .55), rgba(130, 176, 255, .22) 45%, rgba(130, 176, 255, 0) 72%); opacity: 0; transition: opacity 400ms ease-in-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fxw-l { animation: none !important; transition: none !important; }
+  .fxw-tint, .fxw-glow { transition: none !important; }
+  .fxw-f { display: none !important; }
+}
