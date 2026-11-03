@@ -1,0 +1,131 @@
+/* The character card (web/card.mjs): a kraft file folder with a form sheet, opened from a character's name tag.
+   Box lines are CSS, the paperclip and the hover folder icon are small PNGs (art/card/build.py). Motion (opening, closing, the photos settling)
+   is Web Animations on transform and opacity only, run by card.mjs while the effects are on. */
+
+/* ---- the name tag: a small folder icon appears beside it on hover or keyboard focus, the tag itself does not move ---- */
+.tag.card-tag { cursor: pointer; }
+.tag.card-tag::after {
+  content: ""; position: absolute; left: 100%; top: 50%; width: 15px; height: 11px; margin: -5px 0 0 4px;
+  background: url(/assets/card/folder-icon.png) no-repeat 0 0 / 15px 11px; image-rendering: pixelated; visibility: hidden;
+}
+.tag.card-tag:hover::after, .tag.card-tag:focus-visible::after { visibility: visible; }
+.tag.card-tag:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ---- colours (paper on a folder; the dark theme dims them a little) ---- */
+.cd-back {
+  --cd-backdrop: rgba(250, 244, 230, .72);
+  --cd-sheet: #fffdf8;
+  --cd-line: #1f1a14;
+  --cd-ink: #2a2118;
+  --cd-lab: #4b4034;
+  --cd-folder: #c9955f;
+  --cd-folder-edge: #7a4f27;
+  --cd-folder-hi: rgba(255, 255, 255, .1);
+  --cd-mat: #aab0b8;
+  --cd-photo: #f6f6f2;
+  --cd-id-bg: #cfe3ee;
+  --cd-body-bg: #eadcc2;
+  --cd-stamp: #b3261e;
+  --cd-shadow: rgba(40, 24, 8, .38);
+}
+:root[data-theme="dark"] .cd-back {
+  --cd-backdrop: rgba(14, 10, 4, .62);
+  --cd-sheet: #dcd5c5;
+  --cd-folder: #8f6a43;
+  --cd-folder-edge: #4c3219;
+  --cd-folder-hi: rgba(255, 255, 255, .05);
+  --cd-mat: #858a92;
+  --cd-photo: #cfcfc8;
+  --cd-id-bg: #a9bcc6;
+  --cd-body-bg: #bcae95;
+  --cd-stamp: #9c211a;
+  --cd-shadow: rgba(0, 0, 0, .6);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .cd-back {
+    --cd-backdrop: rgba(14, 10, 4, .62);
+    --cd-sheet: #dcd5c5;
+    --cd-folder: #8f6a43;
+    --cd-folder-edge: #4c3219;
+    --cd-folder-hi: rgba(255, 255, 255, .05);
+    --cd-mat: #858a92;
+    --cd-photo: #cfcfc8;
+    --cd-id-bg: #a9bcc6;
+    --cd-body-bg: #bcae95;
+    --cd-stamp: #9c211a;
+    --cd-shadow: rgba(0, 0, 0, .6);
+  }
+}
+
+/* ---- the card: designed at one size (ui.card.layout), scaled to fit the window by card.mjs ---- */
+.cd-back { position: fixed; inset: 0; z-index: 100000; background: var(--cd-backdrop); color: var(--cd-ink); }
+.cd-fit { position: absolute; left: 50%; top: 50%; transform-origin: 50% 50%; }
+.cd { position: absolute; inset: 0; outline: none; }
+
+.cd-folder {
+  position: absolute; left: 0; top: 26px; width: 536px; bottom: 0; box-sizing: border-box;
+  background-color: var(--cd-folder);
+  background-image: linear-gradient(var(--cd-folder-hi), rgba(0, 0, 0, .08)), repeating-linear-gradient(90deg, rgba(90, 50, 10, .07) 0 2px, transparent 2px 6px);
+  border: 3px solid var(--cd-folder-edge); box-shadow: 0 6px 0 var(--cd-shadow);
+}
+.cd-tab {
+  position: absolute; right: -27px; top: 150px; width: 30px; height: 150px; box-sizing: border-box;
+  background: var(--cd-folder); border: 3px solid var(--cd-folder-edge); border-left: 0;
+  clip-path: polygon(0 0, 50% 0, 100% 14%, 100% 86%, 50% 100%, 0 100%);
+}
+
+.cd-sheet {
+  position: absolute; left: 22px; top: 8px; width: 492px; box-sizing: border-box; padding: 2px;
+  display: grid; gap: 2px; background: var(--cd-line);
+  grid-template-columns: 190px 1fr 1fr;
+  grid-template-rows: 46px 40px 40px 40px 54px 44px 44px 96px 118px 112px;
+  grid-template-areas:
+    "photo name name" "photo age age" "photo birth birth" "photo home home" "photo hair eye"
+    "height skill skill" "weight skill skill" "sign skill skill" "bio bio bio" "memo memo memo";
+  box-shadow: 0 3px 0 var(--cd-shadow), 0 10px 22px var(--cd-shadow);
+}
+.cd-cell { position: relative; min-width: 0; box-sizing: border-box; padding: 5px 7px; background: var(--cd-sheet); overflow: hidden; }
+.cd-photos { grid-area: photo; overflow: visible; z-index: 2; padding: 0; }
+.c-name { grid-area: name; } .c-age { grid-area: age; } .c-birth { grid-area: birth; } .c-home { grid-area: home; }
+.c-hair { grid-area: hair; } .c-eye { grid-area: eye; } .c-height { grid-area: height; } .c-weight { grid-area: weight; }
+.c-sign { grid-area: sign; } .c-skill { grid-area: skill; } .c-bio { grid-area: bio; } .c-memo { grid-area: memo; }
+
+.cd-lab { display: block; font: 700 11px/1 "Courier New", Consolas, "D2Coding", monospace; letter-spacing: .04em; color: var(--cd-lab); }
+.cd-val { margin-top: 5px; font-size: 15px; font-weight: 700; line-height: 1.25; color: var(--cd-ink); overflow-wrap: anywhere; }
+.c-name .cd-val { font-size: 17px; padding-right: 30px; }
+.cd-text { font-size: 13px; font-weight: 600; line-height: 1.55; }
+.cd-list { margin: 5px 0 0; padding: 0; list-style: none; }
+.cd-list li { font-size: 13px; font-weight: 700; line-height: 1.5; }
+.cd-list li::before { content: "· "; color: var(--cd-lab); }
+.c-memo .cd-list li { font-weight: 600; }
+.cd-sig { display: block; width: 100%; height: 64px; margin-top: 0; }
+.cd-sig path { fill: none; stroke: #1d2a5c; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.cd-sig path + path { stroke-width: 1.6; }
+
+/* the two photos, tilted, held to the sheet by a paperclip; the sprite pictures are scaled up crisp */
+.cd-ph { position: absolute; top: 14px; width: 94px; height: 134px; }
+.cd-ph.id { left: 4px; transform: rotate(-4deg); }
+.cd-ph.body { left: 94px; transform: rotate(3deg); }
+.cd-ph-in { width: 100%; height: 100%; box-sizing: border-box; padding: 3px; background: var(--cd-photo); border: 3px solid var(--cd-mat); box-shadow: 2px 3px 0 var(--cd-shadow); }
+.cd-ph-win { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.cd-ph.id .cd-ph-win { background: var(--cd-id-bg); }
+.cd-ph.body .cd-ph-win { background: var(--cd-body-bg); }
+.cd-pic { position: absolute; left: 50%; width: auto; max-width: none; image-rendering: pixelated; translate: -50% 0; }
+.cd-ph.id .cd-pic { top: 2px; }
+.cd-ph.body .cd-pic { bottom: 2px; }
+.cd-clip { position: absolute; left: 66px; top: 0; width: 15px; height: 34px; image-rendering: pixelated; transform: rotate(8deg); pointer-events: none; }
+
+.cd-stamp {
+  position: absolute; right: 38px; top: 52px; z-index: 3; padding: 1px 8px; border: 3px double var(--cd-stamp); color: var(--cd-stamp);
+  font-size: 14px; font-weight: 800; line-height: 1.3; letter-spacing: .06em; transform: rotate(-11deg); opacity: .82; pointer-events: none;
+}
+.cd-gone {
+  position: absolute; right: 52px; bottom: 34px; z-index: 3; padding: 2px 12px; border: 3px solid #66605a; color: #66605a; background: rgba(255, 253, 248, .6);
+  font-size: 20px; font-weight: 800; letter-spacing: .1em; transform: rotate(-8deg); pointer-events: none;
+}
+.cd-close {
+  position: absolute; right: 32px; top: 14px; z-index: 4; width: 26px; height: 26px; padding: 0; line-height: 22px; text-align: center; font-size: 20px; font-weight: 800;
+  color: #fff; background: var(--cd-folder-edge); border: 2px solid var(--cd-line); box-shadow: 2px 2px 0 var(--cd-shadow);
+}
+.cd-close:hover { background: var(--cd-stamp); }
+.cd-close:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }

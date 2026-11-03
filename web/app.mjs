@@ -28,6 +28,7 @@ import { init as initFxEvents } from './fx-events.mjs';
 import { init as initFxLed } from './fx-led.mjs';
 import { init as initFxHit } from './fx-hit.mjs';
 import { init as initOfficeLife } from './officelife.mjs';
+import { bindTag, createCard } from './card.mjs';
 
 // Visual constants (how things look/move, not planning numbers; those come from /api/ui).
 const WALK_PX_PER_SEC = 150;
@@ -1597,10 +1598,12 @@ function catEnter(rec) {
 function catSpawn(frec) {
   const { door } = frec.scene.r;
   const rec = createChar({ sprite: 'cat-walk-1', slot: null }, frec.stage, { x: door.at[0], y: door.at[1] }, frec.scene, true);
+  bindCardTag(rec);
   rec.frec = frec;
   rec.isCat = true;
   rec.state = 'cat';
   setText(rec.tag, catC.name);
+  tagLabel(rec, catC.name);
   setFacing(rec, door.face);
   cat = { rec, frec, timer: 0, leaveAt: Date.now() + between(Math.random, catC.moveEveryMs), spotId: '', poke: null, force: '' };
   catEnter(rec);
@@ -1813,6 +1816,7 @@ function renderAgent(av, floorEl) {
     const { door } = sc.r;
     const startAt = walksIn ? { x: door.at[0], y: door.at[1] } : target;
     rec = createChar(av, frec.stage, startAt, sc);
+    bindCardTag(rec);
     rec.frec = frec;
     rec.isLead = isLead;
     frec.agents.set(av.key, rec);
@@ -1850,6 +1854,7 @@ function renderAgent(av, floorEl) {
   }
   setText(rec.tag, av.name);
   rec.tag.title = av.role;
+  tagLabel(rec, av.name);
   const odd = !isLead && av.slot.i % 2 === 1;
   rec.el.classList.toggle('odd', odd);
   rec.tagRoot.classList.toggle('odd', odd);
@@ -2488,6 +2493,7 @@ function lobbyFigure(e, slot) {
   let rec = lb.chars.get(e.key);
   if (!rec) {
     rec = createChar({ sprite: e.sprite, slot: null }, lb.stage, { x: p[0], y: p[1] }, lb.scene, false, true);
+    bindCardTag(rec);
     rec.sid = e.sid;
     rec.tag.textContent = '';
     rec.tagFl = el('i', 'fl'); // the floor number in the team colour
@@ -2513,6 +2519,7 @@ function lobbyFigure(e, slot) {
   setText(rec.tagFl, String(e.floorNo));
   if (rec.tagLead.hidden !== (e.rank !== 'lead')) rec.tagLead.hidden = e.rank !== 'lead';
   setText(rec.tagName, e.name);
+  tagLabel(rec, e.name);
   setAttr(rec.tag, 'title', `${lobbyFill(ui.ui.lobby.floorLabel, { n: e.floorNo })} · ${e.role}`);
   const color = colorOf(e.sid);
   if (rec.tag.style.getPropertyValue('--c') !== color) {
@@ -3054,6 +3061,7 @@ function render(state) {
   catSync();
   followPoke();
   lobbySync(list);
+  card?.refresh();
 }
 
 async function refreshState() {
@@ -3303,6 +3311,55 @@ function initFxSwitches(S) {
   onFxChange(() => { // the reduced-motion default can flip while the panel exists
     for (const which of Object.keys(boxes)) boxes[which].checked = fxChoices()[which];
   });
+}
+
+// ---------- character card (web/card.mjs): opens from a name tag ----------
+
+let card = null; // the card component, null while ui.card.enabled is off
+
+function initCard() {
+  const cfg = ui.ui.card;
+  if (!cfg.enabled) return;
+  card = createCard({ cfg, lobbyLabels: ui.ui.lobby, server: ui, fx: fxApi, now: () => lastNow, reduced: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches });
+}
+
+/** The name tag of a new character opens its card (a click, Enter or Space; the folder icon on hover is CSS in web/card.css). */
+function bindCardTag(rec) {
+  if (ui.ui.card.enabled) bindTag(rec.tag, () => card.open(rec, rec.tag, cardWho));
+}
+
+/** The tag's accessible name, kept in step with the name it shows. */
+function tagLabel(rec, name) {
+  if (ui.ui.card.enabled) setAttr(rec.tag, 'aria-label', ui.ui.card.labels.tagLabel.replace('{name}', name));
+}
+
+/** The two pictures of a card photo: the standing picture, or the seated one while it sits. `h` = the picture's own height in px. */
+function cardPics(rec, sprite) {
+  if (rec.isCat) return { id: { url: spriteUrl('cat-sit'), h: 21 }, body: rec.seated || rec.el.classList.contains('cat-sit') || rec.el.classList.contains('cat-sleep') ? { url: spriteUrl('cat-sit'), h: 21 } : { url: spriteUrl('cat-walk-1'), h: 22 } };
+  const stand = { url: spriteUrl(sprite), h: ui.spriteHeight };
+  return { id: stand, body: rec.seated && sitSet.has(sprite) ? { url: sitUrl(sprite), h: ui.sitHeight } : stand };
+}
+
+/** What the office shows of a character right now, for its card; null once it has left (or its floor is gone). */
+function cardWho(rec) {
+  if (rec.isCat) {
+    if (cat?.rec !== rec) return null;
+    return { sprite: 'cat', name: catC.name, role: '', rank: 'cat', state: '', floorStatus: '', floorNo: lastFloors.get(cat.frec.sid)?.floorNo ?? 0, lobby: false, startedAt: 0, pics: cardPics(rec, 'cat') };
+  }
+  if (lobby?.chars && lobbyRecOf.get(rec.el) === rec) {
+    const e = lobby.roster?.find((r) => lobby.chars.get(r.key) === rec);
+    if (!e) return null;
+    return { sprite: e.sprite, name: e.name, role: e.role, rank: e.rank, state: e.state, floorStatus: e.floorStatus, floorNo: e.floorNo, lobby: true, startedAt: e.startedAt, pics: cardPics(rec, e.sprite) };
+  }
+  const frec = rec.frec;
+  const fv = frec && floorRecs.get(frec.sid) === frec ? lastFloors.get(frec.sid) : null;
+  const key = fv ? [...frec.agents].find(([, r]) => r === rec)?.[0] : null;
+  const a = key === 'lead' ? fv.lead : key ? fv.agents.find((x) => x.key === key) : null;
+  if (!a) return null;
+  return {
+    sprite: a.sprite, name: a.name, role: a.role, rank: key === 'lead' ? 'lead' : a.wf ? 'project' : 'staff', state: a.state, floorStatus: fv.status,
+    floorNo: fv.floorNo, lobby: false, startedAt: key === 'lead' ? fv.startedAt ?? 0 : a.enteredAt ?? 0, pics: cardPics(rec, a.sprite),
+  };
 }
 
 /** Everything an effects area may use of the office, so it never reaches into this file (the typedef in web/fx.mjs is the documentation). */
@@ -3754,6 +3811,7 @@ async function openPip() {
   pipFxStop = trackDoc(d); // the small window's <html> carries fx-on too
   landFlights(); // moving the floors cancels running animations
   closeBig(); // its listeners belong to this page's document
+  card?.close(); // so does the character card (it sits in <body> of the window it was opened in)
   pipWin = w;
   d.body.append(floorsEl);
   holdEl.hidden = false;
@@ -3776,6 +3834,7 @@ function pipClosed() {
   pipFxStop = null;
   landFlights();
   closeBig();
+  card?.close();
   for (const t of liveTimers.values()) {
     if (t.win !== gone) continue; // the closed window's timers died with it: they run on this page now
     t.win = window;
@@ -3852,6 +3911,7 @@ async function init() {
   applyTime();
   initWeather();
   initFxAreas();
+  initCard();
   clearBubbleOverlap();
   connEl.hidden = true;
   if (document.hidden) document.body.classList.add('paused');

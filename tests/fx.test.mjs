@@ -228,7 +228,7 @@ test('app.mjs emits exactly the documented events, each with the documented fiel
 test('the pages link the six area style sheets right after style.css, scripts stay as they were', () => {
   const css = ['fx-weather', 'fx-chars', 'fx-events', 'fx-led', 'fx-hit', 'officelife', 'decor'];
   const links = css.map((n) => `<link rel="stylesheet" href="/web/${n}.css">`).join('\n');
-  assert.ok(INDEX_HTML.includes(`<link rel="stylesheet" href="/web/style.css">\n${links}\n</head>`));
+  assert.ok(INDEX_HTML.includes(`<link rel="stylesheet" href="/web/style.css">\n${links}\n<link rel="stylesheet" href="/web/card.css">\n</head>`)); // the character card's sheet follows the six
   assert.match(INDEX_HTML, /<fieldset id="wx-choices"><legend><\/legend><\/fieldset>\s*<fieldset id="fx-choices"><legend><\/legend><\/fieldset>/);
   for (const n of css) assert.ok(existsSync(join(ROOT, 'web', `${n}.css`)), `${n}.css exists`);
 });
