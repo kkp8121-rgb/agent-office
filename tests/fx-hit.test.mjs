@@ -10,7 +10,7 @@ import { loadPersonas, personaLimits } from '../server/persona.mjs';
 import { createFx, nextCombo } from '../web/fx.mjs';
 import { nextPoke } from '../web/play.mjs';
 import {
-  TYPES, bounceFrames, burstPlan, comboSpeaks, comboView, createLinePicker, flightFrames, headShakeFrames, hitStopMs, knockDir, landFrames, lineKeyFor,
+  TYPES, bounceFrames, burstPlan, createLinePicker, flightFrames, headShakeFrames, hitStopMs, knockDir, landFrames, lineKeyFor,
   liftFrames, moodLineKey, motionFrames, personaKey, personaOf, snackMood, typeOf,
 } from '../web/fx-hit-rules.mjs';
 import { createSound, soundPlan } from '../web/fx-hit-sound.mjs';
@@ -108,18 +108,26 @@ test('motion: a dodger has already stepped aside when the tap lands, the others 
   assert.ok(tx(flinch) < H.types.flinch.knock * 0.5);
 });
 
-test('lift, flight, landing, bounce and head shake: transform-only keyframes that end at rest (flight at its spin)', () => {
+test('lift, flight, landing, bounce and head shake: transform-only keyframes that end at rest', () => {
   const lf = liftFrames(H.types.goofy, H);
   assert.equal(lf.pop.at(-1).transform, REST);
   assert.ok(lf.wiggle.length === 2 && lf.wiggleMs > 0);
   const ff = flightFrames(H.types.dramatic, 600, -200, 800, H);
   assert.equal(ff.ms, 800);
   assert.ok(ff.frames[0].transform.includes('scale(1.3, 0.8)'));
-  const mid = H.throw.spinMidPx;
-  assert.ok(ff.frames.every((f) => f.transform.startsWith(`translate(0px, ${-mid}px) `) && f.transform.endsWith(`translate(0px, ${mid}px)`)), 'turns about the body middle');
-  assert.ok(ff.frames.at(-1).transform.includes(') rotate(1080deg) rotate('));
-  assert.ok(flightFrames(H.types.tough, -600, 0, 500, H).frames.at(-1).transform.includes(') rotate(0deg) rotate('));
-  assert.ok(flightFrames(H.types.flinch, -600, 0, 500, H).frames.at(-1).transform.includes(') rotate(-360deg) rotate('));
+  // no rotation in flight: every frame is only rotate(a) scale() rotate(-a), which nets out to a stretch along the velocity
+  for (const t of Object.keys(H.types)) {
+    for (const [vx, vy] of [[600, -200], [-600, 0]]) {
+      const a = Math.round(Math.atan2(vy, vx) * (180 / Math.PI) * 1000) / 1000;
+      for (const f of flightFrames(H.types[t], vx, vy, 500, H).frames) {
+        const m = /^rotate\((-?[\d.]+)deg\) scale\([^)]*\) rotate\((-?[\d.]+)deg\)$/.exec(f.transform);
+        assert.ok(m, `${t}: ${f.transform}`);
+        assert.equal(Number(m[1]) + Number(m[2]), 0);
+        assert.equal(Number(m[1]), a);
+      }
+    }
+  }
+  assert.equal(flightFrames(H.types.dramatic, 600, -200, 800, H).frames.at(-1).transform.includes('scale(1, 1)'), true);
   for (const k of [landFrames(H.types.tough, H), bounceFrames(H.types.bubbly, H), headShakeFrames(H)]) {
     assert.ok(k.ms > 0);
     assert.equal(k.frames.at(-1).transform, REST);
@@ -127,9 +135,9 @@ test('lift, flight, landing, bounce and head shake: transform-only keyframes tha
   assert.ok(landFrames(H.types.tough, H).frames[0].transform.includes('scale(1.07'));
 });
 
-// ---- combo ----
+// ---- hit counter ----
 
-test('combo: counts from the third consecutive poke, grows with each click up to its cap; the persona line takes over past the top level', () => {
+test('hit counter: counts consecutive clicks (word rotation, centre knock), no combo label; the poke level stops at maxLevel', () => {
   let c = null;
   const ns = [];
   for (const t of [0, 400, 800, 1200, 1600, 5000]) {
@@ -137,15 +145,7 @@ test('combo: counts from the third consecutive poke, grows with each click up to
     ns.push(c.n);
   }
   assert.deepEqual(ns, [1, 2, 3, 4, 5, 1]);
-  assert.equal(comboView(2, H), null);
-  assert.equal(comboView(3, H).text, '3 콤보');
-  assert.equal(comboView(3, H).scale, H.combo.baseScale);
-  assert.ok(comboView(5, H).scale > comboView(4, H).scale);
-  assert.equal(comboView(99, H).scale, H.combo.maxScale);
   const max = cfg.ui.poke.maxLevel;
-  assert.equal(comboSpeaks(max, max), false);
-  assert.equal(comboSpeaks(max + 1, max), true);
-  // the poke level stops at maxLevel while the combo goes on
   let p = null;
   for (let i = 0; i < 7; i++) p = nextPoke(p, i * 300, cfg.ui.poke);
   assert.equal(p.level, max);
@@ -179,14 +179,14 @@ test('persona of a character: its sprite key (the cat is "cat"), else a bare per
   assert.equal(typeOf({ sprite: 'scout' }, personas.scout), 'flinch');
 });
 
-test('line keys: lead variants map onto the plain keys, the cat generic combo and snack keys onto the persona ones', () => {
+test('line keys: lead variants map onto the plain keys, the cat generic snack keys onto the persona ones', () => {
   const lead = { sprite: 'lead', isLead: true };
   assert.deepEqual([1, 2, 3, 4].map((n) => lineKeyFor(`pokeLead${n}`, lead)), ['poke1', 'poke2', 'poke3', 'poke4']);
   assert.equal(lineKeyFor('liftLead', lead), 'lift');
   assert.equal(lineKeyFor('grumbleLead', lead), 'grumble');
   assert.equal(lineKeyFor('poke2', lead), 'poke2');
   const cat = { isCat: true, sprite: 'cat' };
-  assert.deepEqual(['catCombo', 'catSnackLove', 'catSnackDislike'].map((k) => lineKeyFor(k, cat)), ['combo', 'snackLove', 'snackDislike']);
+  assert.deepEqual(['catSnackLove', 'catSnackDislike'].map((k) => lineKeyFor(k, cat)), ['snackLove', 'snackDislike']);
   assert.equal(moodLineKey('snackDone', 'love'), 'snackLove');
   assert.equal(moodLineKey('catSnackDone', 'dislike'), 'snackDislike');
   assert.equal(moodLineKey('snackDone', null), 'snackDone');
@@ -217,11 +217,10 @@ test('line picker: the persona line when it has one, never twice in a row, lead 
   assert.equal(withTask.pick('snackEat', '커피', { sprite: 'x' }), '커피 냠');
 });
 
-test('line picker: the cat combo, a loved or disliked snack (done line), and the generic mood lines when the persona has none', () => {
+test('line picker: a loved or disliked snack (done line), and the generic mood lines when the persona has none', () => {
   const generic = cfg.ui.lines;
   const pk = createLinePicker({ personas, generic, rng: Math.random });
   const cat = { isCat: true, sprite: 'cat' };
-  assert.ok(personas.cat.lines.combo.includes(pk.pick('catCombo', undefined, cat)));
   pk.setMood(cat, 'love');
   assert.ok(personas.cat.lines.snackLove.includes(pk.pick('catSnackDone', undefined, cat)));
   assert.ok(personas.cat.lines.catSnackDone.includes(pk.pick('catSnackDone', undefined, cat)), 'the mood is used once');
@@ -251,19 +250,21 @@ test('snack mood: love and dislike from the persona taste, none otherwise', () =
 test('config: every type has its numbers, its sound exists, its words fit the limit; the generic lines for the new situations exist', () => {
   assert.deepEqual(Object.keys(H.types).sort(), [...TYPES, 'cat'].sort());
   for (const [name, t] of Object.entries(H.types)) {
-    for (const k of ['knock', 'hop', 'tilt', 'press', 'peak', 'ms', 'peakShare', 'springs', 'decay', 'jelly', 'snd', 'color', 'words', 'wig', 'spin']) assert.ok(k in t, `${name}.${k}`);
+    for (const k of ['knock', 'hop', 'tilt', 'press', 'peak', 'ms', 'peakShare', 'springs', 'decay', 'jelly', 'snd', 'color', 'words', 'wig']) assert.ok(k in t, `${name}.${k}`);
     assert.ok(H.sound.recipes[t.snd], `${name} sound ${t.snd}`);
     assert.ok(t.words.every((w) => Array.from(w).length <= H.persona.hitWordMax), `${name} words`);
     if (t.extra?.kind === 'mark') assert.ok(H.marks[t.extra.mark], `${name} mark`);
   }
-  for (const k of ['combo', 'snackLove', 'snackDislike', 'catCombo', 'catSnackLove', 'catSnackDislike']) {
+  for (const k of ['snackLove', 'snackDislike', 'catSnackLove', 'catSnackDislike']) {
     assert.ok(cfg.ui.lines[k].length >= 3, k);
     assert.ok(cfg.ui.lines[k].every((l) => Array.from(l).length <= cfg.ui.bubbleMaxChars), `${k} fits a bubble`);
   }
   assert.ok(H.shake.px <= 4 && H.shake.ms <= 250);
   assert.equal(H.shake.fromLevel, 3);
   assert.equal(H.flash.fromLevel, 3);
-  assert.equal(H.combo.from, 3);
+  assert.equal(H.combo, undefined);
+  assert.equal(H.throw.spinMidPx, undefined);
+  assert.equal(cfg.ui.lines.combo, undefined);
 });
 
 test('config: the fixture personas use real types and every fixture line fits a bubble', () => {
@@ -313,15 +314,13 @@ function fakeAudio() {
 
 const soundDeps = (over = {}) => ({ enabled: () => true, volume: () => 0.25, maxVoices: H.sound.maxVoices, noiseMs: H.sound.noiseMs, attackMs: H.sound.attackMs, tailMs: H.sound.tailMs, ...over });
 
-test('sound plan: pitch follows the persona voice and the combo (capped), the master volume scales the gain, unknown kinds are silent', () => {
-  const base = soundPlan('pop', 1, 1, H.sound)[0];
-  assert.equal(soundPlan('pop', 1.2, 1, H.sound)[0].f0, base.f0 * 1.2);
-  assert.ok(soundPlan('pop', 1, 4, H.sound)[0].f0 > base.f0);
-  assert.equal(soundPlan('pop', 1, 99, H.sound)[0].f0, base.f0 * H.sound.comboPitchMax);
+test('sound plan: pitch follows the persona voice, the master volume scales the gain, unknown kinds are silent', () => {
+  const base = soundPlan('pop', 1, H.sound)[0];
+  assert.equal(soundPlan('pop', 1.2, H.sound)[0].f0, base.f0 * 1.2);
   assert.equal(base.gain, H.sound.recipes.pop[0].gain * H.sound.master);
-  assert.deepEqual(soundPlan('nope', 1, 1, H.sound), []);
-  assert.ok(soundPlan('whoosh', 1, 1, H.sound)[0].noise);
-  for (const k of Object.keys(H.sound.recipes)) assert.ok(soundPlan(k, 1, 1, H.sound).every((v) => v.f0 > 0 && v.ms > 0 && v.gain > 0), k);
+  assert.deepEqual(soundPlan('nope', 1, H.sound), []);
+  assert.ok(soundPlan('whoosh', 1, H.sound)[0].noise);
+  for (const k of Object.keys(H.sound.recipes)) assert.ok(soundPlan(k, 1, H.sound).every((v) => v.f0 > 0 && v.ms > 0 && v.gain > 0), k);
 });
 
 test('sound gating: no AudioContext before a gesture, none while the sound is off, silent until then', () => {
@@ -329,27 +328,27 @@ test('sound gating: no AudioContext before a gesture, none while the sound is of
   let on = false;
   const s = createSound(soundDeps({ Ctor, enabled: () => on }));
   assert.equal(made.contexts, 0);
-  assert.equal(s.play(soundPlan('pop', 1, 1, H.sound)), false, 'nothing plays before a gesture');
+  assert.equal(s.play(soundPlan('pop', 1, H.sound)), false, 'nothing plays before a gesture');
   s.gesture(); // a gesture while 「효과음」 is off
   assert.equal(made.contexts, 0);
   on = true;
-  assert.equal(s.play(soundPlan('pop', 1, 1, H.sound)), false, 'still no context: only a gesture makes it');
+  assert.equal(s.play(soundPlan('pop', 1, H.sound)), false, 'still no context: only a gesture makes it');
   assert.equal(made.contexts, 0);
   s.gesture();
   assert.equal(made.contexts, 1);
   assert.equal(s.ready(), true);
   s.gesture();
   assert.equal(made.contexts, 1, 'one context');
-  assert.equal(s.play(soundPlan('pop', 1, 1, H.sound)), true);
+  assert.equal(s.play(soundPlan('pop', 1, H.sound)), true);
   on = false;
-  assert.equal(s.play(soundPlan('pop', 1, 1, H.sound)), false, 'off again: silent');
+  assert.equal(s.play(soundPlan('pop', 1, H.sound)), false, 'off again: silent');
 });
 
 test('sound: at most maxVoices at once; a blocked or missing AudioContext keeps the office silent without throwing', () => {
   const { Ctor, made } = fakeAudio();
   const s = createSound(soundDeps({ Ctor }));
   s.gesture();
-  const plan = soundPlan('thump', 1, 1, H.sound);
+  const plan = soundPlan('thump', 1, H.sound);
   const results = Array.from({ length: H.sound.maxVoices + 3 }, () => s.play(plan));
   assert.equal(results.filter(Boolean).length, H.sound.maxVoices);
   assert.equal(s.voices(), H.sound.maxVoices);
@@ -388,6 +387,7 @@ function fakePage({ fxChoice = true, sfxChoice = true, hitEnabled = true } = {})
     addEventListener: (t, fn) => listeners.push({ t, fn }),
     removeEventListener: (t, fn) => listeners.splice(listeners.findIndex((l) => l.t === t && l.fn === fn), 1),
     createElement: node,
+    querySelectorAll: () => [],
   };
   const audio = fakeAudio();
   globalThis.AudioContext = audio.Ctor;
@@ -400,7 +400,8 @@ function fakePage({ fxChoice = true, sfxChoice = true, hitEnabled = true } = {})
     fxHit: { animate: (frames, opts) => { const a = { frames, opts, cancel() { a.cancelled = true; }, onfinish: null }; anims.push(a); return a; } },
     flip: { append() {} }, spr: { cloneNode: () => ({ ...node(), setAttribute() {} }) },
   };
-  const floor = { off: false, layer: { append() {} }, stage: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }), animate: () => ({ cancel() {} }) }, scene: { r: { size: [800, 600] } } };
+  const stageKids = [];
+  const floor = { off: false, layer: { append() {} }, stage: { append: (n) => stageKids.push(n), querySelectorAll: () => [], getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }), animate: () => ({ cancel() {} }) }, scene: { r: { size: [800, 600] } } };
   rec.frec = floor;
   const said = [];
   const ctx = {
@@ -416,7 +417,7 @@ function fakePage({ fxChoice = true, sfxChoice = true, hitEnabled = true } = {})
     sayFor: (r, text) => said.push(text),
     line: (k, f, r) => pickers[0](k, f, r) ?? `generic:${k}`,
   };
-  return { fx, ctx, listeners, audio, pickers, anims, classes, rec, said, floor };
+  return { fx, ctx, listeners, audio, pickers, anims, classes, rec, said, floor, stageKids };
 }
 
 test('area: with the hit area switched off in config it registers nothing', () => {
@@ -454,7 +455,7 @@ test('area: the sound listener exists only while 「효과음」 is on, and the 
   assert.equal(page.audio.made.last.state, 'suspended');
 });
 
-test('area: a poke plays one reaction on the wrapper (the office own squash gives way), and clicks past the top level speak the persona combo line', () => {
+test('area: a poke plays one reaction on the wrapper (the office own squash gives way), and clicks past the top level say nothing extra', () => {
   const page = fakePage();
   init(page.ctx);
   page.fx.emitFx('poke', { rec: page.rec, key: 'scout', level: 2, combo: 2, x: 120, y: 120 });
@@ -463,10 +464,11 @@ test('area: a poke plays one reaction on the wrapper (the office own squash give
   const first = page.anims[0];
   assert.ok(first.opts.duration > hitStopMs(2, H.types.flinch, H));
   assert.deepEqual(page.said, []);
+  assert.equal(page.stageKids.length, 1, 'the particles sit in one layer of our own on the stage (under the name tags), not in the shared .fx-layer');
+  assert.equal(page.stageKids[0].className, 'fxh-layer');
   page.fx.emitFx('poke', { rec: page.rec, key: 'scout', level: 4, combo: 5, x: 120, y: 120 });
   assert.equal(first.cancelled, true, 'the new reaction replaces the old one');
-  assert.equal(page.said.length, 1);
-  assert.ok(personas.scout.lines.combo.includes(page.said[0]));
+  assert.deepEqual(page.said, []);
 });
 
 test('area: switching the effects off takes the running reaction away', () => {

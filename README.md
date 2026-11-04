@@ -176,7 +176,7 @@ Codex 의 imagegen 으로 그림을 만든 뒤 `art\snap.py` 로 격자에 맞�
 **캐릭터 성격 고치기**: 저장소 맨 위의 `persona.json` 에 `personas.<스프라이트 키>`(예: `lead` · `scout` · `extra-07` · `cat`)마다 35명의 성격이 있습니다. 메모장으로 고치고 사무실을 다시 켜면 반영됩니다(서버가 시작할 때 한 번 읽습니다).
 - `type`: 클릭·던지기 반응 10가지 중 하나(`flinch` `angry` `dodge` `proud` `lazy` `bubbly` `tough` `dramatic` `shy` `goofy`). 고양이는 고양이 모션을 따로 씁니다. `voice` 는 효과음 음높이(0.8~1.25), `hitWords` 는 맞을 때 나오는 짧은 글자(1~4자, 3개까지), `about` 는 한 줄 소개(40자까지, 화면에는 안 나옴)입니다.
 - `snack`: 좋아하는 간식 `love` 와 싫어하는 간식 `dislike`(각 최대 1개). 사람은 `coffee` · `donut` · `cookie` 중에서, 고양이는 좋아하는 것이 `fish` 입니다.
-- `lines`: 상황별 대사 목록(`poke1`~`poke4`, `combo`, `snackEat`, `smallTalk` 등). 한 줄은 `ui.bubbleMaxChars`(16자) 이하여야 하고, 기준에 안 맞는 줄은 그 줄만 버려집니다. 빠진 상황은 `config.json` 의 `ui.lines` 일반 대사로 채웁니다. 팀장도 `pokeLead1`~ 이 아니라 `poke1`~ 이름으로 적습니다.
+- `lines`: 상황별 대사 목록(`poke1`~`poke4`, `snackEat`, `smallTalk` 등). 한 줄은 `ui.bubbleMaxChars`(16자) 이하여야 하고, 기준에 안 맞는 줄은 그 줄만 버려집니다. 빠진 상황은 `config.json` 의 `ui.lines` 일반 대사로 채웁니다. 팀장도 `pokeLead1`~ 이 아니라 `poke1`~ 이름으로 적습니다.
 - 파일이 없거나 깨졌으면 서버 로그에 경고 한 줄을 남기고 일반 대사로 돕니다. 서버는 이 파일을 읽기만 하고 만들거나 고치지 않습니다. 다른 파일로 시험하려면 환경변수 `AGENT_OFFICE_PERSONA_FILE` 에 경로를 줍니다. 대사 수·길이·겹침 규칙은 `npm test` 의 `persona-data` 가 검사합니다.
 
 ## 개인정보
