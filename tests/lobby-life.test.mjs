@@ -266,17 +266,12 @@ test('stroll back: at the desk the transition time of the last piece is reset to
   assert.equal(rec.tagRoot.style.transitionDuration, '0ms', 'and its name tag layer');
 });
 
-test('crop mode: switching the lobby to the small-window crop stops its life, leaving the crop starts it, and a cropped lobby never starts', () => {
-  const calls = [];
-  const el = () => ({ ...fakeEl(), style: {} });
-  const lb = { cropped: false, crop: { x: 3, y: 4, w: 50, h: 60 }, scene: { r: { size: [200, 100] } }, el: el(), stage: el() };
-  const lobbyBox = fnIn('lobbyBox', { lobby: lb, stopLobbyLife: () => calls.push('stop'), startLobbyLife: () => calls.push('start'), emitFx() {} });
-  assert.deepEqual([...lobbyBox(true)], [50, 60]);
-  assert.deepEqual([...lobbyBox(true)], [50, 60]);
-  assert.deepEqual([...lobbyBox(false)], [200, 100]);
-  assert.deepEqual(calls, ['stop', 'start'], 'only on a change');
-  const start = appSrc.slice(appSrc.indexOf('function startLobbyLife('), appSrc.indexOf('/** Stops the clock'));
-  assert.match(start, /lb\.cropped/, 'a hidden-by-crop lobby starts no timer');
+test('small window: the lobby is shown whole (no crop to the wall), scaled like any floor, and its life is never held back by a crop', () => {
+  assert.doesNotMatch(appSrc, /function lobbyBox|lb\.cropped|lobby\.cropped|lb\.crop/, 'no crop mode is left in the lobby code');
+  const fit = appSrc.slice(appSrc.indexOf('function fitFloors('), appSrc.indexOf('function showConn('));
+  assert.match(fit, /fitBox\(availW, availH, \.\.\.shown\.scene\.r\.size, SINGLE_MAX_ZOOM\)/, 'the lobby and the floors are fitted by the size of their scene');
+  const css = readFileSync(new URL('../web/style.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(css, /\.floor\.lobby\.crop/);
 });
 
 test('bubble pass: a floor with fewer than two shown bubbles costs no style or layout read (a lone one is reset), the others are still measured', () => {

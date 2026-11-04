@@ -122,8 +122,7 @@ function fitFloors() {
   }
   const shown = shownId === null ? null : shownId === LOBBY_ID ? lobby : floorRecs.get(shownId);
   if (shown) {
-    const size = shown === lobby ? lobbyBox(mini) : shown.scene.r.size;
-    floorsEl.style.zoom = String(fitBox(availW, availH, ...size, SINGLE_MAX_ZOOM));
+    floorsEl.style.zoom = String(fitBox(availW, availH, ...shown.scene.r.size, SINGLE_MAX_ZOOM));
     return;
   }
   const widest = Math.max(0, ...[...floorRecs.values()].map((r) => r.scene.r.size[0]));
@@ -2256,7 +2255,7 @@ function renderFloor(fv, elm) {
 
 const lobbyBtn = $('tab-lobby');
 const lobbyRecOf = new WeakMap(); // a figure's body layer or tag layer -> its rec
-let lobby = null; // {el, stage, scene, off, dirty, floors, roster, seatMap, chars, populated, news, hist, page, pages, pageAt, timer, wall, crop, writes, ...}
+let lobby = null; // {el, stage, scene, off, dirty, floors, roster, seatMap, chars, populated, news, hist, page, pages, pageAt, timer, wall, writes, ...}
 
 const lobbyFill = (template, vars) => template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
 
@@ -2381,7 +2380,7 @@ function createLobby() {
   root.setAttribute('aria-label', L.wallLabel);
   const stage = buildStage(sc, ui.lobby.design, 1);
   const layer = addFxLayer(stage);
-  stage.style.width = `${r.size[0]}px`; // fixed, so the small window can crop the floor to the wall without squeezing the room
+  stage.style.width = `${r.size[0]}px`;
   stage.style.height = `${r.size[1]}px`;
   const board = el('div', 'board');
   const [bx, by, bw] = r.board;
@@ -2394,12 +2393,6 @@ function createLobby() {
   stage.append(board, more);
   const wall = buildWall(stage, sc.raw);
   const chars = new Map(); // the lobby's figures (also lobby.agents, so an effects area reads every floor the same way)
-  const quads = (sc.raw.ledWall?.panels ?? []).flatMap((p) => p.quad);
-  const xs = quads.map((p) => p[0]);
-  const ys = quads.map((p) => p[1]);
-  const crop = quads.length
-    ? { x: Math.min(...xs) - 4, y: Math.min(...ys) - 4, w: Math.max(...xs) - Math.min(...xs) + 8, h: Math.max(...ys) - Math.min(...ys) + 8 }
-    : { x: 0, y: 0, w: r.size[0], h: r.size[1] };
   stage.addEventListener('click', (e) => {
     const row = e.target.closest('.lr[data-sid], .lf[data-sid]');
     const sid = row ? row.dataset.sid : lobbyRecOf.get(e.target.closest('.ag, .agt'))?.sid;
@@ -2415,7 +2408,7 @@ function createLobby() {
   floorsEl.append(root);
   lobby = {
     el: root, stage, layer, sid: LOBBY_ID, scene: sc, off: true, dirty: false, floors: [], roster: [], seatMap: new Map(), chars, agents: chars, populated: false, news: [],
-    hist: new Map(), page: 0, pages: 1, pageAt: 0, timer: 0, wall, crop, cropped: false, writes: 0, boardLine, more, backRow: backRowSeats(sc.r.seats),
+    hist: new Map(), page: 0, pages: 1, pageAt: 0, timer: 0, wall, writes: 0, boardLine, more, backRow: backRowSeats(sc.r.seats),
     design: ui.lobby.design, life: DEBUG_AMBIENT ? scaleLife(L.life, 0.1) : L.life, clock: null,
   };
   lobby.clock = makeLobbyClock(lobby);
@@ -2429,29 +2422,10 @@ function createLobby() {
     window.__lobby = {
       writes: () => lobby.writes,
       timer: () => lobby.timer !== 0,
-      state: () => ({ off: lobby.off, dirty: lobby.dirty, chars: lobby.chars.size, roster: lobby.roster.length, page: lobby.page, pages: lobby.pages, timers: liveTimers.size, cropped: lobby.cropped }),
+      state: () => ({ off: lobby.off, dirty: lobby.dirty, chars: lobby.chars.size, roster: lobby.roster.length, page: lobby.page, pages: lobby.pages, timers: liveTimers.size }),
       life: () => ({ away: lobbyAway().length, walking: [...lobby.chars.values()].filter((r) => r.walk).length }),
     };
   }
-}
-
-/** The small window shows only the wall (the crop of its screens); a normal window shows the whole room. Returns the size to fit. */
-function lobbyBox(mini) {
-  const lb = lobby;
-  if (lb.cropped !== mini) {
-    lb.cropped = mini;
-    const { x, y, w, h } = lb.crop;
-    const [fw, fh] = lb.scene.r.size;
-    lb.el.classList.toggle('crop', mini);
-    lb.el.style.width = `${mini ? w : fw}px`;
-    lb.el.style.height = `${mini ? h : fh}px`;
-    lb.stage.style.marginLeft = mini ? `${-x}px` : '';
-    lb.stage.style.marginTop = mini ? `${-y}px` : '';
-    if (mini) stopLobbyLife(); // the figures are display:none in the crop: a walk would never get its transitionend
-    else startLobbyLife();
-    emitFx('crop', { cropped: mini, floor: lb });
-  }
-  return mini ? [lb.crop.w, lb.crop.h] : lb.scene.r.size;
 }
 
 /** The ink (white or dark) that reads on a #rrggbb colour: the floor number sits on a chip in the team colour. */
@@ -2869,7 +2843,7 @@ function abortStroll(rec) {
 /** Starts the clock from fresh times, unless the viewer wants less motion or the whole thing is switched off in config.json. */
 function startLobbyLife() {
   const lb = lobby;
-  if (!lb || lb.off || lb.cropped || paused() || !lb.life.enabled || prefersLessMotion()) return;
+  if (!lb || lb.off || paused() || !lb.life.enabled || prefersLessMotion()) return;
   for (const rec of lb.chars.values()) freshLifeTimes(rec);
   lb.clock.start();
 }
@@ -3809,6 +3783,7 @@ async function openPip() {
   w.addEventListener('pagehide', pipClosed);
   syncSnacks();
   for (const f of floorRecs.values()) f.clock.kick(); // move the one clock timer to the small window
+  lobby?.clock.kick(); // the lobby's life clock too (the lobby is shown whole in the small window)
   armRotate(); // and the rotation timer
   armLobby(); // and the lobby's one timer
   if (followTimer) armFollow(Math.max(0, followDue - Date.now())); // and the pending follow check
@@ -3835,7 +3810,10 @@ function pipClosed() {
   holdEl.hidden = true;
   floorsEl.style.zoom = '';
   if (document.hidden) pause(); // pausing was skipped while the small window showed the office
-  else for (const f of floorRecs.values()) f.clock.kick(); // its timer died with the small window
+  else {
+    for (const f of floorRecs.values()) f.clock.kick(); // its timer died with the small window
+    lobby?.clock.kick();
+  }
   fitFloors();
 }
 

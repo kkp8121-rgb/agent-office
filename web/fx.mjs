@@ -59,7 +59,6 @@
 //   'sysload'       {cpu, mem}                       the server's CPU / memory sample (integer percents), every ui sample.
 //   'floor-shown'   {floor}                          a floor came on screen (also a floor created while shown, and the lobby).
 //   'floor-hidden'  {floor, removed}                 a floor went off screen; removed = true when the floor is gone for good.
-//   'crop'          {cropped, floor}                 the small window crops the lobby to its wall (cropped) or shows it whole again.
 //
 // ---- ctx: what init(ctx) of an area receives (built in app.mjs, "effects"). An area never needs app.mjs internals. ----
 /**
@@ -116,7 +115,7 @@ const KEY_SFX = 'agent-office.sfx';
 /** Every event name the office emits (tests check app.mjs emits exactly these). */
 export const FX_EVENTS = Object.freeze([
   'poke', 'cat-pet', 'lift', 'drop', 'thrown', 'landed', 'snack', 'report', 'high-five', 'meeting-start', 'meeting-end', 'phase', 'fail-start',
-  'fail-end', 'state', 'walk-start', 'walk-end', 'pose', 'weather', 'daylight', 'sysload', 'floor-shown', 'floor-hidden', 'crop',
+  'fail-end', 'state', 'walk-start', 'walk-end', 'pose', 'weather', 'daylight', 'sysload', 'floor-shown', 'floor-hidden',
 ]);
 
 /** '1' -> true, '0' -> false, anything else (nothing stored, junk) -> null: the viewer has not chosen. */

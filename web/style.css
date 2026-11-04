@@ -619,7 +619,6 @@ body.paused .wx-a, body.paused .wx-b, body.paused .wx-f { animation-play-state: 
   --led-bg: #06122b; --led-dots: rgba(90, 150, 255, .07); --led-num: #7fd3ff; --led-ink: #eef4ff; --led-name: #ffa53d;
   --led-up: #ff4d3a; --led-down: #3d8bff; --led-flat: #b9c4d8; --led-bezel: #02060f;
 }
-.floor.lobby.crop { overflow: hidden; border-radius: 8px; }
 /* lobby life: every figure moves a little in the way of its state, from the pictures it already has (one transform on .spr, nothing per frame in script).
    idle/enter: breathing; thinking: a slow head tilt; working: a small typing bob; stale: dozing (a slow nod and the zZ); done: the report jump (above).
    --ph (set once per figure, app.mjs initLobbyLife) starts each one somewhere else in its cycle so the crowd is never in step. */
@@ -710,8 +709,6 @@ body.paused .wx-a, body.paused .wx-b, body.paused .wx-f { animation-play-state: 
 .led-tickerLeft, .led-tickerCenter, .led-tickerRight { display: flex; align-items: center; padding: 0 4px; }
 .led .tk-l { flex: none; margin-right: 6px; color: var(--led-name); font-weight: 800; }
 .led .tk-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--led-ink); font-size: 9px; }
-/* the small window crops to the wall: figures that peek over the crop edge stay out of it */
-.floor.lobby.crop .ag, .floor.lobby.crop .agt, .floor.lobby.crop .lobby-more { display: none; }
 
 /* ---- effects scaffolding (web/fx.mjs, web/fx-*.css): neutral wrappers and an empty layer; the areas fill them ---- */
 /* every character: .fx-move (movement effects) around .fx-hit (hit feel) around the picture parts; both are zero-size, transform none, so they change nothing until an area animates them. Their origin is the feet. */
