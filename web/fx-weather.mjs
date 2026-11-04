@@ -1,15 +1,15 @@
 // Effects area "weather" (window weather and room light). While the effects are on, every room window gets a richer sky than the plain
 // one of weather.mjs: rain and snow in three parallax sheets, drifting cloud banks, rolling fog, soft lightning in a storm, a smooth
-// day -> dusk -> night cross-fade of the light, and a soft glow of the monitors on the desks of those who work at night.
+// day -> dusk -> night cross-fade of the light, and the light of the monitor on the face of those who sit at a desk at night.
 //
 // Everything that moves is a pre-drawn tile (inline SVG or a CSS gradient) on a layer that only slides by transform, or a tint that only
 // changes opacity (web/fx-weather.css), so the GPU does the work and no script runs per frame. The only timers are the lightning
-// bursts (storm only) and the removal of the glows after they faded out. Effects off: nothing is built, no timer, no listener work.
+// bursts (storm only); the face light is a CSS animation of opacity and no script runs per frame. Effects off: nothing is built, no timer, no listener work.
 //
-// The top half of this module is pure (tiles, layers per weather, light plan, lightning schedule, glow spots; randomness is injected),
+// The top half of this module is pure (tiles, layers per weather, light plan, lightning schedule, face light mode, timing, fall-off and the lit picture's pixels; randomness is injected),
 // the bottom half is the DOM part: init(ctx), called once at start-up (see the ctx typedef in fx.mjs). Numbers: config ui.fx.weather.
 // It never invents activity: the weather and the light are the office's real ones (the `weather` and `daylight` events); the lightning
-// only decorates a real storm; a glow shows only at the desk of someone who is really seated and working or thinking.
+// only decorates a real storm; the face light shows only on someone who is really seated (working, thinking or idle).
 
 import { windowBoxes } from './weather.mjs';
 
@@ -160,26 +160,60 @@ export function flashFrames(peak) {
   ];
 }
 
-/** Where the monitor glows go: one per character that is really seated and in one of cfg.glow.states, as a centre in scene pixels. */
-export function glowSpots(recs, cfg) {
-  const out = [];
-  for (const rec of recs) {
-    if (!rec.seated || rec.away || !cfg.glow.states.includes(rec.state)) continue;
-    out.push({ rec, x: Math.round(rec.x + cfg.glow.offset[0]), y: Math.round(rec.y + cfg.glow.offset[1]), lead: Boolean(rec.isLead) });
+/**
+ * What the monitor light does on a character: 'work' (working or thinking: the light ripples like a changing screen), 'rest' (idle: a steady
+ * soft light) or '' (nothing: standing, away on a trip, asleep, finished). Only someone really seated at a desk is lit.
+ */
+export function litMode(rec, cfg) {
+  if (!rec.seated || rec.away || rec.isCat) return '';
+  return cfg.glow.states[rec.state] ?? '';
+}
+
+/** The ripple of the n-th lit character: a cycle length inside cfg.glow.rippleMs and a start offset (both spread by the golden ratio so neighbours never beat in step). */
+export function litTiming(n, cfg) {
+  const f = (n * 0.6180339887) % 1;
+  const g = (n * 0.7548776662) % 1;
+  const [lo, hi] = cfg.glow.rippleMs;
+  const ms = Math.round(lo + f * (hi - lo));
+  return { ms, delayMs: -Math.round(g * ms) };
+}
+
+/** How strong the light is at a height t (0 = top of the picture, 1 = its feet): cfg.glow.strength times the piecewise-linear fall-off cfg.glow.fall = [[t, weight], ...]. */
+export function litAt(t, cfg) {
+  const { fall, strength } = cfg.glow;
+  if (t <= fall[0][0]) return strength * fall[0][1];
+  for (let i = 1; i < fall.length; i++) {
+    const [t1, w1] = fall[i];
+    if (t <= t1) {
+      const [t0, w0] = fall[i - 1];
+      return strength * (w0 + ((t - t0) / (t1 - t0)) * (w1 - w0));
+    }
   }
-  return out;
+  return strength * fall[fall.length - 1][1];
 }
 
 /**
- * The clip of one glow: its box minus the back of the monitor on the desk. The seated one faces the screen, so the viewer sees only the dark
- * back panel; the light falls on the face, the upper body and the desk around it, never on the panel. `holes` (cfg.glow.holes) holds, per design and
- * desk kind (desk | lead), the panel's outline as points in scene pixels around the glow's centre. Nothing known for a design: no clip.
+ * The lit copy of a seated picture: the same pixels with the monitor light screened onto them (c + L * p * (1 - c) per channel, p = litAt of the pixel's
+ * row), the alpha untouched. Laid over the plain picture, it can only ever change pixels the picture itself covers. `rgba` is not modified.
+ * @param {Uint8ClampedArray|Uint8Array} rgba  w*h*4 bytes
+ * @returns {Uint8ClampedArray}
  */
-export function glowClip(size, holes, design, lead) {
-  const pts = holes?.[design]?.[lead ? 'lead' : 'desk'];
-  if (!pts?.length) return '';
-  const [w, h] = size;
-  return `path(evenodd, "M0 0H${w}V${h}H0Z M${pts.map(([x, y]) => `${x + w / 2} ${y + h / 2}`).join(' L')}Z")`;
+export function bakeLit(rgba, w, h, cfg) {
+  const out = new Uint8ClampedArray(rgba);
+  const L = cfg.glow.color;
+  for (let y = 0; y < h; y++) {
+    const p = litAt((y + 0.5) / h, cfg);
+    if (p <= 0) continue;
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (out[i + 3] === 0) continue;
+      for (let k = 0; k < 3; k++) {
+        const c = out[i + k] / 255;
+        out[i + k] = Math.round((c + (L[k] / 255) * p * (1 - c)) * 255);
+      }
+    }
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------- DOM part
@@ -190,7 +224,7 @@ export function init(ctx) {
   if (!cfg.enabled) return;
   const { fx } = ctx;
   const doc = document;
-  const floorsState = new Map(); // floor record -> {root, wins: [{box, el, c: [], p: [], flash}], glows: Map(rec -> el), glowLayer}
+  const floorsState = new Map(); // floor record -> {root, wins: [{box, el, c: [], p: [], flash}], lits: Map(rec -> el)}
   const tileCache = new Map(); // spec object -> css background-image text (tiles are drawn once)
   let phase = null; // the phase the overlays show now (null before the first sync)
   let kind = 'none';
@@ -198,7 +232,8 @@ export function init(ctx) {
   let fadeMs = 0;
   let lightningTimer = 0;
   let syncTimer = 0;
-  let glowOnlyPending = true; // true while only pose/state events asked for the next sync: then only the glows are refreshed
+  let glowOnlyPending = true; // true while only pose/state events asked for the next sync: then only the face lights are refreshed
+  let litCount = 0; // how many face lights were ever built: the next one's ripple timing
   const reduced = () => !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   const bg = (spec) => {
@@ -242,7 +277,7 @@ export function init(ctx) {
     const root = doc.createElement('div');
     root.className = 'fxw';
     root.style.zIndex = '1';
-    const st = { root, wins: [], glows: new Map(), glowLayer: null };
+    const st = { root, wins: [], lits: new Map() };
     windowBoxes(windows).forEach((box, i) => {
       const el = doc.createElement('div');
       el.className = 'fxw-win';
@@ -274,34 +309,56 @@ export function init(ctx) {
     s.setProperty('--fxw-dim', String(target.dim));
   }
 
-  // ---- monitor glow ----
+  // ---- monitor light on the face ----
+  // One div per seated character, laid inside its .spr exactly like the figure, holding the lit copy of the seated picture
+  // (assets/sprites/lit/<key>-sit.png, drawn ahead of time by scripts/make-lit-sprites.mjs with bakeLit: the same pixels with the light screened
+  // onto them). Over the plain picture it can only change pixels the picture covers, so nothing outside the figure is ever touched, and the desk
+  // and monitor in front of the figure hide it as they hide the figure. The ripple is a CSS animation of opacity (fxw-lit-i); the script only
+  // sets a mode, the timing and the picture. No lit file for a picture: nothing shows for that figure.
+  const litUrl = (src) => src.replace('/sprites/', '/sprites/lit/');
+
+  function litEl(rec, floorLits) {
+    let el = floorLits.get(rec);
+    if (!el) {
+      el = doc.createElement('div');
+      el.className = 'fxw-lit';
+      const pic = doc.createElement('img');
+      pic.className = 'fxw-lit-i';
+      pic.alt = '';
+      pic.addEventListener('error', () => pic.removeAttribute('src'));
+      el.append(pic);
+      const t = litTiming(litCount++, cfg);
+      el.style.setProperty('--fxw-lit-ms', `${t.ms}ms`);
+      el.style.setProperty('--fxw-lit-delay', `${t.delayMs}ms`);
+      rec.spr.append(el);
+      floorLits.set(rec, el);
+      void el.offsetWidth; // one reflow so the first opacity change is a transition
+    }
+    const src = rec.sitImg?.getAttribute('src') ?? '';
+    if (el.dataset.src !== src) {
+      el.dataset.src = src;
+      if (src) el.firstChild.src = litUrl(src);
+      else el.firstChild.removeAttribute('src');
+    }
+    return el;
+  }
+
   function syncGlow(floor, st) {
     if (!floor.layer || floor.cropped) return;
-    const want = target.glow > 0 ? glowSpots(ctx.chars(floor), cfg) : [];
-    const keep = new Set(want.map((w) => w.rec));
-    for (const [rec, el] of st.glows) {
-      if (keep.has(rec)) continue;
-      el.style.opacity = '0';
-      st.glows.delete(rec);
-      ctx.timers.setTimeout(() => el.remove(), fadeMs + 200);
+    const recs = ctx.chars(floor);
+    for (const rec of recs) {
+      const mode = target.glow > 0 ? litMode(rec, cfg) : '';
+      let el = st.lits.get(rec);
+      if (!mode && !el) continue;
+      el = litEl(rec, st.lits);
+      if (el.dataset.mode === mode) continue;
+      el.style.transitionDuration = `${fadeMs || cfg.glow.fadeMs}ms`;
+      el.dataset.mode = mode;
     }
-    for (const w of want) {
-      let el = st.glows.get(w.rec);
-      if (!el) {
-        el = doc.createElement('div');
-        el.className = 'fxw-glow';
-        Object.assign(el.style, { left: `${w.x - cfg.glow.size[0] / 2}px`, top: `${w.y - cfg.glow.size[1] / 2}px`, width: `${cfg.glow.size[0]}px`, height: `${cfg.glow.size[1]}px`, opacity: '0' });
-        const clip = glowClip(cfg.glow.size, cfg.glow.holes, floor.design, w.lead);
-        if (clip) el.style.clipPath = clip;
-        floor.layer.append(el);
-        void el.offsetWidth; // one reflow so the first opacity change is a transition
-        st.glows.set(w.rec, el);
-      }
-      const o = String(target.glow);
-      if (el.style.opacity !== o) {
-        el.style.transitionDuration = `${fadeMs || 400}ms`;
-        el.style.opacity = o;
-      }
+    for (const [rec, el] of st.lits) {
+      if (recs.includes(rec)) continue; // a character that left: its picture goes with it
+      el.remove();
+      st.lits.delete(rec);
     }
   }
 
@@ -388,7 +445,7 @@ export function init(ctx) {
     syncTimer = 0;
     for (const st of floorsState.values()) {
       st.root.remove();
-      for (const el of st.glows.values()) el.remove();
+      for (const el of st.lits.values()) el.remove();
     }
     floorsState.clear();
     phase = null;
@@ -405,7 +462,7 @@ export function init(ctx) {
     if (!st) return;
     if (d.removed) {
       st.root.remove();
-      for (const el of st.glows.values()) el.remove();
+      for (const el of st.lits.values()) el.remove();
       floorsState.delete(d.floor);
     }
   });
