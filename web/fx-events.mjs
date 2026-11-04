@@ -359,7 +359,7 @@ export function createEvents(ctx, deps) {
     else if (rec.mood) startFail(rec);
   }
 
-  /** Takes everything of one floor off (not shown, cropped, or the floor is gone). */
+  /** Takes everything of one floor off (not shown, or the floor is gone). */
   function clearFloor(floor) {
     for (const [rec, f] of [...fails]) if (f.floor === floor) stopFail(rec);
     for (const it of [...active]) if (it.layer === floor.layer) release(it);
@@ -392,7 +392,6 @@ export function createEvents(ctx, deps) {
   offs.push(fx.onFx('pose', ({ rec }) => { if (fails.has(rec)) startFail(rec); }));
   offs.push(fx.onFx('floor-hidden', ({ floor }) => clearFloor(floor), { always: true }));
   offs.push(fx.onFx('floor-shown', ({ floor }) => resume(floor)));
-  offs.push(fx.onFx('crop', ({ cropped, floor }) => (cropped ? clearFloor(floor) : resume(floor)), { always: true }));
   offs.push(fx.onFxChange(({ fx: on }) => (on ? resume() : clearAll())));
   offs.push(ctx.onPauseChange((paused) => (paused ? clearAll() : ctx.fx.fxOn() && resume())));
 

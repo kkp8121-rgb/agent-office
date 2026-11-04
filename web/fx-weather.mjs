@@ -465,7 +465,7 @@ export function init(ctx) {
   }
 
   function syncGlow(floor, st) {
-    if (!floor.layer || floor.cropped) return;
+    if (!floor.layer) return;
     const recs = ctx.chars(floor);
     for (const rec of recs) {
       const mode = target.glow > 0 ? litMode(rec, cfg) : '';
@@ -577,7 +577,7 @@ export function init(ctx) {
     glowOnlyPending = false;
   }
 
-  for (const name of ['weather', 'daylight', 'floor-shown', 'crop']) fx.onFx(name, () => later(true));
+  for (const name of ['weather', 'daylight', 'floor-shown']) fx.onFx(name, () => later(true));
   for (const name of ['pose', 'state']) fx.onFx(name, () => later(false));
   fx.onFx('floor-hidden', (d) => {
     const st = floorsState.get(d.floor);

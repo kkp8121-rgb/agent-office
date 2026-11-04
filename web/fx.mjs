@@ -22,7 +22,7 @@
 //   init(ctx): if (!ctx.ui.fx.<area>.enabled) return;           // config switch of the area
 //     const off = ctx.fx.onFx('poke', (d) => { ... });           // only called while effects are on
 //     ctx.fx.onFxChange(({ fx }) => { if (!fx) tidy(); });
-//     inside a listener or timer: if (!ctx.floorActive(d.floor)) return;   // not shown / cropped (PiP) / page hidden -> nothing
+//     inside a listener or timer: if (!ctx.floorActive(d.floor)) return;   // not shown / page hidden -> nothing
 //     while the page is hidden: ctx.onPauseChange((paused) => ...) and ctx.paused().
 //
 // ---- the events (detail shapes). rec = a character record (see ctx.chars), floor = a floor record (see ctx.floors) ----
@@ -81,7 +81,7 @@
  * @property {(rec: object, text: string, ms: number, shiftPx?: number) => void} sayFor   a short bubble (replaces its current one)
  * @property {(rec: object) => void} clearSay
  * @property {(rec: object, text: string, ms: number, force?: boolean) => void} chatter   small talk / greeting bubble (skipped while busy)
- * @property {(floor: object) => boolean} floorActive   shown (not off) AND not cropped (PiP) AND page not hidden
+ * @property {(floor: object) => boolean} floorActive   shown (not off) AND page not hidden
  * @property {() => boolean} paused            the page is hidden (nothing may run)
  * @property {(fn: (paused: boolean) => void) => () => void} onPauseChange
  * @property {() => number} now                the clock (Date.now)

@@ -355,7 +355,7 @@ function fakeOffice(over = {}) {
     set: (on) => { fxOn = on; },
   };
   const floor = {
-    sid: 'f1', off: false, cropped: false, meeting: null, design: 'd', agents: new Map(), clock: { kick() {} },
+    sid: 'f1', off: false, meeting: null, design: 'd', agents: new Map(), clock: { kick() {} },
     scene: { r: { spots: SPOTS, seats: ROSTER.map((m) => ({ at: [m.x, m.y], visit: [m.x, m.y + 20] })) } },
   };
   const recs = ROSTER.map((m, n) => {
@@ -373,7 +373,7 @@ function fakeOffice(over = {}) {
     ui: { ...cfg.ui, officeLife: L, ambient: { ...AMB } },
     fx, floors: () => [floor, lobbyRec], floor: (id) => (id === 'f1' ? floor : null), lobby: () => lobbyRec,
     chars: () => [...floor.agents.values()], now: () => clock.t, timers,
-    floorActive: (f) => !f.off && !f.cropped && !over.paused,
+    floorActive: (f) => !f.off && !over.paused,
     onPauseChange: () => () => {}, paused: () => !!over.paused,
     clearGestures() {}, chatter: (rec, text) => lines.push([rec.m.id, text]), line: (key) => `line:${key}`,
     nav: { grid: () => ({ open: [], cols: 1, cellPx: 8 }), snap: (_d, p) => p },

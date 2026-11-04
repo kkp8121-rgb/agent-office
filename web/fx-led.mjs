@@ -3,7 +3,7 @@
 //   - colour steps on the CPU and memory numbers of the board header (config ui.fx.led.load.steps, e.g. 80 and 90 percent),
 //   - a blink (opacity only) on a wall number whose text really changed,
 //   - a marquee (one transform animation per line) on a news ticker whose text does not fit, paused while the lobby is not
-//     shown, cropped (PiP) or the page is hidden, and removed when the line fits again.
+//     shown or the page is hidden, and removed when the line fits again.
 // The dot-matrix texture and the glow are static CSS in fx-led.css (html.fx-on). The wall itself is built by app.mjs (buildWall); this
 // module only reads its nodes (lobby.wall) and sets data-load / data-mq attributes and Web Animations on them.
 // Rules are pure functions below (tests/fx-led.test.mjs); the DOM glue lives in init().
@@ -145,7 +145,7 @@ export function init(ctx) {
   }
 
   fx.onFx('sysload', (d) => { attach(); paintLoad(d); });
-  for (const name of ['floor-shown', 'floor-hidden', 'crop']) fx.onFx(name, () => { attach(); refresh(); });
+  for (const name of ['floor-shown', 'floor-hidden']) fx.onFx(name, () => { attach(); refresh(); });
   ctx.onPauseChange(() => syncActive());
   fx.onFxChange(({ fx: on }) => {
     if (on) { attach(); refresh(); } else tidy();

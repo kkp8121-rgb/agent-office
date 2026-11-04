@@ -30,8 +30,8 @@ function make({ fxOn = true, ui = { fx: { events: cfg } } } = {}) {
   const pauseFns = new Set();
   const state = { paused: false, now: 1000, timeouts: [] };
   const floors = [
-    { layer: fakeLayer(), off: false, cropped: false, agents: new Map(), wb: { frame: { x: 100, y: 40, w: 60, h: 30 } }, scene: { raw: { meeting: { boss: { at: [120, 200] } } } } },
-    { layer: fakeLayer(), off: false, cropped: false, agents: new Map(), scene: { raw: {} } },
+    { layer: fakeLayer(), off: false, agents: new Map(), wb: { frame: { x: 100, y: 40, w: 60, h: 30 } }, scene: { raw: { meeting: { boss: { at: [120, 200] } } } } },
+    { layer: fakeLayer(), off: false, agents: new Map(), scene: { raw: {} } },
   ];
   const rec = (floor, extra = {}) => {
     const r = { x: 50, y: 150, seated: false, state: 'working', el: { classList: { contains: () => false } }, frec: floor, ...extra };
@@ -41,7 +41,7 @@ function make({ fxOn = true, ui = { fx: { events: cfg } } } = {}) {
   const ctx = {
     ui, fx,
     floors: () => floors,
-    floorActive: (f) => !f.off && !f.cropped && !state.paused,
+    floorActive: (f) => !f.off && !state.paused,
     onPauseChange: (fn) => (pauseFns.add(fn), () => pauseFns.delete(fn)),
     now: () => state.now,
     timers: { setTimeout: (fn) => state.timeouts.push(fn), clearTimeout() {} },
@@ -240,7 +240,7 @@ test('no work while effects are off; turning them off tidies everything; back on
   assert.equal(f.layer.children.size, cfg.rain.drops);
 });
 
-test('hidden floor, crop and a hidden page clear the effects; coming back restores the failure mood only', () => {
+test('hidden floor and a hidden page clear the effects; coming back restores the failure mood only', () => {
   const t = make();
   const [f] = t.floors;
   const r = t.rec(f, { mood: cloudMood });
@@ -251,12 +251,6 @@ test('hidden floor, crop and a hidden page clear the effects; coming back restor
   assert.equal(f.layer.children.size, 0);
   f.off = false;
   t.fx.emitFx('floor-shown', { floor: f });
-  assert.equal(f.layer.children.size, cfg.rain.drops);
-  f.cropped = true;
-  t.fx.emitFx('crop', { cropped: true, floor: f });
-  assert.equal(f.layer.children.size, 0);
-  f.cropped = false;
-  t.fx.emitFx('crop', { cropped: false, floor: f });
   assert.equal(f.layer.children.size, cfg.rain.drops);
   t.state.paused = true;
   for (const fn of t.pauseFns) fn(true);

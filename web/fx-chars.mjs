@@ -10,7 +10,7 @@
 //   sit    on 'pose' (seated) with animate: the figure drops into the chair, dips a little and settles.
 //   stand  on 'pose' (standing) with animate: a small crouch, a push-off hop and settle (a walk that follows waits for it).
 // A pose change without animate (the first draw, a hidden tab catching up) shows nothing: no invented activity.
-// Nothing runs for a floor that is not shown, for the cropped small window or while the page is hidden; the cat keeps its own frames.
+// Nothing runs for a floor that is not shown, or while the page is hidden; the cat keeps its own frames.
 // The rules (frames, timing) are pure functions below; the DOM part is createMotion (an element with .animate is all it needs).
 
 /** One step of the walk in ms: the legs' cycle divided by its steps (a bob is one step). */
@@ -180,7 +180,6 @@ export function init(ctx) {
   ctx.fx.onFx('lift', ({ rec }) => motions.get(rec)?.cancel());
   ctx.fx.onFx('floor-hidden', ({ floor }) => stopFloor(floor));
   ctx.fx.onFx('floor-shown', ({ floor }) => startFloor(floor));
-  ctx.fx.onFx('crop', ({ cropped, floor }) => (cropped ? stopFloor(floor) : startFloor(floor)));
   ctx.onPauseChange((paused) => motions.forEach((m) => m.pause(paused)));
   ctx.fx.onFxChange(({ fx }) => {
     if (fx) [...ctx.floors()].forEach(startFloor);

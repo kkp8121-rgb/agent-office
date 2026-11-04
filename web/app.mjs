@@ -3382,7 +3382,7 @@ function buildFxCtx() {
     sayFor,
     clearSay,
     chatter,
-    floorActive: (f) => !f.off && !f.cropped && !paused(),
+    floorActive: (f) => !f.off && !paused(),
     paused,
     onPauseChange: hook(pauseFns),
     now: Date.now,

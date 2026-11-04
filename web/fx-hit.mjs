@@ -432,9 +432,6 @@ export function init(ctx) {
     ctx.fx.onFx('landed', (d) => onDown(d, true)),
     ctx.fx.onFx('snack', onSnack),
     ctx.fx.onFx('floor-hidden', (d) => tidyFloor(d.floor)),
-    ctx.fx.onFx('crop', (d) => {
-      if (d.cropped && d.floor) tidyFloor(d.floor);
-    }),
   ];
   void offs;
   ctx.onPauseChange((paused) => {

@@ -242,7 +242,7 @@ test('area: a pose change plays only when animated; the effects off means nothin
   assert.equal(off.a.fxMove.anims.length, 0);
 });
 
-test('area: lift, a floor going off screen, the small window crop and the effects switch stop the motion', () => {
+test('area: lift, a floor going off screen and the effects switch stop the motion', () => {
   const o = office();
   const start = () => o.fx.emitFx('walk-start', { rec: o.a });
   start();
@@ -254,10 +254,6 @@ test('area: lift, a floor going off screen, the small window crop and the effect
   o.a.walk = { pieces: [] };
   o.fx.emitFx('floor-shown', { floor: o.floor });
   assert.equal(live(o.a.fxMove).length, 1, 'a walker of a floor that came back gets its bob');
-  o.fx.emitFx('crop', { cropped: true, floor: o.floor });
-  assert.equal(live(o.a.fxMove).length, 0);
-  o.fx.emitFx('crop', { cropped: false, floor: o.floor });
-  assert.equal(live(o.a.fxMove).length, 1);
   o.fx.setFx(false);
   assert.equal(live(o.a.fxMove).length, 0);
   o.fx.setFx(true);

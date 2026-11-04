@@ -137,7 +137,7 @@ export function chooseLifeAct(rng, L, snap, mem, opts = {}) {
 
 /**
  * One timer for all floors: each floor has its own next time (`L.everyMs` after a start, `L.retryMs` after nothing could start); one wake
- * handles the due floors and sleeps until the earliest. `floors()` lists the floors that may run now (shown, not cropped, page visible);
+ * handles the due floors and sleeps until the earliest. `floors()` lists the floors that may run now (shown, page visible);
  * `tick(id)` tries to start something and answers whether it did. A floor met for the first time waits `L.firstDelayMs`; `reset(id)` does the same.
  */
 export function createDirector({ L, now, rng, timers, floors, tick }) {
@@ -535,7 +535,6 @@ export function init(ctx) {
     if (removed) floorState.delete(floor.sid);
   }, always);
   fx.onFx('floor-shown', ({ floor }) => { director.reset(floor.sid); director.kick(); }, always);
-  fx.onFx('crop', () => director.kick(), always);
   ctx.onPauseChange((paused) => {
     if (paused) stopAll();
     director.kick();
