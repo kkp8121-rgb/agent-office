@@ -12,7 +12,18 @@ Reads art/glass.json[room] and assets/scenes/<room>/scene.json (`windows`, `view
                  painted garden has not) are found inside the hand boxes `plants` and left out.
   `plantReach` / `plantDens` (flood): how tightly the plant outline blob is cut (default 4 px / .07; greenhouse 2 / .25, so the pasted pieces of
                  old picture around the hanging plants become glass); `islands` N: opaque pieces of at most N px cut off from everything else are old-picture specks and become glass.
+  `rim` (poly): {"band": k, "max": m, "rb": d}: the polygons are drawn on the frame, so within `band` px of a polygon edge frame-coloured pixels (dark brown or grey:
+                 max channel <= `max`, R - B >= `rb`, G <= R + 5) stay in the shell instead of being cut (studio2: the window rims); blue-ish pixels (B - R > `bleed`, 20) next to the hole are old glass and join it.
+  `members`: the frame members (beams, posts, rails, sills) that must run unbroken, {"name", "axis": "v"|"h", "box": [x0, y0, x1, y1], "ref": [a, b]}.
+                 After the hole is cut, every gap pixel of a member (see frame_check.py: alpha 0 or a colour far from the member's own profile; hanging
+                 plants, nibbled edges, cut-out vine strands) is rebuilt from the member itself: it takes the pixel at the same cross-section offset from the
+                 nearest intact pixel along the member, or, with `ref` (an intact span along the member), from that span mirrored outward from its end.
+                 python art/frame_check.py <room> counts what is left (must be 0).
   `subtract` / `add`: hand polygons removed from / added to the hole (hanging plants painted into the shell, door handles).
+  `cuts`: old-picture leftovers that the hole missed, because they sit in small panes closed off by frame pieces (the triangles between roof struts), or
+                 hang beside a plant: {"name", "box": [x0, y0, x1, y1] or "spans": [[y, x0, x1], ...] (inclusive; only these pixels), "where": [...], "keep": n}.
+                 Applied last, after the ring clean-up, so no pixel outside the cut changes. A pixel is cut when it is opaque and matches one of `where`
+                 ("all", "sky" blue, "green", "yellow", "pale" light green, "black"), unless its brightest channel is <= `keep` (dark frame outline).
 Writes shell.png as RGBA: alpha 0 on the glass, the old picture's RGB kept under the hole (tools that drop alpha still see the old view),
 and the 1-2 px ring around the hole decontaminated: ring pixels that still carry the old glass colour take the nearest frame colour.
 Run it on a shell that still has the old view (git checkout of shell.png), or on its own output (the RGB under the hole is the old view, so it is repeatable).
@@ -23,6 +34,8 @@ import os
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
+
+from frame_check import gap_mask
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -110,6 +123,14 @@ def hole_for(rgb, windows, cfg, outline=None):
     else:
         zone = grow(poly_mask((w, h), windows), cfg.get("grow", 1))
         hole = zone
+        if cfg.get("rim"):
+            r = cfg["rim"]
+            R, G, B = (rgb[..., i].astype(int) for i in range(3))
+            rimlike = (rgb.max(axis=2) <= r.get("max", 150)) & (R - B >= r.get("rb", 10)) & (G <= R + 5)
+            band = zone & ~shrink(zone, r.get("band", 6))
+            hole = zone & ~(band & rimlike)
+            for _ in range(2):  # sky-blue edge pixels just outside the polygon: the old glass bleeding over the rim
+                hole |= grow(hole, 1) & (B - R > r.get("bleed", 20))
         if mode == "colour":
             glass = zone & ~frame_like(rgb)
             hole = shrink(grow(glass, 1), 1) & zone  # closing: yellow flowers and light spots inside the glass are not frame
@@ -124,6 +145,53 @@ def hole_for(rgb, windows, cfg, outline=None):
             if len(pts) <= cfg["islands"]:
                 hole[pts[:, 0], pts[:, 1]] = True
     return hole
+
+
+def mirror(d, n):
+    """Index d (0, 1, 2 ...) steps away from the end of a span of n pixels, folded back and forth inside the span."""
+    j = d % (2 * n)
+    return j if j < n else 2 * n - 1 - j
+
+
+def repair_members(rgb, hole, members):
+    """Rebuilds every gap pixel of every member from the member itself (see the `members` note above). Returns the new rgb and hole."""
+    rgb, hole = rgb.copy(), hole.copy()
+    for m in members:
+        x0, y0, x1, y1 = m["box"]
+        rgba = np.dstack([rgb, np.where(hole, 0, 255).astype(np.uint8)])
+        bad = gap_mask(rgba, m)
+        vertical = m["axis"] == "v"
+        new = rgb.copy()
+        for ly in range(bad.shape[1] if vertical else bad.shape[0]):  # one line along the member per cross-section offset
+            line = bad[:, ly] if vertical else bad[ly]
+            if not line.any():
+                continue
+            good = np.flatnonzero(~line)
+            if len(good) == 0:
+                continue
+            for t in np.flatnonzero(line):
+                src = None
+                if m.get("ref"):
+                    a, b = m["ref"]
+                    pos = (y0 if vertical else x0) + t
+                    if pos < a:
+                        src = a + mirror(a - 1 - pos, b - a + 1)
+                    elif pos > b:
+                        src = b - mirror(pos - b - 1, b - a + 1)
+                    if src is not None:
+                        src -= (y0 if vertical else x0)
+                        if not 0 <= src < len(line) or line[src]:
+                            src = None
+                if src is None:
+                    src = good[np.argmin(np.abs(good - t))]
+                if vertical:
+                    new[y0 + t, x0 + ly] = rgb[y0 + src, x0 + ly]
+                    hole[y0 + t, x0 + ly] = False
+                else:
+                    new[y0 + ly, x0 + t] = rgb[y0 + ly, x0 + src]
+                    hole[y0 + ly, x0 + t] = False
+        rgb = new
+    return rgb, hole
 
 
 def decontaminate(rgb, hole, ring_px):
@@ -154,6 +222,37 @@ def decontaminate(rgb, hole, ring_px):
     return out
 
 
+CUT_TESTS = {
+    "all": lambda r, g, b, mx, sat: np.ones(r.shape, bool),
+    "sky": lambda r, g, b, mx, sat: (b > r + 8) & (g >= r - 6),
+    "green": lambda r, g, b, mx, sat: (g >= r + 6) & (g >= b - 4) & (sat >= 0.12),
+    "yellow": lambda r, g, b, mx, sat: (r > 140) & (g > 140) & (b < 120),
+    "pale": lambda r, g, b, mx, sat: (mx >= 150) & (g >= r + 3) & (g >= b - 3) & (sat < 0.5),
+    "black": lambda r, g, b, mx, sat: mx <= 45,
+}
+
+
+def cut_mask(rgb, alpha, cuts):
+    """Pixels of the `cuts` entries (see the module note) that are still opaque and match their `where` tests."""
+    r, g, b = (rgb[..., i].astype(int) for i in range(3))
+    mx = rgb.max(axis=2).astype(int)
+    sat = (mx - rgb.min(axis=2).astype(int)) / np.maximum(mx, 1)
+    out = np.zeros(alpha.shape, bool)
+    for c in cuts:
+        area = np.zeros(alpha.shape, bool)
+        if "spans" in c:
+            for y, x0, x1 in c["spans"]:
+                area[y, x0:x1 + 1] = True
+        else:
+            x0, y0, x1, y1 = c["box"]
+            area[y0:y1 + 1, x0:x1 + 1] = True
+        hit = np.zeros(alpha.shape, bool)
+        for w in c["where"]:
+            hit |= CUT_TESTS[w](r, g, b, mx, sat)
+        out |= area & hit & (alpha > 0) & (mx > c.get("keep", -1))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("room")
@@ -167,10 +266,17 @@ def main():
     shell = Image.open(os.path.join(d, scene["shell"]))
     rgb = np.asarray(shell.convert("RGB")).copy()
     hole = hole_for(rgb, scene["windows"], cfg, scene.get("outline"))
+    if cfg.get("members"):
+        rgb, hole = repair_members(rgb, hole, cfg["members"])
     ring = cfg.get("ring", 2)
     clean = decontaminate(rgb, hole, ring) if ring else rgb
     alpha = np.where(hole, 0, 255).astype(np.uint8)
-    out = np.dstack([np.where(hole[..., None], rgb, clean), alpha])  # keep the old view's RGB under the hole
+    pix = np.where(hole[..., None], rgb, clean)  # keep the old view's RGB under the hole
+    if cfg.get("cuts"):
+        extra = cut_mask(pix, alpha, cfg["cuts"])
+        alpha[extra] = 0
+        print("  cuts px", int(extra.sum()))
+    out = np.dstack([pix, alpha])
     print(a.room, "hole px", int(hole.sum()), "ring px", int((grow(hole, ring) & ~hole).sum()))
     for i, p in enumerate(scene["windows"]):
         m = poly_mask(hole.shape[::-1], [p])
