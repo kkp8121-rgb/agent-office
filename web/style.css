@@ -185,6 +185,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .spr img.sit { display: none; height: var(--sit-h, 50px); }
 .ag.sitting .spr img.stand { display: none; }
 .ag.sitting .spr img.sit { display: block; }
+/* ---- desks (web/app.mjs setLegs, scene kind seat.legs): under a table that is open below, a seated figure shows its lower legs and feet.
+   The legs picture (assets/sprites/legs/<key>-legs.png, 30 rows, soles on the last row, made from the standing picture by scripts/make-leg-sprites.mjs) is the
+   background of a ::before of the figure's .spr, behind the seated picture, hung so that the soles end --dk-sole px under the seated picture's bottom edge.
+   No element is added; the desk picture in front of the figure hides it wherever the desk has a front panel. The contact shadow moves down to the soles. ---- */
+.ag.sitting.dk-open .spr { isolation: isolate; }
+.ag.sitting.dk-open .spr::before {
+  content: ""; position: absolute; left: 0; right: 0; top: calc(100% + var(--dk-sole) - 30px); height: 30px; z-index: -1;
+  background: var(--dk-legs) no-repeat 50% 0; image-rendering: pixelated; pointer-events: none;
+}
+.ag.sitting.dk-open .body::before { bottom: calc(-2px - var(--dk-sole)); }
 /* the name tag stands beside the torso: below the feet it would hit the speech bubbles of the desk row underneath */
 .tag {
   position: absolute; left: 20px; top: -26px; white-space: nowrap;
@@ -650,6 +660,7 @@ body.paused .wx-a, body.paused .wx-b, body.paused .wx-f { animation-play-state: 
 /* a sleepy figure stays readable: a faint grey cue instead of a ghost; her zZ sits beside the head, in the gap between desks, clear of every name tag */
 .floor.lobby .st-stale .spr { opacity: .85; filter: grayscale(.55) brightness(.92); }
 .floor.lobby .agt .zz { left: calc(50% + 16px); bottom: 44px; }
+.floor.lobby .agt.sitting .zz { bottom: 30px; } /* a seated figure's head is lower */
 #topbar .tab.lobby { border-bottom-color: var(--c); }
 
 /* the screens: a dark navy box laid on each screen quad (one shear, like the whiteboard), dot-matrix background, KRX-like colours */

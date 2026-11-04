@@ -48,7 +48,7 @@
             "life": {
               "enabled": true, "tickMinMs": 1000, "firstDelayMs": [2000, 25000],
               "fidgetEveryMs": [20000, 70000],
-              "fidgets": { "standing": ["look", "lean", "stretch", "hop"] },
+              "fidgets": { "seated": ["look", "lean", "stretch"], "standing": ["look", "lean", "stretch", "hop"] },
               "strollEveryMs": { "working": [180000, 420000], "thinking": [60000, 160000], "idle": [30000, 90000] },
               "stayMs": [3000, 8000], "maxAway": 3, "strollPx": [70, 210], "strollGapPx": 60, "strollTries": 6, "phaseS": 6
             }

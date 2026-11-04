@@ -190,6 +190,7 @@ export function checkSceneFormat(raw, opts) {
         for (const f of ['at', 'approach']) if (!isPt(s[f])) err(`${p}.seat.${f}`, '[dx, dy] 여야 합니다');
         for (const f of ['sitAt', 'visit']) if (s[f] !== undefined && s[f] !== null && !isPt(s[f])) err(`${p}.seat.${f}`, '[dx, dy] 여야 합니다');
         if (!['left', 'right'].includes(s.face)) err(`${p}.seat.face`, "'left' 또는 'right' 여야 합니다");
+        if (s.legs !== undefined && !(Number.isInteger(s.legs) && s.legs >= 0)) err(`${p}.seat.legs`, '0 이상의 정수여야 합니다 (열린 책상 아래에 앉은 사람의 다리 끝이 앉은 그림 아래로 몇 px 내려오는지, 0 = 안 그림)');
       }
     }
   }
@@ -324,6 +325,7 @@ export function resolveScene(raw) {
       approach: rel(base, s.approach),
       visit: s.visit ? rel(base, s.visit) : null,
       face: o.flipX ? flipFace(s.face) : s.face,
+      legs: s.legs ?? 0,
     };
   });
   const l = raw.lead;

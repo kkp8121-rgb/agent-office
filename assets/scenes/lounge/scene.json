@@ -48,7 +48,8 @@
      59,
      -5
     ],
-    "face": "left"
+    "face": "left",
+    "legs": 26
    }
   },
   "chair": {

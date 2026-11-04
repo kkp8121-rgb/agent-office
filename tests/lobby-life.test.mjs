@@ -252,16 +252,18 @@ function fnIn(name, globals, ...more) {
 }
 
 test('stroll back: at the desk the transition time of the last piece is reset to 0ms (a zoom change must not slide the figure again)', () => {
-  const rec = { m: { returnAt: 5, nextTripAt: 0 }, home: { at: [10, 20], face: 'left' }, away: true, x: 1, y: 1, el: fakeEl(), tagRoot: fakeEl() };
+  const rec = { m: { returnAt: 5, nextTripAt: 0 }, home: { at: [10, 20], rest: [10, 22], sits: true, face: 'left' }, away: true, x: 1, y: 1, el: fakeEl(), tagRoot: fakeEl() };
+  const poses = [];
   rec.el.style.transitionDuration = rec.tagRoot.style.transitionDuration = '86.6667ms'; // what stepWalk leaves behind
   const strollBack = fnIn('strollBack', {
     strollRoute: () => [[1, 1], [10, 20]],
     walkPath: (r, f, pts, onArrive) => onArrive(),
     abortStroll: () => assert.fail('a route exists'),
-    lobby: { clock: { kick() {} } }, ui: { depth: {} }, charZ: () => 1000, setFacing() {}, scheduleStroll() {},
+    lobby: { clock: { kick() {} } }, ui: { depth: {} }, charZ: () => 1000, setFacing() {}, scheduleStroll() {}, setPose: (r, seated, animate) => poses.push([seated, animate]),
   }, 'noSlide');
   strollBack(rec);
   assert.equal(rec.away, false);
+  assert.deepEqual(poses, [[true, true]], 'a figure of a seat sits down again at the desk');
   assert.equal(rec.el.style.transitionDuration, '0ms', 'the figure');
   assert.equal(rec.tagRoot.style.transitionDuration, '0ms', 'and its name tag layer');
 });

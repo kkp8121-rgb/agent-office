@@ -307,7 +307,8 @@
           -40,
           18
         ],
-        "face": "right"
+        "face": "right",
+        "legs": 30
       }
     },
     "chair": {
@@ -316,6 +317,38 @@
         81,
         35,
         50
+      ],
+      "anchor": [
+        17,
+        35
+      ],
+      "footprint": [
+        [
+          -11,
+          -8
+        ],
+        [
+          11,
+          -8
+        ],
+        [
+          11,
+          0
+        ],
+        [
+          -11,
+          0
+        ]
+      ],
+      "blocks": false,
+      "depth": "auto"
+    },
+    "chair-open": {
+      "rect": [
+        218,
+        81,
+        35,
+        66
       ],
       "anchor": [
         17,
@@ -674,7 +707,7 @@
     },
     {
       "id": "chair-1",
-      "kind": "chair",
+      "kind": "chair-open",
       "at": [
         366,
         182
@@ -690,7 +723,7 @@
     },
     {
       "id": "chair-2",
-      "kind": "chair",
+      "kind": "chair-open",
       "at": [
         474,
         182
@@ -706,7 +739,7 @@
     },
     {
       "id": "chair-3",
-      "kind": "chair",
+      "kind": "chair-open",
       "at": [
         582,
         182
@@ -722,7 +755,7 @@
     },
     {
       "id": "chair-4",
-      "kind": "chair",
+      "kind": "chair-open",
       "at": [
         690,
         182
@@ -738,7 +771,7 @@
     },
     {
       "id": "chair-5",
-      "kind": "chair",
+      "kind": "chair-open",
       "at": [
         366,
         272
@@ -754,7 +787,7 @@
     },
     {
       "id": "chair-6",
-      "kind": "chair",
+      "kind": "chair-open",
       "at": [
         474,
         272
@@ -770,7 +803,7 @@
     },
     {
       "id": "chair-7",
-      "kind": "chair",
+      "kind": "chair-open",
       "at": [
         582,
         272
@@ -786,7 +819,7 @@
     },
     {
       "id": "chair-8",
-      "kind": "chair",
+      "kind": "chair-open",
       "at": [
         690,
         272
@@ -802,7 +835,7 @@
     },
     {
       "id": "chair-9",
-      "kind": "chair",
+      "kind": "chair-open",
       "at": [
         366,
         362
@@ -818,7 +851,7 @@
     },
     {
       "id": "chair-10",
-      "kind": "chair",
+      "kind": "chair-open",
       "at": [
         474,
         362
@@ -834,7 +867,7 @@
     },
     {
       "id": "chair-11",
-      "kind": "chair",
+      "kind": "chair-open",
       "at": [
         582,
         362
@@ -850,7 +883,7 @@
     },
     {
       "id": "chair-12",
-      "kind": "chair",
+      "kind": "chair-open",
       "at": [
         690,
         362

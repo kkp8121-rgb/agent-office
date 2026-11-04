@@ -534,7 +534,7 @@ test('lobby scene: the wings are taller at the outer end (concave), every screen
   assert.doesNotMatch(fn, /boardFrame/);
 });
 
-test('lobby scene: 40 straight desks, every seat stands behind its desk facing the viewer (at == sitAt, face right, no chair seat)', () => {
+test('lobby scene: 40 straight desks, every seat sits behind its desk facing the viewer (sitAt 2px below at like the floors, face right, its chair behind)', () => {
   const raw = lobbyRaw();
   assert.equal(raw.seats.length, 40);
   const objs = new Map(raw.objects.map((o) => [o.id, o]));
@@ -542,7 +542,9 @@ test('lobby scene: 40 straight desks, every seat stands behind its desk facing t
   const seats = res.resolved.seats;
   assert.equal(seats.length, 40);
   for (const s of seats) {
-    assert.deepEqual(s.at, s.sitAt, `${s.i}: the standing picture is placed at the seat`);
+    assert.deepEqual([s.sitAt[0], s.sitAt[1] - 2], s.at, `${s.i}: the seated picture sits 2px below the standing point, as on the floors`);
+    const chair = res.resolved.objects.find((o) => o.id === `chair-${s.deskId.split('-')[1]}`);
+    assert.ok(chair && chair.at[0] === s.at[0] && chair.footprint.every((q) => q[1] <= s.at[1] - 2), `${s.i}: a chair behind the seated figure`);
     assert.equal(s.face, 'right');
     assert.ok(['desk', 'desk-b'].includes(objs.get(s.deskId)?.kind), `${s.i}: a straight desk kind`);
   }
@@ -551,15 +553,19 @@ test('lobby scene: 40 straight desks, every seat stands behind its desk facing t
     const xs = k.footprint.map((p) => p[0]);
     const ys = k.footprint.map((p) => p[1]);
     assert.ok(Math.max(...xs) > 3 * (Math.max(...ys) - Math.min(...ys)), `${kind}: long side horizontal (footprint is a flat rectangle)`);
-    assert.deepEqual(k.seat.at, k.seat.sitAt);
+    assert.deepEqual([k.seat.sitAt[0], k.seat.sitAt[1] - 2], k.seat.at);
   }
 });
 
-test('lobby figure: the lobby never uses the seated picture (standing front view behind the desk)', () => {
+test('lobby figure: a figure of a seat sits (the seated picture at sitAt), one on a standing spot stands', () => {
   const app = readFileSync(join(ROOT, 'web', 'app.mjs'), 'utf8');
   const fn = app.slice(app.indexOf('function lobbyFigure('), app.indexOf('/** Roster -> seats -> figures'));
-  assert.doesNotMatch(fn, /sitSet|sitAt|setPose/);
-  assert.match(fn, /p = s\.at;/);
+  assert.match(fn, /p = sitSet\.has\(e\.sprite\) \? s\.sitAt : s\.at;/);
+  assert.match(fn, /setPose\(rec, rec\.home\.sits, false\)/);
+  assert.match(fn, /sits: at !== null && rec\.sitImg !== null/);
+  const o = fn.slice(fn.indexOf('} else {'), fn.indexOf('let rec = lb.chars.get'));
+  assert.match(o, /p = o\.at;/, 'a standing spot is a standing place');
+  assert.doesNotMatch(o, /sitAt|setPose/);
 });
 
 // ---- name tags: floor number chip and lead marker ----

@@ -405,6 +405,25 @@ function walkPath(rec, frec, points, onArrive) {
   return Math.max(total, WALK_MIN_MS);
 }
 
+const legsUrl = (key) => `/assets/sprites/legs/${encodeURIComponent(key)}-legs.png`;
+
+/**
+ * The lower legs of a seated figure under an open table (style.css "desks"): `sole` = how far below the seated picture's bottom the soles are, 0 = none
+ * (a desk with a front panel hides them anyway, so the scene says which seats show them). The picture is a CSS background of the .spr, so no element is added.
+ */
+function setLegs(rec, sole) {
+  const want = sole > 0 && rec.sitImg !== null ? sole : 0;
+  if (rec.legsSole === want && rec.legsKey === rec.sprite) return;
+  rec.legsSole = want;
+  rec.legsKey = rec.sprite;
+  rec.el.classList.toggle('dk-open', want > 0);
+  if (want > 0) {
+    rec.spr.style.setProperty('--dk-legs', `url(${legsUrl(rec.sprite)})`);
+    rec.spr.style.setProperty('--dk-sole', `${want}px`);
+    rec.el.style.setProperty('--dk-sole', `${want}px`);
+  }
+}
+
 /** Stand up or sit down: the picture swaps by class, a short squash covers the change. A character without a seated picture never sits. */
 function setPose(rec, seated, animate) {
   const sit = seated && rec.sitImg !== null;
@@ -430,6 +449,7 @@ function arriveAt(rec, target, animate = true) {
   rec.arrived = true;
   setFacing(rec, target.face);
   setPose(rec, target.seated, animate);
+  setLegs(rec, target.seat?.legs ?? 0);
   if (rec.state === 'done') rec.el.classList.add('arrived');
   if (rec.greet) {
     rec.greet = false; // a newcomer says hello once, at its desk
@@ -449,7 +469,8 @@ function sceneTarget(av, frec, done) {
   if (s.kind === 'seat') {
     const canSit = sitSet.has(av.sprite);
     const p = canSit ? s.sit : [s.x, s.y];
-    return { x: p[0], y: p[1], face: s.face, seated: canSit, seat: { at: [s.x, s.y], sit: canSit ? s.sit : null, approach: s.approach } };
+    const legs = canSit && av.key !== 'lead' ? r.seats[s.i]?.legs ?? 0 : 0; // an open table shows the figure's lower legs (scene kind seat.legs)
+    return { x: p[0], y: p[1], face: s.face, seated: canSit, seat: { at: [s.x, s.y], sit: canSit ? s.sit : null, approach: s.approach, legs } };
   }
   const raw = [s.x, s.y];
   const p = nav.snap(frec.design, raw) ?? raw;
@@ -1844,10 +1865,12 @@ function renderAgent(av, floorEl) {
         rec.sitImg = makeSitSprite(rec, av.sprite);
         rec.img.parentElement.append(rec.sitImg);
       }
+      if (rec.legsSole) setLegs(rec, rec.legsSole);
     } else if (rec.sitImg) {
       rec.sitImg.remove();
       rec.sitImg = null;
       setPose(rec, false, false);
+      setLegs(rec, 0);
     }
   }
   setText(rec.tag, av.name);
@@ -2449,13 +2472,15 @@ function readableOn(hex) {
 function lobbyFigure(e, slot) {
   const lb = lobby;
   const { r } = lb.scene;
-  // the lobby always shows the standing picture (front view) behind a straight desk, so the face is seen: the figure is never switched to the seated one
-  let p;
+  // a figure in a seat sits at its desk like the floors' (the seated picture, the chair behind it, the monitor's back in front); one on a standing spot stands
+  let p; // where the figure is at rest: the seat's sitAt, or the standing spot
+  let at = null; // a seat's standing point behind the desk (where a stroll starts and ends)
   let face;
   let via = null; // where a seat's figure steps out to (the aisle in front of its desk); a standing spot has none
   if (slot.kind === 'seat') {
     const s = r.seats[slot.i];
-    p = s.at;
+    at = s.at;
+    p = sitSet.has(e.sprite) ? s.sitAt : s.at;
     face = s.face;
     via = s.approach;
   } else {
@@ -2481,12 +2506,13 @@ function lobbyFigure(e, slot) {
     initLobbyLife(rec, e);
   }
   rec.sid = e.sid;
-  const moved = !rec.home || rec.home.at[0] !== p[0] || rec.home.at[1] !== p[1];
-  rec.home = { at: p, via, face };
+  const moved = !rec.home || rec.home.rest[0] !== p[0] || rec.home.rest[1] !== p[1];
+  rec.home = { at: at ?? p, rest: p, sits: at !== null && rec.sitImg !== null, via, face };
   if (moved) { // a new place: it is there at once (never on the way), whatever stroll it was on
     abortStroll(rec);
     if (rec.x !== p[0] || rec.y !== p[1]) placeAt(rec, p, false);
     setFacing(rec, face);
+    setPose(rec, rec.home.sits, false);
   }
   rec.floorStatus = e.floorStatus;
   setText(rec.tagFl, String(e.floorNo));
@@ -2776,19 +2802,19 @@ function lobbyFidget(rec) {
   const { life } = lobby;
   rec.m.nextFidgetAt = Date.now() + between(rec.rng, life.fidgetEveryMs);
   if (rec.walk || rec.away || rec.state === 'done' || rec.state === 'stale') return; // a sleeper does not fidget
-  playFidget(rec, chooseFidget(rec.rng, false, life));
+  playFidget(rec, chooseFidget(rec.rng, rec.seated, life));
 }
 
 /** The polyline of a stroll leg. Out: desk -> aisle -> goal; back: where it stands -> aisle -> desk. Null when the grid has no route. */
 function strollRoute(rec, goal, out) {
-  const { at, via } = rec.home;
+  const { at, rest, via } = rec.home;
   const from = [rec.x, rec.y];
-  const pts = out ? [from, ...(via ? [via] : [])] : [from];
+  const pts = out ? [from, ...(via ? [at, via] : [])] : [from]; // a seated figure first steps up to its standing point behind the desk, then out to the aisle
   const path = nav.path(lobby.design, pts[pts.length - 1], out ? goal : via ?? at);
   if (!path) return null;
   pts.pop();
   pts.push(...path);
-  if (!out && via) pts.push(at);
+  if (!out && via) pts.push(at, rest);
   return pts.filter((p, i) => i === 0 || !same(p, pts[i - 1]));
 }
 
@@ -2812,6 +2838,7 @@ function lobbyStroll(rec) {
   if (!pts) return;
   if (!rec.legs.length) rec.legs = makeLegs(rec.spr, rec.sprite); // the legs are drawn only for those who ever walk
   rec.away = true;
+  setPose(rec, false, true); // up from the chair
   const ms = walkPath(rec, lb, pts, () => noSlide(rec));
   rec.m.returnAt = Date.now() + ms + between(rec.rng, lb.life.stayMs);
 }
@@ -2830,8 +2857,9 @@ function strollBack(rec) {
   walkPath(rec, lobby, pts, () => {
     rec.away = false;
     noSlide(rec);
-    rec.el.style.zIndex = String(charZ(rec.home.at[1], ui.depth));
+    rec.el.style.zIndex = String(charZ(rec.home.rest[1], ui.depth));
     setFacing(rec, rec.home.face);
+    setPose(rec, rec.home.sits, true); // back in the chair
     scheduleStroll(rec);
     lobby.clock.kick();
   });
@@ -2845,8 +2873,9 @@ function abortStroll(rec) {
   rec.el.classList.remove('walking');
   noteWalk(rec, false);
   clearGestures(rec);
-  placeAt(rec, rec.home.at, false);
+  placeAt(rec, rec.home.rest, false);
   setFacing(rec, rec.home.face);
+  setPose(rec, rec.home.sits, false);
   rec.m.returnAt = 0;
   scheduleStroll(rec);
 }
