@@ -12,10 +12,28 @@ export function boardFrame(quad) {
   return { x: tl[0], y: tl[1], w, h: bl[1] - tl[1], slope: (tr[1] - tl[1]) / w };
 }
 
-/** How many item lines fit under the title in a board `h` px high (at least `min`). */
-export function boardCapacity(h, linePx, padPx, min) {
-  return Math.max(min, Math.floor((h - 2 * padPx) / linePx) - 1);
+/** How many item lines fit under the title in a board `h` px high (at least `min`); `extraPx` is more space the title takes (the progress bar). */
+export function boardCapacity(h, linePx, padPx, min, extraPx = 0) {
+  return Math.max(min, Math.floor((h - 2 * padPx - extraPx) / linePx) - 1);
 }
+
+/** Share of the work done as 0..1 (0 when there is nothing to count; never above 1). */
+export const progressFrac = (done, total) => (total > 0 ? Math.min(1, Math.max(0, done / total)) : 0);
+
+/**
+ * The lines to draw on a board with room for `cap` lines under the title: {rows, hidden}. `items` is what the server sent
+ * and `more` how many it left out. When something is hidden the last line says so, so the rows leave one line free; the
+ * in-progress item always stays among the rows, with the items around it (itemWindow). hidden counts every item not drawn.
+ */
+export function boardRows(items, more, cap) {
+  const all = items.length + more;
+  if (all <= cap) return { rows: items, hidden: 0 };
+  const rows = itemWindow(items, Math.max(1, cap - 1));
+  return { rows, hidden: all - rows.length };
+}
+
+/** The class of an item row in the progress display: done (struck through), now (in progress, stands out), next (remaining). */
+export const rowKind = (status) => (status === 'completed' ? 'done' : status === 'in_progress' ? 'now' : 'next');
 
 /**
  * The run of `cap` items to show: it holds the in-progress item (else the first pending one, else the last item), with
@@ -36,7 +54,8 @@ export const todoKey = (t) => `${t.done}/${t.total}|${t.items.map((i) => `${i.st
 const fill = (template, vars) => template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
 
 /**
- * What the wall board of a floor shows, from its snapshot view: {head, items: [{text, status}], more} or null when there is nothing.
+ * What the wall board of a floor shows, from its snapshot view: {head, items: [{text, status}], more, progress} or null when there is nothing.
+ * `progress` is {done, total, frac} for a to-do list and for the phases of a workflow that lists them (the board draws the count and a bar), else null.
  * `more` counts the items the server left out. The to-do list wins; without one the server sends `sheet`
  * (phases of the running workflow, sub-agents, or the session title) already cleaned and clipped. `labels` is ui.board.
  */
@@ -45,12 +64,15 @@ export function boardSheet(fv, labels) {
   if (!s) {
     const t = fv.todos;
     if (!t || t.total === 0) return null;
-    return { head: fill(labels.todos, { done: t.done, total: t.total }), items: t.items, more: t.total - t.items.length };
+    return { head: fill(labels.todos, { done: t.done, total: t.total }), items: t.items, more: t.total - t.items.length, progress: progressOf(t.done, t.total) };
   }
-  if (s.kind === 'title') return { head: '', items: [{ text: s.text, status: 'plain' }], more: 0 }; // no list: the title as one wrapped line
-  const head = s.kind === 'phases' ? fill(s.total > 0 ? labels.phases : labels.phasesOpen, s) : fill(labels.agents, s);
-  return { head, items: s.items, more: s.more };
+  if (s.kind === 'title') return { head: '', items: [{ text: s.text, status: 'plain' }], more: 0, progress: null }; // no list: the title as one wrapped line
+  if (s.kind !== 'phases') return { head: fill(labels.agents, s), items: s.items, more: s.more, progress: null };
+  const done = Math.min(Math.max(0, s.n - 1), s.total); // the phases before the current one; a script that lists none has no total and no bar
+  return { head: fill(s.total > 0 ? labels.phases : labels.phasesOpen, { ...s, done }), items: s.items, more: s.more, progress: s.total > 0 ? progressOf(done, s.total) : null };
 }
+
+const progressOf = (done, total) => ({ done, total, frac: progressFrac(done, total) });
 
 /** A string that changes exactly when what the board shows changes ('' for nothing). */
 export const sheetKey = (b) => (b ? `${b.head}|${b.more}|${b.items.map((i) => `${i.status[0]}${i.text}`).join('\n')}` : '');

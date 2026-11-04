@@ -726,6 +726,15 @@ export class Office {
     };
   }
 
+  /** The phases of the running workflow: {n: current position, total: 0 if the script lists none, items: [{text,status}], more}; null without one. Independent of the to-do list (the detail panel shows both). */
+  #phasesView(f) {
+    if (!f.boardPhases) return null;
+    const { list, at, known } = f.boardPhases;
+    const all = list.map((text, i) => ({ text, status: i < at ? 'completed' : i === at ? 'in_progress' : 'pending' }));
+    const items = viewWindow(all);
+    return { n: at + 1, total: known ? list.length : 0, items, more: all.length - items.length };
+  }
+
   /**
    * What the whiteboard shows when the session keeps no to-do list, highest first: the phases of its running workflow
    * ({kind:'phases', n: current position, total: 0 if the script lists none}), its sub-agents ({kind:'agents', total}), its title
@@ -737,11 +746,8 @@ export class Office {
       const items = viewWindow(all);
       return { items, more: all.length - items.length, ...extra };
     };
-    if (f.boardPhases) {
-      const { list, at, known } = f.boardPhases;
-      const all = list.map((text, i) => ({ text, status: i < at ? 'completed' : i === at ? 'in_progress' : 'pending' }));
-      return rows(all, { kind: 'phases', n: at + 1, total: known ? list.length : 0 });
-    }
+    const phases = this.#phasesView(f);
+    if (phases) return { kind: 'phases', ...phases };
     if (f.agents.size > 0) {
       const all = [...f.agents.values()].map((a) => ({
         text: a.desc,
@@ -775,6 +781,7 @@ export class Office {
         board: { title, line: f.boardLine },
         todos,
         sheet: this.#sheetView(f, todos),
+        phases: this.#phasesView(f),
         reports: f.reports,
         startedAt: f.startedAt,
         failAt: [...f.failAt],

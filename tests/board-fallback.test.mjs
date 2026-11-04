@@ -249,14 +249,14 @@ test('board web: ui.board has the Korean headers', () => {
 
 test('board web: boardSheet builds the header and rows of each kind', () => {
   const todos = { items: [{ text: 'a', status: 'completed' }, { text: 'b', status: 'pending' }], done: 1, total: 5 };
-  assert.deepEqual(boardSheet({ todos, sheet: null }, L), { head: '할 일 1/5', items: todos.items, more: 3 });
+  assert.deepEqual(boardSheet({ todos, sheet: null }, L), { head: '할 일 1/5', items: todos.items, more: 3, progress: { done: 1, total: 5, frac: 0.2 } });
   assert.equal(boardSheet({ todos: { items: [], done: 0, total: 0 }, sheet: null }, L), null);
   assert.equal(boardSheet({}, L), null);
   const items = [{ text: '가', status: 'completed' }, { text: '나', status: 'in_progress' }];
-  assert.deepEqual(boardSheet({ sheet: { kind: 'phases', n: 2, total: 4, items, more: 2 } }, L), { head: '단계 2/4', items, more: 2 });
+  assert.deepEqual(boardSheet({ sheet: { kind: 'phases', n: 2, total: 4, items, more: 2 } }, L), { head: '단계 1/4', items, more: 2, progress: { done: 1, total: 4, frac: 0.25 } });
   assert.equal(boardSheet({ sheet: { kind: 'phases', n: 2, total: 0, items, more: 0 } }, L).head, '단계 2');
   assert.equal(boardSheet({ sheet: { kind: 'agents', total: 3, items, more: 1 } }, L).head, '직원 3명');
-  assert.deepEqual(boardSheet({ sheet: { kind: 'title', text: '제목' } }, L), { head: '', items: [{ text: '제목', status: 'plain' }], more: 0 });
+  assert.deepEqual(boardSheet({ sheet: { kind: 'title', text: '제목' } }, L), { head: '', items: [{ text: '제목', status: 'plain' }], more: 0, progress: null });
 });
 
 test('board web: sheetKey changes exactly when the board changes', () => {
