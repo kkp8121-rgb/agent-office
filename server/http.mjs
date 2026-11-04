@@ -215,6 +215,7 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
       scenes, sitSprites, sitHeight: cfg.sitHeight, nav: cfg.nav, depth: cfg.depth,
       lobby: cfg.lobby?.enabled ? { design: cfg.lobby.design } : null,
       weather: { enabled: Boolean(weather?.enabled), city: cfg.weather?.city ?? '' },
+      sysload: { taskManager: Boolean(sysload?.available), on: Boolean(sysload?.taskManager) }, // the Task Manager CPU basis: usable here, and on now
       personas: personas ?? {},
       cards,
     };
@@ -247,13 +248,20 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
       res.end(() => onShutdown?.());
       return;
     }
-    if (path !== '/api/hide' && path !== '/api/rename') return notFound(res);
+    if (path !== '/api/hide' && path !== '/api/rename' && path !== '/api/sysload') return notFound(res);
 
     let json;
     try {
       json = JSON.parse(body);
     } catch {
       return badRequest(res);
+    }
+    if (path === '/api/sysload') { // the settings panel's CPU basis switch: {taskManager: boolean}
+      if (!isObj(json) || typeof json.taskManager !== 'boolean') return badRequest(res);
+      sysload?.setTaskManager(json.taskManager);
+      res.writeHead(204);
+      res.end();
+      return;
     }
     if (!isObj(json) || typeof json.sessionId !== 'string') return badRequest(res);
 

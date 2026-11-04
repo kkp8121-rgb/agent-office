@@ -14,7 +14,7 @@
   "shortcut": { "name": "에이전트 사무실", "icon": "assets/icon.ico", "windowStyle": 7 },
   "server": { "ssePingMs": 25000, "maxBodyBytes": 1024 },
   "weather": { "enabled": true, "city": "서울", "latitude": 37.5665, "longitude": 126.978, "refreshMinutes": 30, "staleMinutes": 180, "timeoutSeconds": 10, "backoffMinutes": [5, 15, 30] },
-  "sysload": { "enabled": true, "intervalSeconds": 3 },
+  "sysload": { "enabled": true, "intervalSeconds": 3, "taskManager": true },
   "ui": { "pip": { "width": 420, "height": 640 }, "rotate": { "seconds": 15 },
           "board": { "todos": "할 일 {done}/{total}", "phases": "단계 {done}/{total}", "phasesOpen": "단계 {n}", "agents": "직원 {total}명", "more": "…외 {n}개",
                     "barPx": 3, "barGapPx": 1, "markPx": 7 },
@@ -62,7 +62,8 @@
                        "kinds": { "clear": "맑음", "cloudy": "흐림", "fog": "안개", "rain": "비", "snow": "눈", "storm": "뇌우", "unknown": "알 수 없음" },
                        "now": "지금 {city}: {kind}", "unknown": "지금 {city}: 알 수 없음 (날씨 서비스에 닿지 않음)", "disabled": "실제 날씨는 config.json 에서 꺼져 있습니다",
                        "credit": "날씨 정보: Open-Meteo.com",
-                       "fxGroup": "효과", "fxSwitch": "화려한 효과", "sfxSwitch": "효과음", "sfxHint": "화려한 효과가 꺼져 있으면 효과음도 나지 않습니다" },
+                       "fxGroup": "효과", "fxSwitch": "화려한 효과", "sfxSwitch": "효과음", "sfxHint": "화려한 효과가 꺼져 있으면 효과음도 나지 않습니다",
+                       "sysGroup": "현황판", "sysSwitch": "CPU 를 작업 관리자 기준으로 표시", "sysHint": "끄면 코어가 일한 시간 기준으로 표시합니다. 명령을 많이 실행하는 동안에는 이쪽이 더 높게 나옵니다", "sysOnlyWin": "Windows 에서만 쓸 수 있습니다" },
           "fx": {
             "enabled": true, "sound": true, "volume": 0.25,
             "weather": {

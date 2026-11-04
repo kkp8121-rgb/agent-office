@@ -48,6 +48,7 @@ function shutdown() {
   if (closing) return;
   closing = true;
   clearTimeout(timer);
+  sysload.close(); // the CPU helper process ends with the server
   const closed = new Promise((resolve) => server.close(resolve));
   server.closeSse();
   server.closeAllConnections();

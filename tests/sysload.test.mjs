@@ -9,7 +9,7 @@ import { createServer } from '../server/http.mjs';
 import { cpuPercent, createSysLoad, memPercent } from '../server/sysload.mjs';
 
 const core = (idle, busy) => ({ times: { user: busy, nice: 0, sys: 0, idle, irq: 0 } });
-const S = { enabled: true, intervalSeconds: 3 };
+const S = { enabled: true, intervalSeconds: 3, taskManager: false }; // the os.cpus way: these tests never start the Windows helper
 const flush = () => new Promise((r) => setTimeout(r, 120));
 
 test('sysload: CPU % is the busy share of the time that passed, over all cores', () => {
@@ -121,7 +121,7 @@ test('server: a page gets sysload events while connected; the sampler stops when
 
 test('page: config text, header slot, hidden until the first value, no second stream', () => {
   const cfg = loadConfig();
-  assert.deepEqual(cfg.sysload, { enabled: true, intervalSeconds: 3 });
+  assert.deepEqual(cfg.sysload, { enabled: true, intervalSeconds: 3, taskManager: true });
   assert.equal(cfg.ui.lobby.sysText, 'CPU {cpu}% · 메모리 {mem}%');
   const app = readFileSync(new URL('../web/app.mjs', import.meta.url), 'utf8');
   const css = readFileSync(new URL('../web/style.css', import.meta.url), 'utf8');

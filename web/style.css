@@ -717,4 +717,4 @@ body.paused .wx-a, body.paused .wx-b, body.paused .wx-f { animation-play-state: 
 .fx-layer { position: absolute; inset: 0; z-index: 8200; pointer-events: none; }
 /* while nothing is in it the layer is not drawn at all: even an empty overlay makes Chrome draw the text under it with grayscale instead of LCD anti-aliasing (measured on the lobby sign), so the office stays pixel-identical */
 .fx-layer:empty { display: none; }
-#fx-choices .wx-opt { grid-column: 1 / -1; }
+#fx-choices .wx-opt, #sys-choices .wx-opt { grid-column: 1 / -1; }
