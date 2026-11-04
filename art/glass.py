@@ -20,6 +20,10 @@ Reads art/glass.json[room] and assets/scenes/<room>/scene.json (`windows`, `view
                  nearest intact pixel along the member, or, with `ref` (an intact span along the member), from that span mirrored outward from its end.
                  python art/frame_check.py <room> counts what is left (must be 0).
   `subtract` / `add`: hand polygons removed from / added to the hole (hanging plants painted into the shell, door handles).
+  `cuts`: old-picture leftovers that the hole missed, because they sit in small panes closed off by frame pieces (the triangles between roof struts), or
+                 hang beside a plant: {"name", "box": [x0, y0, x1, y1] or "spans": [[y, x0, x1], ...] (inclusive; only these pixels), "where": [...], "keep": n}.
+                 Applied last, after the ring clean-up, so no pixel outside the cut changes. A pixel is cut when it is opaque and matches one of `where`
+                 ("all", "sky" blue, "green", "yellow", "pale" light green, "black"), unless its brightest channel is <= `keep` (dark frame outline).
 Writes shell.png as RGBA: alpha 0 on the glass, the old picture's RGB kept under the hole (tools that drop alpha still see the old view),
 and the 1-2 px ring around the hole decontaminated: ring pixels that still carry the old glass colour take the nearest frame colour.
 Run it on a shell that still has the old view (git checkout of shell.png), or on its own output (the RGB under the hole is the old view, so it is repeatable).
@@ -218,6 +222,37 @@ def decontaminate(rgb, hole, ring_px):
     return out
 
 
+CUT_TESTS = {
+    "all": lambda r, g, b, mx, sat: np.ones(r.shape, bool),
+    "sky": lambda r, g, b, mx, sat: (b > r + 8) & (g >= r - 6),
+    "green": lambda r, g, b, mx, sat: (g >= r + 6) & (g >= b - 4) & (sat >= 0.12),
+    "yellow": lambda r, g, b, mx, sat: (r > 140) & (g > 140) & (b < 120),
+    "pale": lambda r, g, b, mx, sat: (mx >= 150) & (g >= r + 3) & (g >= b - 3) & (sat < 0.5),
+    "black": lambda r, g, b, mx, sat: mx <= 45,
+}
+
+
+def cut_mask(rgb, alpha, cuts):
+    """Pixels of the `cuts` entries (see the module note) that are still opaque and match their `where` tests."""
+    r, g, b = (rgb[..., i].astype(int) for i in range(3))
+    mx = rgb.max(axis=2).astype(int)
+    sat = (mx - rgb.min(axis=2).astype(int)) / np.maximum(mx, 1)
+    out = np.zeros(alpha.shape, bool)
+    for c in cuts:
+        area = np.zeros(alpha.shape, bool)
+        if "spans" in c:
+            for y, x0, x1 in c["spans"]:
+                area[y, x0:x1 + 1] = True
+        else:
+            x0, y0, x1, y1 = c["box"]
+            area[y0:y1 + 1, x0:x1 + 1] = True
+        hit = np.zeros(alpha.shape, bool)
+        for w in c["where"]:
+            hit |= CUT_TESTS[w](r, g, b, mx, sat)
+        out |= area & hit & (alpha > 0) & (mx > c.get("keep", -1))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("room")
@@ -236,7 +271,12 @@ def main():
     ring = cfg.get("ring", 2)
     clean = decontaminate(rgb, hole, ring) if ring else rgb
     alpha = np.where(hole, 0, 255).astype(np.uint8)
-    out = np.dstack([np.where(hole[..., None], rgb, clean), alpha])  # keep the old view's RGB under the hole
+    pix = np.where(hole[..., None], rgb, clean)  # keep the old view's RGB under the hole
+    if cfg.get("cuts"):
+        extra = cut_mask(pix, alpha, cfg["cuts"])
+        alpha[extra] = 0
+        print("  cuts px", int(extra.sum()))
+    out = np.dstack([pix, alpha])
     print(a.room, "hole px", int(hole.sum()), "ring px", int((grow(hole, ring) & ~hole).sum()))
     for i, p in enumerate(scene["windows"]):
         m = poly_mask(hole.shape[::-1], [p])
