@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createNightmap, VARIANTS, isVariant, monitorSpot, facePoint, poolPlan, poolKey, deskIdOf, maskParts, maskGradient, fillGradient, tintBox, stageVars } from '../web/fx-nightmap.mjs';
+import { createNightmap, VARIANTS, isVariant, monitorSpot, facePoint, poolPlan, poolKey, deskIdOf, maskParts, maskGradient, fillGradient, tintBox, stageVars, hazePlan, lampPlans, lampMaskGradient, lampGlowGradient } from '../web/fx-nightmap.mjs';
 import { atlasOf, loadConfig, loadData, monDrawing, rimDrawing, sceneOf, DIR } from '../scripts/make-nightmap.mjs';
 import { decodePng, encodePng } from '../scripts/make-lit-sprites.mjs';
 
@@ -11,12 +11,14 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const cfg = loadConfig();
 const data = loadData();
 
-test('variants: v0 is the page as it was, v1 and v2 add features, nothing else is known yet', () => {
-  assert.deepEqual(Object.keys(VARIANTS), ['v0', 'v1', 'v2']);
+test('variants: v0 is the page as it was, v1 and v2 add features, v3 adds the haze and v4 the lamps on top of v2', () => {
+  assert.deepEqual(Object.keys(VARIANTS), ['v0', 'v1', 'v2', 'v3', 'v4']);
   assert.deepEqual({ ...VARIANTS.v0 }, {});
   assert.ok(VARIANTS.v1.veil && VARIANTS.v1.pool && !VARIANTS.v1.rim && !VARIANTS.v1.flicker);
   assert.ok(VARIANTS.v2.veil && VARIANTS.v2.pool && VARIANTS.v2.rim && VARIANTS.v2.flicker);
-  assert.ok(isVariant('v2') && !isVariant('v9') && !isVariant(undefined));
+  assert.ok(VARIANTS.v3.haze && !VARIANTS.v3.lamps && VARIANTS.v4.lamps && !VARIANTS.v4.haze);
+  for (const v of ['v3', 'v4']) assert.ok(VARIANTS[v].veil && VARIANTS[v].pool && VARIANTS[v].rim && VARIANTS[v].flicker, `${v} = v2 plus one feature`);
+  assert.ok(isVariant('v4') && !isVariant('v9') && !isVariant(undefined));
 });
 
 test('pool: centred between the monitor and the face, in whole pixels, keyed by desk and place', () => {
@@ -128,4 +130,56 @@ test('v0 (the default) touches nothing: no element, no class, no debug handle wi
   night.tidy();
   assert.equal(globalThis.__fxNight, undefined);
   assert.equal(night.setVariant('v9'), false);
+});
+
+test('haze: a cone from the monitor towards the face, a square box round the monitor, two layers multiplied (no alpha, no mask)', () => {
+  const h = hazePlan([300, 200], [300, 170], cfg); // the face straight above the monitor
+  assert.equal(h.angle, 0);
+  assert.equal(h.len, Math.max(cfg.haze.minLen, Math.round(30 * cfg.haze.lenMul)));
+  assert.deepEqual([h.x, h.y, h.w, h.h], [300 - h.len, 200 - h.len, 2 * h.len, 2 * h.len]);
+  assert.ok(h.bg.startsWith(`conic-gradient(from -${cfg.haze.halfAngle}deg at 50% 50%, #000 0deg`));
+  assert.ok(h.bg.includes('radial-gradient(circle closest-side, rgb(255, 255, 255) 0%'));
+  assert.doesNotMatch(h.bg, /rgba/);
+  const right = hazePlan([300, 200], [330, 200], cfg); // the face to the right: 90 degrees clockwise from up
+  assert.equal(right.angle, 90);
+  assert.equal(hazePlan([300, 200], [301, 201], cfg).angle, 0); // a face on top of the monitor: straight up, no division by nothing
+  assert.ok(cfg.haze.strength <= 0.5 && cfg.haze.halfAngle < 45, 'the haze stays faint and narrow');
+});
+
+test('lamps: boxes from the data file and the kinds of the config, a partial hole in the veil mask, warm glow', () => {
+  const plans = lampPlans([{ kind: 'sconce', at: [60, 165] }, { kind: 'nope', at: [1, 1] }], cfg);
+  assert.equal(plans.length, 1);
+  const k = cfg.lamps.kinds.sconce;
+  assert.deepEqual([plans[0].x, plans[0].y, plans[0].w, plans[0].h], [60 - k.rx, 165 - k.ry, 2 * k.rx, 2 * k.ry]);
+  assert.deepEqual(lampPlans(undefined, cfg), []);
+  const m = maskParts([{ x: 10, y: 20, w: 116, h: 88 }], cfg, plans);
+  assert.equal(m.mc, 'subtract, add, add');
+  assert.equal(m.mi.split('radial-gradient').length - 1, 2);
+  assert.equal(m.mp.split(', ').length, 3);
+  assert.equal(maskParts([], cfg, []).mi, 'none');
+  assert.ok(maskParts([], cfg, plans).mi.startsWith('linear-gradient(#000, #000), radial-gradient'));
+  assert.ok(lampMaskGradient(cfg).includes(`rgba(0, 0, 0, ${cfg.lamps.hole}) 0%`), 'the lamp hole is only cfg.lamps.hole deep');
+  assert.ok(cfg.lamps.hole < 1);
+  assert.ok(lampGlowGradient(cfg).startsWith('radial-gradient(closest-side, rgba(255, 170, 90, '));
+  assert.ok(lampGlowGradient(cfg).endsWith('rgba(255, 170, 90, 0) 100%)'));
+});
+
+test('data file: the lamps of every design use kinds the config knows and lie inside the room picture', () => {
+  for (const design of ['library', 'studio2', 'lounge', 'greenhouse']) {
+    const [W, H] = sceneOf(design).size;
+    const list = data.lamps[design];
+    assert.ok(list?.length >= 3, `${design} has lamps`);
+    for (const l of list) {
+      assert.ok(cfg.lamps.kinds[l.kind], `${design}: kind ${l.kind}`);
+      assert.ok(l.at[0] > 0 && l.at[0] < W && l.at[1] > 0 && l.at[1] < H, `${design}: ${l.at} inside ${W}x${H}`);
+    }
+  }
+});
+
+test('css: the haze and the lamps carry the module prefix, contain: paint, and no motion under reduced motion', () => {
+  const css = readFileSync(join(ROOT, 'web', 'fx-weather.css'), 'utf8');
+  assert.ok(css.includes('.fxn-t, .fxn-f, .fxn-m, .fxn-r, .fxn-h, .fxn-l { position: absolute; pointer-events: none; contain: paint;'));
+  const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+  assert.ok(reduced.includes('.fxn-h, .fxn-l { animation: none !important; transition: none !important; }'));
+  assert.ok(css.includes('.fxn-fl .fxn-h[data-on="1"]'));
 });

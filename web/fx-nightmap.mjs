@@ -10,8 +10,10 @@
 //       floor round it. Idle seats get no pool; the existing face light stays as it is.
 //   v2  v1 plus light leaking round the monitor's edge (a thin glow in the pixels just outside the monitor, between the figure and the desk) and a flicker
 //       that follows the face light's ripple (pure CSS: the same cycle length and offset as the figure's .fxw-lit).
-//   v3 / v4 (next stage): a faint haze between screen and face (feature `haze`), warm pools from the room's own lamps (feature `lamps`, positions in the data file).
-//       Add the variant to VARIANTS and a builder to makePool / sync below; nothing else has to change.
+//   v3  v2 plus a very faint haze of light between the screen and the face (photo 11's beam, kept subtle): per pool one small element laid between the figure and the desk,
+//       a cone of cool light (a conic gradient multiplied with a radial fade, blended with `screen`: no mask, no alpha), flickering with the pool.
+//   v4  v2 plus warm pools from the lamps the room art already draws (wall sconces, pendants, floor lamps, spotlights; positions per design in the data file, `lamps`):
+//       a permanent, partial hole in the veil and a warm glow at each lamp, so the room is not pitch black. Not tied to any seat (they stay on while nobody works).
 //
 // How a pool fades in and out without animating a mask: the hole in the veil is static, and a "fill" (the veil's own colour in the shape of the hole, with the alpha
 // that makes veil + fill exactly the plain veil) lies in it; the fill's opacity is what fades (1 = no pool, 0 = the full pool). The flicker is the fill's opacity too.
@@ -19,11 +21,13 @@
 // resize or the small window needs nothing): no timer of its own besides the end of a fade, no frame loop, no canvas.
 // Day mode (light theme), effects off and rooms the data file does not know: nothing is built and the page keeps its own pixels. Reduced motion: no flicker.
 
-/** What each variant switches on: veil = darker veil with holes, pool = tint and dark monitor, rim = edge glow, flicker = the ripple. v0 is the page as it was. */
+/** What each variant switches on: veil = darker veil with holes, pool = tint and dark monitor, rim = edge glow, flicker = the ripple, haze = the cone between screen and face, lamps = warm pools at the room's lamps. v0 is the page as it was. */
 export const VARIANTS = Object.freeze({
   v0: Object.freeze({}),
   v1: Object.freeze({ veil: true, pool: true }),
   v2: Object.freeze({ veil: true, pool: true, rim: true, flicker: true }),
+  v3: Object.freeze({ veil: true, pool: true, rim: true, flicker: true, haze: true }),
+  v4: Object.freeze({ veil: true, pool: true, rim: true, flicker: true, lamps: true }),
 });
 
 export const variantIds = () => Object.keys(VARIANTS);
@@ -54,7 +58,7 @@ export function poolPlan(face, monitor, deskId, cfg) {
   const { rx, ry, mix } = cfg.pool;
   const cx = Math.round(monitor[0] + (face[0] - monitor[0]) * mix);
   const cy = Math.round(monitor[1] + (face[1] - monitor[1]) * mix);
-  return { cx, cy, rx, ry, x: cx - rx, y: cy - ry, w: 2 * rx, h: 2 * ry, deskId };
+  return { cx, cy, rx, ry, x: cx - rx, y: cy - ry, w: 2 * rx, h: 2 * ry, deskId, monitor, face };
 }
 
 /** A key that changes when the pool of a seat has to be drawn again. */
@@ -76,15 +80,61 @@ export function maskGradient(cfg) {
  * The veil's mask for a set of pools: the first layer is the whole veil, taken away where any pool's hole is (subtract); the holes add up (add).
  * The parts are CSS custom property values for mask-image, mask-size, mask-position and mask-composite (one entry per layer).
  */
-export function maskParts(pools, cfg) {
-  if (!pools.length) return { mi: 'none', ms: 'auto', mp: '0 0', mc: 'add' };
+export function maskParts(pools, cfg, lamps = []) {
+  if (!pools.length && !lamps.length) return { mi: 'none', ms: 'auto', mp: '0 0', mc: 'add' };
   const grad = maskGradient(cfg);
+  const lgrad = lamps.length ? lampMaskGradient(cfg) : '';
   return {
-    mi: ['linear-gradient(#000, #000)', ...pools.map(() => grad)].join(', '),
-    ms: ['100% 100%', ...pools.map((p) => `${p.w}px ${p.h}px`)].join(', '),
-    mp: ['0 0', ...pools.map((p) => `${p.x}px ${p.y}px`)].join(', '),
-    mc: ['subtract', ...pools.map(() => 'add')].join(', '),
+    mi: ['linear-gradient(#000, #000)', ...pools.map(() => grad), ...lamps.map(() => lgrad)].join(', '),
+    ms: ['100% 100%', ...pools.map((p) => `${p.w}px ${p.h}px`), ...lamps.map((l) => `${l.w}px ${l.h}px`)].join(', '),
+    mp: ['0 0', ...pools.map((p) => `${p.x}px ${p.y}px`), ...lamps.map((l) => `${l.x}px ${l.y}px`)].join(', '),
+    mc: ['subtract', ...pools.map(() => 'add'), ...lamps.map(() => 'add')].join(', '),
   };
+}
+
+/** The hole of a lamp inside the mask: like a pool's, but only cfg.lamps.hole deep (a lamp warms the room, it does not light it like a screen). */
+export function lampMaskGradient(cfg) {
+  const stops = cfg.lamps.falloff.map(([t, h]) => `rgba(0, 0, 0, ${num(h * cfg.lamps.hole)}) ${num(t * 100)}%`);
+  return `radial-gradient(closest-side, ${stops.join(', ')})`;
+}
+
+/** The warm glow of a lamp: cfg.lamps.color, strongest in the middle, nothing at the edge (blended with cfg.lamps.blend, under the veil). */
+export function lampGlowGradient(cfg) {
+  const { color, alpha, falloff } = cfg.lamps;
+  const stops = falloff.map(([t, h]) => `${rgba(color, alpha * h)} ${num(t * 100)}%`);
+  return `radial-gradient(closest-side, ${stops.join(', ')})`;
+}
+
+/** The lamps of a room as boxes in floor pixels, from the data file's lamps.<design> = [{kind, at: [x, y]}] and cfg.lamps.kinds.<kind> = {rx, ry}; a kind the config does not know is left out. */
+export function lampPlans(list, cfg) {
+  const out = [];
+  for (const l of list ?? []) {
+    const k = cfg.lamps.kinds[l.kind];
+    if (!k) continue;
+    out.push({ kind: l.kind, cx: l.at[0], cy: l.at[1], x: l.at[0] - k.rx, y: l.at[1] - k.ry, w: 2 * k.rx, h: 2 * k.ry });
+  }
+  return out;
+}
+
+/**
+ * The haze of one pool: a cone of light from the monitor (apex, floor px) towards the face. The box is a square of 2 x len around the apex. The picture is two layers multiplied
+ * (background-blend-mode: multiply): a conic gradient (black outside the cone, cfg.haze.color x strength along its middle) and a radial fade with the distance from the apex
+ * (white to black). The element is blended with `screen`, so black adds nothing and no mask or alpha is needed. angle = degrees clockwise from straight up.
+ */
+export function hazePlan(apex, face, cfg) {
+  const h = cfg.haze;
+  const dx = face[0] - apex[0];
+  const dy = face[1] - apex[1];
+  const dist = Math.hypot(dx, dy);
+  const len = Math.round(Math.max(h.minLen, dist * h.lenMul));
+  const angle = dist < 4 ? 0 : (Math.atan2(dx, -dy) * 180) / Math.PI;
+  const c = h.color.map((v) => Math.round(v * h.strength));
+  const cone = `conic-gradient(from ${num(angle - h.halfAngle)}deg at 50% 50%, #000 0deg, rgb(${c.join(', ')}) ${num(h.halfAngle)}deg, #000 ${num(2 * h.halfAngle)}deg, #000 360deg)`;
+  const grey = (v) => `rgb(${Math.round(v * 255)}, ${Math.round(v * 255)}, ${Math.round(v * 255)})`;
+  const fade = `radial-gradient(circle closest-side, ${h.fade.map(([t, v]) => `${grey(v)} ${num(t * 100)}%`).join(', ')})`;
+  const x = Math.round(apex[0]) - len;
+  const y = Math.round(apex[1]) - len;
+  return { x, y, w: 2 * len, h: 2 * len, bg: `${cone}, ${fade}`, angle: num(angle), len };
 }
 
 /**
@@ -112,14 +162,14 @@ export function tintBox(p, cfg) {
 }
 
 /** The custom properties of the night map that sit on a stage: the veil's colour and opacity, and the mask. */
-export function stageVars(pools, cfg) {
-  const m = maskParts(pools, cfg);
+export function stageVars(pools, cfg, lamps = []) {
+  const m = maskParts(pools, cfg, lamps);
   return { '--fxn-veil': rgb(cfg.outside.color), '--fxn-o': String(cfg.outside.opacity), '--fxn-dim': String(cfg.flicker.dim), '--fxn-mi': m.mi, '--fxn-ms': m.ms, '--fxn-mp': m.mp, '--fxn-mc': m.mc };
 }
 
 // ---------------------------------------------------------------- DOM part
 
-const CLS = { tint: 'fxn-t', fill: 'fxn-f', mon: 'fxn-m', rim: 'fxn-r' };
+const CLS = { tint: 'fxn-t', fill: 'fxn-f', mon: 'fxn-m', rim: 'fxn-r', haze: 'fxn-h', lamp: 'fxn-l' };
 
 /**
  * Creates the night map. deps: ctx (the effects' ctx), cfg (ui.fx.weather.night), doc, modeOf(rec) -> 'work'|'rest'|'' (the face light's own decision),
@@ -136,7 +186,7 @@ export function createNightmap({ ctx, cfg, doc, modeOf, timingOf, resync, debug 
   const reduced = () => !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const dark = () => Number.parseFloat(globalThis.getComputedStyle(doc.documentElement).getPropertyValue('--room-dim')) > 0;
   const features = () => VARIANTS[variantId];
-  const gradients = { fill: fillGradient(cfg), tint: tintGradient(cfg) };
+  const gradients = { fill: fillGradient(cfg), tint: tintGradient(cfg), lamp: lampGlowGradient(cfg) };
   const px = (n) => `${n}px`;
 
   function load() {
@@ -191,6 +241,14 @@ export function createNightmap({ ctx, cfg, doc, modeOf, timingOf, resync, debug 
         layer(CLS.mon, n.z + 1, cfg.monitor.opacity, 'mon');
         if (f.rim) layer(CLS.rim, n.z - 1, cfg.rim.opacity, 'rim');
       }
+      if (f.haze) { // the cone lies where the rim does (above the figure, under the desk), so the desk and the monitor back keep covering it
+        const hz = hazePlan(plan.monitor, plan.face, cfg);
+        const zs = floor.scene.nodes.filter((x) => x.objId === deskObj.id).map((x) => x.z);
+        const e = add(box(CLS.haze, hz, Math.min(...zs) - 1), cfg.haze.opacity);
+        e.style.backgroundImage = hz.bg;
+        e.style.backgroundBlendMode = 'multiply, normal';
+        e.style.mixBlendMode = cfg.haze.blend;
+      }
     }
     return { rec, plan, key: poolKey(plan), els, on: false };
   }
@@ -202,7 +260,7 @@ export function createNightmap({ ctx, cfg, doc, modeOf, timingOf, resync, debug 
 
   /** The veil's mask and colour for the pools of a floor (the ones fading out keep their hole until they are gone). */
   function applyMask(st) {
-    const vars = stageVars([...st.pools.values(), ...st.leaving].map((p) => p.plan), cfg);
+    const vars = stageVars([...st.pools.values(), ...st.leaving].map((p) => p.plan), cfg, st.lamps);
     const sig = JSON.stringify(vars);
     if (sig === st.mask) return;
     st.mask = sig;
@@ -212,6 +270,9 @@ export function createNightmap({ ctx, cfg, doc, modeOf, timingOf, resync, debug 
   function clearStage(st) {
     for (const timer of st.timers) ctx.timers.clearTimeout(timer);
     for (const pool of [...st.pools.values(), ...st.leaving]) for (const e of pool.els) e.remove();
+    for (const e of st.lampEls) e.remove();
+    st.lampEls = [];
+    st.lamps = [];
     st.timers.clear();
     st.pools.clear();
     st.leaving.clear();
@@ -235,6 +296,19 @@ export function createNightmap({ ctx, cfg, doc, modeOf, timingOf, resync, debug 
       applyMask(st);
     }, cfg.fadeMs + 60);
     st.timers.add(timer);
+  }
+
+  /** v4: the room's lamps, once per stage: a glow element each (under the veil) and a permanent hole in the veil's mask (applyMask takes st.lamps along). */
+  function makeLamps(st, floor) {
+    st.lamps = lampPlans(data.lamps?.[floor.design], cfg);
+    for (const l of st.lamps) {
+      const e = box(CLS.lamp, tintBox({ cx: l.cx, cy: l.cy, rx: l.w / 2, ry: l.h / 2 }, { tint: { scale: cfg.lamps.glowScale } }), 7400);
+      e.dataset.on = '0';
+      e.style.backgroundImage = gradients.lamp;
+      e.style.mixBlendMode = cfg.lamps.blend;
+      st.stage.append(e);
+      st.lampEls.push(e);
+    }
   }
 
   /** The pools a floor wants right now: working seats at a desk the data file knows, each with its plan. */
@@ -262,7 +336,8 @@ export function createNightmap({ ctx, cfg, doc, modeOf, timingOf, resync, debug 
       }
       return;
     }
-    if (!st) floors.set(floor, (st = { stage: floor.stage, pools: new Map(), leaving: new Set(), timers: new Set(), mask: '' }));
+    if (!st) floors.set(floor, (st = { stage: floor.stage, pools: new Map(), leaving: new Set(), timers: new Set(), mask: '', lamps: [], lampEls: [] }));
+    if (features().lamps && !st.lamps.length) makeLamps(st, floor);
     const want = wanted(floor);
     st.stage.classList.add('fxn-on');
     st.stage.classList.toggle('fxn-fl', !!features().flicker && !reduced());
@@ -279,9 +354,11 @@ export function createNightmap({ ctx, cfg, doc, modeOf, timingOf, resync, debug 
       fresh.push(pool);
     }
     applyMask(st);
-    if (fresh.length) {
+    const lampsOff = st.lampEls.filter((e) => e.dataset.on === '0');
+    if (fresh.length || lampsOff.length) {
       void st.stage.offsetWidth; // one reflow so the first change of opacity is a fade
       for (const pool of fresh) setOn(pool, true);
+      for (const e of lampsOff) e.dataset.on = '1';
     }
   }
 
@@ -326,8 +403,8 @@ export function createNightmap({ ctx, cfg, doc, modeOf, timingOf, resync, debug 
       variants: variantIds,
       set: setVariant,
       ready: () => !!data,
-      /** the pools of every floor that has some: [{design, shown, pools: [{cx, cy, rx, ry, x, y, w, h, deskId, on}]}] */
-      pools: () => [...floors].map(([floor, st]) => ({ design: floor.design, shown: !!floor.stage?.offsetParent, pools: [...st.pools.values()].map((p) => ({ ...p.plan, on: p.on })) })),
+      /** the pools of every floor that has some: [{design, shown, pools: [{cx, cy, rx, ry, x, y, w, h, deskId, on}], lamps: [{kind, cx, cy, x, y, w, h}]}] */
+      pools: () => [...floors].map(([floor, st]) => ({ design: floor.design, shown: !!floor.stage?.offsetParent, pools: [...st.pools.values()].map((p) => ({ ...p.plan, on: p.on })), lamps: st.lamps })),
     };
   }
 

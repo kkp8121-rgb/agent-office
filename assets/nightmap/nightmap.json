@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "Night map data per room design (read by web/fx-nightmap.mjs; the pictures <design>-mon.png and <design>-rim.png are drawn from it by scripts/make-nightmap.mjs). Coordinates are in the desk picture as drawn in objects.png, measured from the top-left of the kind's rect. monitors.<design>.<desk kind>: box = the area that holds the monitor (back, neck and foot), seed = a pixel of the monitor's back, screen = the back of the screen [x0, y0, x1, y1] (its centre is where the pool is pulled towards). lamps are for the lamp variant (next stage).",
+  "about": "Night map data per room design (read by web/fx-nightmap.mjs; the pictures <design>-mon.png and <design>-rim.png are drawn from it by scripts/make-nightmap.mjs). Coordinates are in the desk picture as drawn in objects.png, measured from the top-left of the kind's rect. monitors.<design>.<desk kind>: box = the area that holds the monitor (back, neck and foot), seed = a pixel of the monitor's back, screen = the back of the screen [x0, y0, x1, y1] (its centre is where the pool is pulled towards). lamps.<design> = the lamps the room art already draws, for the lamp variant (v4): kind (sconce | pendant | floor | spot, sizes in config ui.fx.weather.night.lamps.kinds) and at = the middle of the glow in floor pixels (1024 wide), eyeballed from shell.png and objects.png.",
   "monitorRule": { "maxSat": 0.25, "minAlpha": 128 },
   "monitors": {
     "library": {
@@ -20,5 +20,35 @@
       "lead-desk": { "box": [33, 0, 72, 29], "seed": [50, 5], "screen": [34, 0, 71, 21] }
     }
   },
-  "lamps": {}
+  "lamps": {
+    "library": [
+      { "kind": "sconce", "at": [60, 165] },
+      { "kind": "sconce", "at": [194, 123] },
+      { "kind": "sconce", "at": [398, 66] },
+      { "kind": "sconce", "at": [625, 66] },
+      { "kind": "sconce", "at": [849, 139] },
+      { "kind": "sconce", "at": [966, 188] },
+      { "kind": "floor", "at": [49, 244] }
+    ],
+    "studio2": [
+      { "kind": "spot", "at": [810, 86] },
+      { "kind": "spot", "at": [861, 116] },
+      { "kind": "floor", "at": [46, 251] }
+    ],
+    "lounge": [
+      { "kind": "pendant", "at": [408, 62] },
+      { "kind": "pendant", "at": [540, 44] },
+      { "kind": "pendant", "at": [672, 93] },
+      { "kind": "pendant", "at": [764, 130] },
+      { "kind": "pendant", "at": [927, 246] },
+      { "kind": "pendant", "at": [970, 274] },
+      { "kind": "sconce", "at": [874, 403] },
+      { "kind": "floor", "at": [108, 253] }
+    ],
+    "greenhouse": [
+      { "kind": "spot", "at": [872, 182] },
+      { "kind": "spot", "at": [909, 206] },
+      { "kind": "floor", "at": [246, 259] }
+    ]
+  }
 }
