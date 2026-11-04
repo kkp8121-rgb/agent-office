@@ -2,7 +2,6 @@
 // Never one process per sample: the short-lived processes a sample would start are the very thing that separates Task Manager's number from the cores' busy time.
 // This file owns the helper's life (start, stop, restart with growing gaps, give up) and the parsing of its lines. The spawner is injected, so tests use a fake child.
 import { spawn as nodeSpawn } from 'node:child_process';
-import os from 'node:os';
 import { join } from 'node:path';
 import { SCRIPT } from './taskmgr-cpu-script.mjs';
 
@@ -16,7 +15,7 @@ export function parseLine(line) {
 
 /**
  * Starts the real helper: Windows PowerShell 5.1 with the script passed as -EncodedCommand (no script file to run, so the execution policy does not matter).
- * The script ends by itself within a second once `parentPid` is gone, so a killed server never leaves it behind. Priority BelowNormal.
+ * The script ends by itself within a second once `parentPid` is gone, so a killed server never leaves it behind. Normal priority, like the server: its cost is about 0.25% of the PC, and at BelowNormal it starved on a busy PC.
  * Returns {pid, onLine(fn), onExit(fn), kill()}.
  */
 export function spawnHelper({ intervalSeconds, parentPid = process.pid, spawn = nodeSpawn } = {}) {
@@ -26,11 +25,6 @@ export function spawnHelper({ intervalSeconds, parentPid = process.pid, spawn = 
     windowsHide: true,
     stdio: ['ignore', 'pipe', 'ignore'],
   });
-  try {
-    os.setPriority(child.pid, os.constants.priority.PRIORITY_BELOW_NORMAL);
-  } catch {
-    // the child already ended (spawn failed): the exit handler counts that as a failure
-  }
   const lineListeners = new Set();
   let rest = '';
   child.stdout?.setEncoding('utf8');
@@ -63,7 +57,7 @@ export function createTaskMgrCpu({ spawn = spawnHelper, intervalSeconds = 3, max
   let logged = false;
   let value = null;
   let valueAt = 0;
-  const freshMs = Math.max(30, intervalSeconds * 10) * 1000; // a helper that hangs without exiting must not freeze the number (generous: at BelowNormal on a saturated PC its lines come late)
+  const freshMs = Math.max(30, intervalSeconds * 10) * 1000; // a helper that hangs without exiting must not freeze the number (generous: on a saturated PC its lines can come late)
 
   function launch() {
     retry = null;
