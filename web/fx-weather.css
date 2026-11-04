@@ -1,30 +1,45 @@
 /* Effects area "weather" (window weather and room light). Scope rules under html.fx-on; animate only transform and opacity.
-   web/fx-weather.mjs builds .fxw (one per floor, after the plain .wx weather) while the effects are on. Everything that moves is a tile
-   layer that slides by transform, or a tint that fades by opacity. Numbers (tile sizes, speeds, opacities, fade time) arrive as custom properties. */
+   web/fx-weather.mjs builds .fxw (one per floor, after the plain .wx weather) and .fxw-shell (the room picture once more) while the effects are on.
+   The weather is outside, behind the glass: .fxw-view is the box of the view picture, .fxw-shell sits above it and its holes are the only place the weather shows.
+   .fxw-sky holds the clouds, the overcast and the lightning glow and is masked by the sky mask of the view picture (sky-day.png / sky-night.png), so they stay behind the skyline.
+   Everything that moves is a tile layer that slides by transform, or a tint that fades by opacity. Numbers (tile sizes, speeds, opacities, fade time) arrive as custom properties. */
 
 .fxw { position: absolute; inset: 0; pointer-events: none; --fxw-dusk-c: rgba(255, 140, 50, .42); --fxw-night-c: rgba(14, 24, 74, .62); --fxw-flash-c: #e4ebff; }
 .stage.viewed .fxw { --fxw-dusk-c: rgba(255, 140, 50, .10); --fxw-night-c: rgba(14, 24, 74, .12); }
-.fxw-win { position: absolute; overflow: hidden; }
-.fxw-l, .fxw-tint, .fxw-f { position: absolute; }
+.fxw-view { position: absolute; overflow: hidden; }
+.fxw-l, .fxw-tint, .fxw-f, .fxw-ovc, .fxw-haze { position: absolute; }
 .fxw-l { background-repeat: repeat; image-rendering: auto; }
 .fxw-cloud, .fxw-fog { background-repeat: repeat-x; }
 .fxw-off { display: none; }
 
-/* the plain weather of weather.mjs and the plain glass tint are replaced on a floor that has this overlay (the wash of .wx stays) */
-.fx-on .stage:has(> .fxw) .wx-a, .fx-on .stage:has(> .fxw) .wx-b, .fx-on .stage:has(> .fxw) .wx-f { display: none !important; }
+/* the room picture above the weather: opaque where the room is, a hole where the glass is */
+.fxw-shell { position: absolute; inset: 0; z-index: 2; pointer-events: none; background-repeat: no-repeat; background-size: 100% 100%; }
+
+/* the sky group: masked by the view picture's sky mask (day and sunset use the day picture's, night the night picture's) */
+.fxw-sky { position: absolute; inset: 0; overflow: hidden; -webkit-mask-image: var(--fxw-sky-day); mask-image: var(--fxw-sky-day); -webkit-mask-size: 100% 100%; mask-size: 100% 100%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
+.stage[data-light="night"] .fxw-sky { -webkit-mask-image: var(--fxw-sky-night); mask-image: var(--fxw-sky-night); }
+.fxw-nomask { -webkit-mask-image: none !important; mask-image: none !important; } /* a scene without a view picture: no sky mask to use */
+
+/* the plain weather of weather.mjs is replaced on a floor that has this overlay, and so is the plain glass tint */
+.fx-on .stage:has(> .fxw) .wx { display: none !important; }
 .fx-on .stage:has(> .fxw) .sky polygon { fill: transparent !important; }
 
-/* sheets and banks: one slide per loop by the tile's own period, so the loop has no seam; windows are out of step by --fxw-p */
-.fxw-l { opacity: calc(var(--fxw-o, 1) * var(--fxw-dim, 1)); transition: opacity var(--fxw-fade, 0ms) ease-in-out; animation: fxw-slide var(--fxw-ms, 1000ms) linear infinite; animation-delay: calc(var(--fxw-p, 0) * var(--fxw-ms, 1000ms) * -1); }
-.fxw-c { opacity: var(--fxw-o, 1); }
+/* sheets and banks: one slide per loop by the tile's own period, so the loop has no seam; one sky per floor, so no window is out of step */
+.fxw-l { opacity: calc(var(--fxw-o, 1) * var(--fxw-dim, 1)); transition: opacity var(--fxw-fade, 0ms) ease-in-out; animation: fxw-slide var(--fxw-ms, 1000ms) linear infinite; }
+.fxw-c { opacity: calc(var(--fxw-o, 1) * var(--fxw-sdim, 1)); }
 @keyframes fxw-slide { to { transform: translate(var(--fxw-dx, 0px), var(--fxw-dy, 0px)); } }
+
+/* the overcast (grey over the blue sky, sky pixels only) and the haze (a mild dimming of the whole outside), dimmer by night */
+.fxw-ovc, .fxw-haze { inset: 0; opacity: var(--fxw-sdim, 1); transition: opacity var(--fxw-fade, 0ms) ease-in-out; }
+.fxw-ovc { background: var(--fxw-ovc, transparent); }
+.fxw-haze { background: var(--fxw-haze, transparent); }
 
 /* the light: dusk and night tints cross-fade by opacity (the targets are set by the script from config) */
 .fxw-tint { inset: 0; opacity: 0; transition: opacity var(--fxw-fade, 0ms) ease-in-out; }
 .fxw-dusk { background: var(--fxw-dusk-c); opacity: var(--fxw-dusk, 0); }
 .fxw-night { background: var(--fxw-night-c); opacity: var(--fxw-night, 0); }
 
-/* lightning: the window's flash layer is lit by a script animation (opacity only), soft and never full-screen */
+/* lightning: the floor's flash layer is lit by a script animation (opacity only), in the sky only, soft and never full-screen */
 .fxw-f { inset: 0; background: var(--fxw-flash-c); opacity: 0; }
 
 /* the light of a monitor at night on the face and upper body of the one who sits at it. web/fx-weather.mjs puts one .fxw-lit into each seated figure's .spr, laid out exactly like the figure, holding a lit copy of that figure's seated picture (.fxw-lit-i: the same pixels with a pale-blue screen light baked in, strongest at the face and gone by the chest; config glow.color / strength / fall). It is drawn over the plain picture and only fades in by opacity, so it can only change pixels the figure itself covers: it cannot reach the wall or the desk, and the desk and the monitor in front of the figure hide it as they hide the figure.
@@ -41,7 +56,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .fxw-l { animation: none !important; transition: none !important; }
-  .fxw-tint { transition: none !important; }
+  .fxw-tint, .fxw-ovc, .fxw-haze { transition: none !important; }
   .fxw-lit .fxw-lit-i { animation: none !important; transition: none !important; }
   .fxw-f { display: none !important; }
 }
