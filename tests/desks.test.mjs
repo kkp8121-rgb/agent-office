@@ -128,6 +128,28 @@ test('greenhouse: the chairs of the open desks are chair-open (taller, the star 
   for (let r = 34; r < 44; r++) for (let c = 16; c <= 19; c++) assert.ok(alphaAt(im, x + c, y + r) > 40, `stem row ${r} col ${c}`);
 });
 
+// ---- the lounge desk ----
+
+test('lounge art: the monitor back stands in front of the seat (between the viewer and the figure), the plant moved to the old monitor place', () => {
+  const im = atlas('lounge');
+  const raw = scene('lounge');
+  const k = raw.kinds.desk;
+  const [rx, ry, rw, rh] = k.rect;
+  const seatX = k.anchor[0] + k.seat.sitAt[0]; // the figure's column inside the desk picture
+  const grey = (x, y) => {
+    const i = ((ry + y) * im.w + rx + x) * 4;
+    return im.rgba[i + 3] > 40 && im.rgba[i] < 60 && im.rgba[i + 1] < 62 && im.rgba[i + 2] < 50 && im.rgba[i + 1] >= im.rgba[i] - 2; // the monitor's black-grey body
+  };
+  let a = rw;
+  let b = -1;
+  for (let y = 0; y < rh - 15; y++) for (let x = 0; x < rw; x++) if (grey(x, y)) { a = Math.min(a, x); b = Math.max(b, x); }
+  assert.ok(a <= seatX - 8 && b >= seatX, `the monitor columns ${a}..${b} cover the seat column ${seatX} from the viewer's side`);
+  for (let y = 4; y < 34; y++) for (let x = 24; x < 40; x++) assert.equal(grey(x, y) && x < 30, false, `nothing grey stays at the old monitor place (${x},${y})`);
+  // the lounge decor slots follow: every monitor slot lies on the monitor, none on the old place
+  const slots = JSON.parse(readFileSync(join(ROOT, 'assets', 'decor', 'decor.json'), 'utf8')).desks.lounge.desk;
+  for (const [x] of [...slots.monitorTop, ...slots.bezel]) assert.ok(x >= a && x <= b, `monitor slot at x ${x} lies within ${a}..${b}`);
+});
+
 // ---- the lobby desks ----
 
 test('lobby art: the monitor back and the laptop lid stand in the middle of their desks, nothing stays at the old places', () => {

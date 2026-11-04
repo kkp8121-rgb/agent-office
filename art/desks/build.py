@@ -1,11 +1,14 @@
 """Desk and chair art that the seated pose needs (assets/scenes/<design>/objects.png). Starts from art/desks/orig/<design>.png, so it can be run again.
 
-  python art/desks/build.py [lobby] [greenhouse]      (default: both)
+  python art/desks/build.py [lobby] [lounge] [greenhouse]      (default: all)
 
 lobby: the monitor backs stand in the middle of the desk, between the viewer and the figure who sits behind it.
   - desk-b: the existing monitor back (it stood at the right end) moves to the middle; its old place is plain desk top again.
   - desk (the laptop desk): the flat closed laptop becomes an open laptop seen from behind: a lid back in the monitor's own colours, with the back edge of the
     keyboard deck under it. The sprite grows 4 rows upward (rect y 93 -> 89, the rows above it are empty in the atlas), the anchor moves down by 4.
+lounge: the diagonal desk (rect [257, 0, 92, 73]) had its monitor at the left end and the seat at the right, so the monitor stood beside the figure. The monitor with its
+    keyboard and shadows moves 23 right and 12 down along the desk so it stands between the viewer and the figure; the plant moves to the old monitor place.
+    The decor slots of the lounge desk (assets/decor/decor.json) move with the monitor.
 greenhouse: the open table (legs only) shows what is under it, so the office chair of its desks gets a long stem and its star base is lowered 16 rows
     (kind chair-open, a new rect under the old chair; the atlas grows by 13 rows at the bottom). The chair of the lead desk (front panel) is not changed.
 """
@@ -78,6 +81,73 @@ def lobby(im):
     return im
 
 
+LOUNGE_BOX = (257, 0, 92, 73)  # the desk rect in the atlas
+WOOD = {(250, 163, 46), (250, 159, 42), (247, 153, 41), (251, 171, 56), (235, 141, 38), (234, 163, 54), (208, 112, 28)}  # desk top colours
+GREY = {(42, 44, 36), (36, 38, 31), (30, 32, 26), (26, 24, 18), (55, 58, 48), (75, 78, 66), (46, 48, 40), (26, 27, 22), (23, 23, 18), (37, 38, 32), (34, 35, 29), (29, 30, 25)}
+KEYS = {(69, 66, 47), (55, 45, 31), (52, 40, 26)}
+LEAF = {(31, 25, 16), (147, 112, 34), (137, 92, 33)}
+LOUNGE_MONITOR_MOVE = (23, 12)  # monitor, keyboard and their shadows
+LOUNGE_PLANT_MOVE = (-32, -12)
+
+
+def lounge(im):
+    ox, oy, w, h = LOUNGE_BOX
+    px = im.load()
+    src = im.copy().load()
+
+    def col(x, y):
+        p = src[ox + x, oy + y]
+        return p[:3] if p[3] else None
+
+    def top_min(x):  # upper edge of the desk top: the left slope, then the back edge
+        return max(15 - 0.52 * (x - 1), 1 + 0.53 * (x - 28))
+
+    def top_max(x):  # lower edge: the front edge, then the right end
+        return min(15 + 0.53 * (x - 1), 48.5 - 0.54 * (x - 64))
+
+    def inside(x, y):  # on the desk top, one pixel off the outline
+        return 1 <= x <= 90 and top_min(x) + 1 <= y <= top_max(x) - 1
+
+    def hull(colours, xs, ys):  # every pixel between the first and the last pixel of those colours in a column
+        out = set()
+        for x in xs:
+            hit = [y for y in ys if col(x, y) in colours]
+            if hit:
+                out.update((x, y) for y in range(min(hit), max(hit) + 1))
+        return out
+
+    stuff = {(x, y) for y in range(h) for x in range(w) if inside(x, y) and col(x, y) is not None and col(x, y) not in WOOD}  # props and their shadows
+    mon = {p for p in stuff if p[0] <= 51} | hull(GREY, range(22, 52), range(0, 36))
+    key = ({p for p in stuff if 52 <= p[0] <= 63 and p[1] <= 28 and p not in mon} | hull(GREY | KEYS, range(52, 64), range(15, 27))) - mon
+    leaf = ({p for p in stuff if p[0] >= 62 and 20 <= p[1] <= 44 and p not in mon and p not in key} | hull(LEAF | GREY | KEYS, range(62, 81), range(22, 43))) - mon - key
+    assert len(stuff - mon - key - leaf) == 0
+
+    def grown(pts, r):
+        out = set(pts)
+        for (x, y) in pts:
+            out.update((x + a, y + b) for a in range(-r, r + 1) for b in range(-r, r + 1) if inside(x + a, y + b))
+        return out
+
+    clear = grown(mon, 2) | grown(key, 1) | grown(leaf, 1)
+    slope = 33 / 63  # the desk's long axis; plain desk top is copied from along it, which keeps the grain bands
+
+    def plain(x, y):
+        for sign in (1, -1):
+            for s in range(1, 70):
+                nx, ny = x + sign * s, y + sign * round(slope * s)
+                if 0 <= nx < w and 0 <= ny < h and (nx, ny) not in clear and col(nx, ny) in WOOD:
+                    return src[ox + nx, oy + ny]
+        raise ValueError((x, y))
+
+    for (x, y) in clear:
+        px[ox + x, oy + y] = plain(x, y)
+    for pts, (dx, dy) in ((mon, LOUNGE_MONITOR_MOVE), (key, LOUNGE_MONITOR_MOVE), (leaf, LOUNGE_PLANT_MOVE)):
+        for (x, y) in pts:
+            if inside(x + dx, y + dy):
+                px[ox + x + dx, oy + y + dy] = src[ox + x, oy + y]
+    return im
+
+
 def greenhouse(im):
     ox, oy, w, h = 218, 81, 35, 50
     d = 16  # rows the base moves down
@@ -102,10 +172,10 @@ def greenhouse(im):
 
 
 def main(argv):
-    want = argv or ["lobby", "greenhouse"]
+    want = argv or ["lobby", "lounge", "greenhouse"]
     for design in want:
         im = Image.open(os.path.join(ORIG, f"{design}.png")).convert("RGBA")
-        im = {"lobby": lobby, "greenhouse": greenhouse}[design](im)
+        im = {"lobby": lobby, "lounge": lounge, "greenhouse": greenhouse}[design](im)
         im.save(os.path.join(OUT, design, "objects.png"))
         print(f"{design}: {im.size}")
 
