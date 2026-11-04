@@ -1218,10 +1218,19 @@ function renderBoard(frec) {
   if (!p) { // sub-agents and the title keep the plain list
     wb.list.replaceChildren(...(b ? itemWindow(b.items, wb.cap).map(todoLine) : []));
   } else {
-    const { rows, hidden } = boardRows(b.items, b.more, wb.capBar);
-    const lines = rows.map(progressLine);
-    if (hidden > 0) lines.push(el('li', 'wb-rest', ui.ui.board.more.replace('{n}', hidden)));
-    wb.list.replaceChildren(...lines);
+    // the in-progress line that does not fit in one line takes two (wb-wrap) instead of being cut off; the room for it comes from the other lines
+    let cap = wb.capBar;
+    for (let pass = 0; pass < 2; pass++) {
+      const { rows, hidden } = boardRows(b.items, b.more, cap);
+      const lines = rows.map(progressLine);
+      if (hidden > 0) lines.push(el('li', 'wb-rest', ui.ui.board.more.replace('{n}', hidden)));
+      wb.list.replaceChildren(...lines);
+      const cut = [...wb.list.querySelectorAll('.wb-now .tx')].filter((t) => t.scrollWidth > t.clientWidth);
+      if (!cut.length) break;
+      for (const t of cut) t.parentNode.classList.add('wb-wrap');
+      if (pass === 0) cap = Math.max(BOARD_MIN_ITEMS, cap - cut.length);
+    }
+    if (!wb.el.offsetWidth) wb.key = ''; // not laid out yet (a floor that is not on screen): nothing could be measured, draw again when it is
   }
   if (!b && boardPanel?.key() === frec.sid) closeBig();
 }
