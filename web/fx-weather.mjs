@@ -15,7 +15,7 @@
 //
 // The top half of this module is pure (tiles, clouds, layers per weather, light plan, lightning schedule, face light mode, timing, fall-off and the lit picture's pixels; randomness is injected),
 // the bottom half is the DOM part: init(ctx), called once at start-up (see the ctx typedef in fx.mjs). Numbers: config ui.fx.weather.
-// The night map (a darker, cooler night with a pool of screen light at every working seat, a comparison behind ?debug=nightmap) is web/fx-nightmap.mjs; this area creates it and syncs it.
+// The real night (the night light choice 「실감 나는 밤」: a darker, cooler night with a pool of screen light at every working seat and warm light at the room's lamps) is web/fx-nightmap.mjs; this area creates it, syncs it and switches it with the choice.
 // It never invents activity: the weather and the light are the office's real ones (the `weather` and `daylight` events); the lightning
 // only decorates a real storm; the face light shows only on someone who is really seated (working, thinking or idle).
 
@@ -504,15 +504,9 @@ export function init(ctx) {
   const night = createNightmap({
     ctx, cfg: cfg.night, doc,
     modeOf: (rec) => (target?.glow > 0 ? litMode(rec, cfg) : ''),
-    timingOf: (rec) => {
-      const s = floorsState.get(rec.frec)?.lits.get(rec)?.style;
-      return s ? { ms: s.getPropertyValue('--fxw-lit-ms'), delay: s.getPropertyValue('--fxw-lit-delay') } : null;
-    },
     resync: () => later(false),
     debug: new URLSearchParams(globalThis.location?.search ?? '').get('debug') === 'nightmap',
   });
-  const presetNight = new URLSearchParams(globalThis.location?.search ?? '').get('night'); // ?debug=nightmap&night=v1: starts in that variant (for a comparison page)
-  if (globalThis.__fxNight && presetNight) night.setVariant(presetNight);
 
   function litEl(rec, floorLits) {
     let el = floorLits.get(rec);
@@ -676,12 +670,14 @@ export function init(ctx) {
     if (ctx.paused()) stopLightning();
     else armLightning();
   });
-  onNightLight(() => { // a new night light: every lit picture on screen changes its file at once (the small window shows the same elements)
+  onNightLight((id) => { // a new night light: every lit picture on screen changes its file at once (the small window shows the same elements)
+    night.setEnabled(id === 'real');
     for (const st of floorsState.values()) for (const el of st.lits.values()) if (el.dataset.src) el.firstChild.src = litUrl(el.dataset.src);
   });
   fx.onFxChange(({ fx: on }) => {
     if (on) sync();
     else tidy();
   });
+  night.setEnabled(getNightLight(cfg) === 'real'); // the choice 「실감 나는 밤」 also builds the real night (its face light is the outline one)
   if (fx.fxOn()) sync();
 }

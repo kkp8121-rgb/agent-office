@@ -3334,6 +3334,7 @@ function initNightLight(S) {
     radio.checked = id === current;
     radio.addEventListener('change', () => setNightLight(cfg, id));
     label.append(radio, ` ${S.lightChoices[id]}`);
+    if (S.lightHints?.[id]) label.title = S.lightHints[id];
     group.append(label);
   }
 }

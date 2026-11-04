@@ -61,27 +61,20 @@
   .fxw-f { display: none !important; }
 }
 
-/* The night map (web/fx-nightmap.mjs, variants v1 and up behind ?debug=nightmap; the default v0 builds none of this). On a stage with .fxn-on the plain veil (.stage::after) is darker and cooler,
-   and has one hole per working seat (a mask of radial gradients, set as --fxn-mi/ms/mp/mc by the script): the room's own colours show again inside the pool.
-   Per pool the script adds, as children of the stage: .fxn-f the fill (the veil's colour in the shape of the hole: opacity 1 = no pool, 0 = the full pool; it is what fades and flickers),
-   .fxn-t the cool tint (blended, under the veil), .fxn-m the dark copy of the monitor back (above the desk), .fxn-r the light round the monitor's edge (between the figure and the desk, v2), .fxn-h the faint cone between screen and face (v3, screen-blended, under the desk),
-   and per lamp of the room .fxn-l its warm glow (v4, under the veil, whose mask has a partial hole there).
-   Blended or masked things carry contain: paint, so the browser does not draw the desks and stools round them again. Opacity only, so the GPU does the fades and the flicker. */
-.fx-on .stage.fxn-on::after { background: var(--fxn-veil); opacity: var(--fxn-o); contain: paint; mask-image: var(--fxn-mi); mask-size: var(--fxn-ms); mask-position: var(--fxn-mp); mask-repeat: no-repeat; mask-composite: var(--fxn-mc); }
-.fxn-t, .fxn-f, .fxn-m, .fxn-r, .fxn-h, .fxn-l { position: absolute; pointer-events: none; contain: paint; transition: opacity var(--fxn-fade, 600ms) ease-in-out; }
-.fxn-f, .fxn-t, .fxn-m, .fxn-r, .fxn-h, .fxn-l { background-repeat: no-repeat; }
+/* The real night (web/fx-nightmap.mjs, the night light choice 「실감 나는 밤」; the other choices build none of this). On a stage with .fxn-on the plain veil (.stage::after) is one picture drawn by the script
+   (--fxn-img: darker and cooler than the plain veil, with a hole at every pool and lamp and the warm light of the lamps, and the plain veil under the floor plaque). It sits one layer below the pools' fills so a fill covers its own hole.
+   Per working seat the script adds, as children of the stage: .fxn-f the fill (the veil's colour in the shape of the hole: opacity 1 = no pool, 0 = the full pool; it fades),
+   .fxn-t the cool light of the screen (over the desk and the figure), .fxn-m the near-black copy of the monitor back (above the desk) and .fxn-r the light round the monitor's edge (between the figure and the desk). Plain alpha, no blend modes, no masks: opacity only. */
+.fx-on .stage.fxn-on::after { z-index: 7499; background: var(--fxn-img) 0 0 / 100% 100% no-repeat; opacity: 1; }
+.fxn-f, .fxn-t, .fxn-m, .fxn-r { position: absolute; pointer-events: none; background-repeat: no-repeat; transition: opacity var(--fxn-fade, 600ms) ease-in-out; }
 .fxn-m, .fxn-r { image-rendering: pixelated; }
+.fxn-t, .fxn-m, .fxn-r { opacity: 0; }
+.fxn-t[data-on="1"], .fxn-m[data-on="1"], .fxn-r[data-on="1"] { opacity: var(--fxn-o, 1); }
+.fxn-fx { transform: scaleX(-1); }
+/* the plain veil under the floor plaque (the picture has a hole there): the same colour and opacity as .stage::after, so the see-through plaque keeps its pixels */
+.fxn-p { position: absolute; z-index: 7499; pointer-events: none; background: rgb(6, 9, 28); opacity: var(--room-dim); }
 .fxn-f { opacity: 1; }
 .fxn-f[data-on="1"] { opacity: 0; }
-.fxn-t, .fxn-m, .fxn-r, .fxn-h, .fxn-l { opacity: 0; }
-.fxn-t[data-on="1"], .fxn-m[data-on="1"], .fxn-r[data-on="1"], .fxn-h[data-on="1"] { opacity: var(--fxn-o, 1); }
-/* v4: the lamps' warm glow is steady (no flicker) */
-.fxn-l[data-on="1"] { opacity: 1; }
-/* v2: the pool follows the face light's ripple (same cycle length and offset as the figure's .fxw-lit): the light swells and dips, the fill brings back a little of the veil when it dips */
-.fxn-fl .fxn-f[data-on="1"] { animation: fxn-dim var(--fxn-t, 2200ms) ease-in-out var(--fxn-delay, 0ms) infinite; --fxn-d: var(--fxn-dim, .3); }
-.fxn-fl .fxn-t[data-on="1"], .fxn-fl .fxn-r[data-on="1"], .fxn-fl .fxn-h[data-on="1"] { animation: fxn-lum var(--fxn-t, 2200ms) ease-in-out var(--fxn-delay, 0ms) infinite; }
-@keyframes fxn-lum { 0%, 100% { opacity: calc(var(--fxn-o) * .78); } 14% { opacity: var(--fxn-o); } 29% { opacity: calc(var(--fxn-o) * .64); } 47% { opacity: calc(var(--fxn-o) * .92); } 63% { opacity: calc(var(--fxn-o) * .7); } 81% { opacity: var(--fxn-o); } }
-@keyframes fxn-dim { 0%, 100% { opacity: calc(var(--fxn-d) * .61); } 14% { opacity: 0; } 29% { opacity: var(--fxn-d); } 47% { opacity: calc(var(--fxn-d) * .22); } 63% { opacity: calc(var(--fxn-d) * .83); } 81% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .fxn-t, .fxn-f, .fxn-m, .fxn-r, .fxn-h, .fxn-l { animation: none !important; transition: none !important; }
+  .fxn-f, .fxn-t, .fxn-m, .fxn-r { animation: none !important; transition: none !important; }
 }

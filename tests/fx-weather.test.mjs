@@ -295,17 +295,25 @@ test('baked lit picture screens in the soft set: the darkest pixel is lifted mos
   assert.ok(blue(soft, 0) > blue(outline, 0), 'the soft set lifts the outline more than the outline set does');
 });
 
-test('night light choice: stored id wins, junk or nothing gives the default, a change tells the listeners and the storage, a blocked storage still works for the page', () => {
-  assert.equal(cfg.glow.default, 'outline');
-  assert.deepEqual(Object.keys(cfg.glow.sets), ['outline', 'soft']);
-  assert.equal(resolveNightLight(null, cfg), 'outline');
-  assert.equal(resolveNightLight('junk', cfg), 'outline');
-  assert.equal(resolveNightLight('toString', cfg), 'outline');
+test('night light choice: 「실감 나는 밤」 is the default and comes first, a stored outline or soft keeps its old meaning, junk gives the default, a change tells the listeners and the storage, a blocked storage still works for the page', () => {
+  assert.equal(cfg.glow.default, 'real');
+  assert.deepEqual(Object.keys(cfg.glow.sets), ['real', 'outline', 'soft']);
+  assert.equal(resolveNightLight(null, cfg), 'real', 'nothing stored: the real night');
+  assert.equal(resolveNightLight('junk', cfg), 'real');
+  assert.equal(resolveNightLight('toString', cfg), 'real');
   assert.equal(resolveNightLight('soft', cfg), 'soft');
+  assert.equal(resolveNightLight('outline', cfg), 'outline');
+  assert.equal(resolveNightLight('real', cfg), 'real');
+  // the real night's face light is today's outline light; outline and soft are exactly what they were
+  assert.deepEqual(cfg.glow.sets.real, cfg.glow.sets.outline);
+  assert.deepEqual(cfg.glow.sets.outline, { dir: 'lit-outline', mode: 'multiply' });
+  assert.deepEqual(cfg.glow.sets.soft, { dir: 'lit', mode: 'screen' });
+  assert.equal(litUrlOf('/assets/sprites/worker-sit.png', 'real', cfg), '/assets/sprites/lit-outline/worker-sit.png');
   assert.equal(litUrlOf('/assets/sprites/worker-sit.png', 'outline', cfg), '/assets/sprites/lit-outline/worker-sit.png');
   assert.equal(litUrlOf('/assets/sprites/worker-sit.png', 'soft', cfg), '/assets/sprites/lit/worker-sit.png');
   const mem = new Map();
   const store = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
+  assert.equal(getNightLight(cfg, () => store), 'real', 'nothing stored: the default');
   mem.set('agent-office.nightLight', 'soft');
   assert.equal(getNightLight(cfg, () => store), 'soft', 'the stored choice beats the default');
   const heard = [];
@@ -314,11 +322,22 @@ test('night light choice: stored id wins, junk or nothing gives the default, a c
   assert.deepEqual(heard, ['outline']);
   assert.equal(mem.get('agent-office.nightLight'), 'outline');
   assert.equal(getNightLight(cfg, () => store), 'outline');
+  setNightLight(cfg, 'real', () => store);
+  assert.equal(mem.get('agent-office.nightLight'), 'real');
   const blocked = () => { throw new Error('blocked'); };
   setNightLight(cfg, 'soft', blocked);
   assert.equal(getNightLight(cfg, blocked), 'soft', 'a blocked storage: this page keeps the choice');
-  assert.deepEqual(heard, ['outline', 'soft']);
+  assert.deepEqual(heard, ['outline', 'real', 'soft']);
   stop();
+});
+
+test('night light texts: every choice has a label and a hint in config, the real night first', () => {
+  const S = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8')).ui.weather;
+  assert.deepEqual(Object.keys(S.lightChoices), Object.keys(cfg.glow.sets));
+  assert.equal(S.lightChoices.real, '실감 나는 밤');
+  assert.equal(S.lightChoices.outline, '윤곽 살린 빛');
+  assert.equal(S.lightChoices.soft, '부드러운 빛');
+  for (const id of Object.keys(cfg.glow.sets)) assert.ok(S.lightHints[id]?.length > 5, id);
 });
 
 test('face light css: the lit picture is an image laid over the figure (no mask, clip-path, blend, box shadow or radius), opacity only, off without a seated figure', () => {
@@ -333,8 +352,9 @@ test('face light css: the lit picture is an image laid over the figure (no mask,
 test('lit pictures: every seated picture has its lit copy in every set on disk, equal to what bakeLit makes now (run scripts/make-lit-sprites.mjs when this fails)', () => {
   const names = litSources();
   assert.ok(names.length >= 30, `found ${names.length} seated pictures`);
-  const dirs = Object.keys(cfg.glow.sets).map((set) => litDir(set, cfg));
+  const dirs = Object.keys(cfg.glow.sets).filter((set) => set !== 'real').map((set) => litDir(set, cfg)); // the real night shares the outline set's pictures
   assert.equal(new Set(dirs).size, dirs.length, 'one folder per set');
+  assert.equal(litDir('real', cfg), litDir('outline', cfg));
   for (const set of Object.keys(cfg.glow.sets)) for (const name of names) {
     const lit = litOf(name, cfg, set);
     const file = decodePng(readFileSync(join(litDir(set, cfg), name)));
