@@ -27,11 +27,21 @@
 /* lightning: the window's flash layer is lit by a script animation (opacity only), soft and never full-screen */
 .fxw-f { inset: 0; background: var(--fxw-flash-c); opacity: 0; }
 
-/* the soft light of a monitor at night, falling on the seated one's face, upper body and the desk around the screen: one pre-drawn radial gradient per working seat, shown by opacity only. The back of the monitor is cut out by a static clip-path (config glow.holes), so the panel stays dark. */
-.fxw-glow { position: absolute; border-radius: 50%; pointer-events: none; background: radial-gradient(ellipse at center, rgba(130, 176, 255, .38), rgba(130, 176, 255, .15) 45%, rgba(130, 176, 255, 0) 72%); opacity: 0; transition: opacity 400ms ease-in-out; }
+/* the light of a monitor at night on the face and upper body of the one who sits at it. web/fx-weather.mjs puts one .fxw-lit into each seated figure's .spr, laid out exactly like the figure, holding a lit copy of that figure's seated picture (.fxw-lit-i: the same pixels with a pale-blue screen light baked in, strongest at the face and gone by the chest; config glow.color / strength / fall). It is drawn over the plain picture and only fades in by opacity, so it can only change pixels the figure itself covers: it cannot reach the wall or the desk, and the desk and the monitor in front of the figure hide it as they hide the figure.
+   It shows only in dark mode: the strength is the room veil (--room-dim, 0 in light mode) times fxw-boost, because the veil lies over the figure too and takes the same share of the light. mode work = the ripple (opacity of the picture only, keyframes fxw-ripple), rest = a steady level, no mode = off. */
+.fxw-lit { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
+/* the picture is the seated one: the instant the figure stands (the class goes first, the script catches up 200 ms later) the light is gone, so it never lies on the standing picture */
+.ag:not(.sitting) .fxw-lit { display: none; }
+.fxw-lit .fxw-lit-i { display: block; flex: none; height: var(--sit-h, 50px); width: auto; image-rendering: pixelated; opacity: 0; transition: opacity 600ms ease-in-out; --fxw-k: calc(var(--room-dim, 0) * var(--fxw-boost, 2)); }
+.fxw-lit .fxw-lit-i:not([src]) { display: none; }
+.fxw-lit[data-mode="rest"] .fxw-lit-i { opacity: calc(var(--fxw-k) * .7); }
+.fxw-lit[data-mode="work"] .fxw-lit-i { opacity: var(--fxw-k); animation: fxw-ripple var(--fxw-lit-ms, 2200ms) ease-in-out var(--fxw-lit-delay, 0ms) infinite; }
+/* the screen changes: a few soft swells and dips, never dark and never a flash (the level stays between .64 and 1 of the steady one) */
+@keyframes fxw-ripple { 0%, 100% { opacity: calc(var(--fxw-k) * .78); } 14% { opacity: var(--fxw-k); } 29% { opacity: calc(var(--fxw-k) * .64); } 47% { opacity: calc(var(--fxw-k) * .92); } 63% { opacity: calc(var(--fxw-k) * .7); } 81% { opacity: var(--fxw-k); } }
 
 @media (prefers-reduced-motion: reduce) {
   .fxw-l { animation: none !important; transition: none !important; }
-  .fxw-tint, .fxw-glow { transition: none !important; }
+  .fxw-tint { transition: none !important; }
+  .fxw-lit .fxw-lit-i { animation: none !important; transition: none !important; }
   .fxw-f { display: none !important; }
 }
