@@ -53,6 +53,7 @@ const ITEMS_URL = '/assets/seasonal/items.json'; // size and anchor of every dec
 const SKY_Z = 1; // the window glass tint: above the room picture, below every object
 const WX_Z = 1; // the weather in the windows: the same layer as the glass tint, drawn after it (DOM order), below every object
 const WX_KEY = 'agent-office.weather'; // localStorage: the weather choice of this viewer
+const SYS_TM_KEY = 'agent-office.cpuTaskManager'; // localStorage: '1' or '0', the CPU basis chosen by this viewer (absent = what the server has)
 const WALL_Z_BELOW = 2; // wall decorations draw this far under the lowest floor object (zBase), above the glass tint
 const SPARKLE_SPOTS = [[-14, -10], [12, -26], [-6, -40]]; // where the three sparkles hover, from the character's feet (the tag layer origin)
 const LED_Z = 7600; // the lobby status wall: above the dark-mode veil (7500) and backdrop cover (7501) so it keeps glowing, below the name tags (8000)
@@ -3277,6 +3278,7 @@ function initWeather() {
     group.append(label);
   }
   initFxSwitches(S);
+  initSysSwitch(S);
   setText($('wx-now'), statusLine(S, ui.weather.enabled, wxReal, ui.weather.city));
   panel.addEventListener('toggle', (ev) => {
     const open = ev.newState === 'open';
@@ -3310,6 +3312,36 @@ function initFxSwitches(S) {
   }
   onFxChange(() => { // the reduced-motion default can flip while the panel exists
     for (const which of Object.keys(boxes)) boxes[which].checked = fxChoices()[which];
+  });
+}
+
+/** The 「CPU 를 작업 관리자 기준으로 표시」 switch. The choice is kept in this browser like the others and also sent to the server (the server computes the number), where the last choice wins. */
+function initSysSwitch(S) {
+  const group = $('sys-choices');
+  setText(group.querySelector('legend'), S.sysGroup);
+  const label = el('label', 'wx-opt');
+  const box = el('input');
+  box.type = 'checkbox';
+  let saved = null;
+  try {
+    saved = localStorage.getItem(SYS_TM_KEY);
+  } catch {
+    // storage blocked: the server's value decides, a change lasts for this page
+  }
+  const avail = ui.sysload.taskManager;
+  box.checked = avail && (saved === null ? ui.sysload.on : saved === '1');
+  box.disabled = !avail;
+  label.append(box, ` ${S.sysSwitch}`);
+  label.title = avail ? S.sysHint : S.sysOnlyWin;
+  group.append(label);
+  if (avail && saved !== null && box.checked !== ui.sysload.on) post('/api/sysload', { taskManager: box.checked }); // this browser's choice wins over what the server started with
+  box.addEventListener('change', () => {
+    try {
+      localStorage.setItem(SYS_TM_KEY, box.checked ? '1' : '0');
+    } catch {
+      // storage blocked: only this page remembers
+    }
+    post('/api/sysload', { taskManager: box.checked });
   });
 }
 

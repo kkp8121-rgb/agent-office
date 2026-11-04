@@ -44,6 +44,7 @@ export const INDEX_HTML = String.raw`<!doctype html>
       <h2 id="settings-title"></h2>
       <fieldset id="wx-choices"><legend></legend></fieldset>
       <fieldset id="fx-choices"><legend></legend></fieldset>
+      <fieldset id="sys-choices"><legend></legend></fieldset>
       <p id="wx-now" role="status"></p>
       <p class="wx-credit" id="wx-credit"></p>
       <button id="settings-close" type="button" popovertarget="settings-panel" popovertargetaction="hide"></button>
