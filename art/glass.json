@@ -1,7 +1,126 @@
 {
  "studio2": {
   "mode": "poly",
-  "grow": 1
+  "grow": 1,
+  "rim": {
+   "band": 6,
+   "max": 150,
+   "rb": 10
+  },
+  "islands": 24,
+  "ring": 0,
+  "members": [
+   {
+    "name": "jamb-5-left",
+    "axis": "v",
+    "box": [
+     288,
+     79,
+     289,
+     140
+    ]
+   },
+   {
+    "name": "jamb-5-right",
+    "axis": "v",
+    "box": [
+     374,
+     74,
+     376,
+     136
+    ]
+   },
+   {
+    "name": "jamb-6-left",
+    "axis": "v",
+    "box": [
+     395,
+     70,
+     396,
+     131
+    ]
+   },
+   {
+    "name": "jamb-6-right",
+    "axis": "v",
+    "box": [
+     488,
+     64,
+     490,
+     125
+    ]
+   },
+   {
+    "name": "jamb-7-left",
+    "axis": "v",
+    "box": [
+     516,
+     58,
+     517,
+     118
+    ]
+   },
+   {
+    "name": "jamb-7-right",
+    "axis": "v",
+    "box": [
+     595,
+     54,
+     597,
+     111
+    ]
+   },
+   {
+    "name": "jamb-8-left",
+    "axis": "v",
+    "box": [
+     606,
+     50,
+     607,
+     112
+    ]
+   },
+   {
+    "name": "jamb-8-right",
+    "axis": "v",
+    "box": [
+     673,
+     48,
+     675,
+     107
+    ]
+   },
+   {
+    "name": "mullion-1",
+    "axis": "v",
+    "box": [
+     106,
+     154,
+     108,
+     213
+    ]
+   },
+   {
+    "name": "mullion-2",
+    "axis": "v",
+    "box": [
+     144,
+     136,
+     146,
+     194
+    ]
+   },
+   {
+    "name": "mullion-3",
+    "axis": "v",
+    "box": [
+     182,
+     117,
+     184,
+     175
+    ]
+   }
+  ]
  },
  "lounge": {
   "mode": "poly",
@@ -79,11 +198,95 @@
      200
     ]
    ]
+  ],
+  "members": [
+   {
+    "name": "mullion-w1-a",
+    "axis": "v",
+    "box": [
+     374,
+     96,
+     376,
+     161
+    ]
+   },
+   {
+    "name": "mullion-w1-b",
+    "axis": "v",
+    "box": [
+     405,
+     84,
+     407,
+     149
+    ]
+   },
+   {
+    "name": "mullion-w2-a",
+    "axis": "v",
+    "box": [
+     657,
+     100,
+     659,
+     167
+    ]
+   },
+   {
+    "name": "mullion-w2-b",
+    "axis": "v",
+    "box": [
+     685,
+     113,
+     687,
+     178
+    ]
+   }
   ]
  },
  "library": {
   "mode": "colour",
-  "grow": 2
+  "grow": 2,
+  "members": [
+   {
+    "name": "jamb-2-left",
+    "axis": "v",
+    "box": [
+     416,
+     44,
+     423,
+     112
+    ]
+   },
+   {
+    "name": "jamb-2-right",
+    "axis": "v",
+    "box": [
+     479,
+     44,
+     486,
+     112
+    ]
+   },
+   {
+    "name": "jamb-3-left",
+    "axis": "v",
+    "box": [
+     537,
+     44,
+     543,
+     112
+    ]
+   },
+   {
+    "name": "jamb-3-right",
+    "axis": "v",
+    "box": [
+     598,
+     44,
+     605,
+     112
+    ]
+   }
+  ]
  },
  "greenhouse": {
   "mode": "flood",
@@ -388,6 +591,311 @@
      175
     ]
    ]
+  ],
+  "members": [
+   {
+    "name": "post-286",
+    "axis": "v",
+    "box": [
+     286,
+     83,
+     293,
+     153
+    ]
+   },
+   {
+    "name": "post-342",
+    "axis": "v",
+    "box": [
+     342,
+     83,
+     351,
+     153
+    ]
+   },
+   {
+    "name": "post-401",
+    "axis": "v",
+    "box": [
+     401,
+     83,
+     410,
+     153
+    ]
+   },
+   {
+    "name": "post-473",
+    "axis": "v",
+    "box": [
+     473,
+     109,
+     481,
+     152
+    ]
+   },
+   {
+    "name": "post-508-upper",
+    "axis": "v",
+    "box": [
+     508,
+     82,
+     515,
+     122
+    ]
+   },
+   {
+    "name": "post-508-lower",
+    "axis": "v",
+    "box": [
+     508,
+     138,
+     515,
+     153
+    ]
+   },
+   {
+    "name": "post-543",
+    "axis": "v",
+    "box": [
+     543,
+     82,
+     551,
+     153
+    ],
+    "ref": [
+     110,
+     143
+    ]
+   },
+   {
+    "name": "post-613",
+    "axis": "v",
+    "box": [
+     613,
+     82,
+     622,
+     153
+    ]
+   },
+   {
+    "name": "post-673",
+    "axis": "v",
+    "box": [
+     673,
+     82,
+     681,
+     153
+    ]
+   },
+   {
+    "name": "rail-a",
+    "axis": "h",
+    "box": [
+     331,
+     70,
+     377,
+     79
+    ]
+   },
+   {
+    "name": "rail-b",
+    "axis": "h",
+    "box": [
+     409,
+     70,
+     461,
+     79
+    ]
+   },
+   {
+    "name": "rail-c",
+    "axis": "h",
+    "box": [
+     487,
+     70,
+     533,
+     79
+    ]
+   },
+   {
+    "name": "rail-gap",
+    "axis": "h",
+    "box": [
+     487,
+     70,
+     558,
+     81
+    ],
+    "far": false,
+    "ref": [
+     517,
+     527
+    ]
+   },
+   {
+    "name": "rail-d",
+    "axis": "h",
+    "box": [
+     559,
+     70,
+     632,
+     79
+    ]
+   },
+   {
+    "name": "rail-e",
+    "axis": "h",
+    "box": [
+     645,
+     70,
+     692,
+     79
+    ]
+   },
+   {
+    "name": "purlin-a",
+    "axis": "h",
+    "box": [
+     333,
+     62,
+     379,
+     62
+    ]
+   },
+   {
+    "name": "purlin-b",
+    "axis": "h",
+    "box": [
+     409,
+     62,
+     542,
+     62
+    ],
+    "far": false,
+    "ref": [
+     430,
+     475
+    ]
+   },
+   {
+    "name": "purlin-d",
+    "axis": "h",
+    "box": [
+     560,
+     62,
+     609,
+     62
+    ]
+   },
+   {
+    "name": "purlin-e",
+    "axis": "h",
+    "box": [
+     560,
+     62,
+     719,
+     62
+    ],
+    "far": false,
+    "ref": [
+     560,
+     609
+    ]
+   },
+   {
+    "name": "rail-end-w",
+    "axis": "h",
+    "box": [
+     517,
+     70,
+     543,
+     81
+    ],
+    "ref": [
+     517,
+     527
+    ]
+   },
+   {
+    "name": "rail-end-e",
+    "axis": "h",
+    "box": [
+     556,
+     74,
+     575,
+     81
+    ]
+   },
+   {
+    "name": "wall-post-w1",
+    "axis": "v",
+    "box": [
+     15,
+     186,
+     26,
+     352
+    ]
+   },
+   {
+    "name": "wall-post-w2",
+    "axis": "v",
+    "box": [
+     65,
+     206,
+     73,
+     340
+    ]
+   },
+   {
+    "name": "wall-post-w3",
+    "axis": "v",
+    "box": [
+     132,
+     175,
+     141,
+     244
+    ]
+   },
+   {
+    "name": "wall-post-e1",
+    "axis": "v",
+    "box": [
+     997,
+     230,
+     1008,
+     352
+    ]
+   },
+   {
+    "name": "wall-post-e2",
+    "axis": "v",
+    "box": [
+     952,
+     260,
+     959,
+     378
+    ]
+   },
+   {
+    "name": "wall-post-e3",
+    "axis": "v",
+    "box": [
+     888,
+     111,
+     892,
+     184
+    ]
+   },
+   {
+    "name": "wall-post-e4",
+    "axis": "v",
+    "box": [
+     786,
+     112,
+     790,
+     205
+    ]
+   }
   ]
  }
 }
