@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "about": "Night map data per room design (read by web/fx-nightmap.mjs; the pictures <design>-mon.png and <design>-rim.png are drawn from it by scripts/make-nightmap.mjs). Coordinates are in the desk picture as drawn in objects.png, measured from the top-left of the kind's rect. monitors.<design>.<desk kind>: box = the area that holds the monitor (back, neck and foot), seed = a pixel of the monitor's back, screen = the back of the screen [x0, y0, x1, y1] (its centre is where the pool is pulled towards). lamps are for the lamp variant (next stage).",
+  "monitorRule": { "maxSat": 0.25, "minAlpha": 128 },
+  "monitors": {
+    "library": {
+      "desk": { "box": [23, 0, 53, 25], "seed": [35, 5], "screen": [24, 0, 50, 15] },
+      "lead-desk": { "box": [40, 0, 70, 24], "seed": [50, 5], "screen": [41, 0, 67, 16] }
+    },
+    "studio2": {
+      "desk": { "box": [27, 0, 58, 26], "seed": [40, 5], "screen": [28, 0, 57, 19] },
+      "lead-desk": { "box": [39, 0, 71, 28], "seed": [50, 5], "screen": [40, 0, 70, 20] }
+    },
+    "lounge": {
+      "desk": { "box": [24, 2, 54, 36], "seed": [38, 12], "screen": [26, 4, 52, 28] },
+      "lead-desk": { "box": [38, 8, 70, 42], "seed": [53, 20], "screen": [41, 10, 66, 34] }
+    },
+    "greenhouse": {
+      "desk": { "box": [21, 0, 57, 26], "seed": [38, 5], "screen": [22, 0, 56, 19] },
+      "lead-desk": { "box": [33, 0, 72, 29], "seed": [50, 5], "screen": [34, 0, 71, 21] }
+    }
+  },
+  "lamps": {}
+}

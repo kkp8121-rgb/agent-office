@@ -15,8 +15,11 @@
 //
 // The top half of this module is pure (tiles, clouds, layers per weather, light plan, lightning schedule, face light mode, timing, fall-off and the lit picture's pixels; randomness is injected),
 // the bottom half is the DOM part: init(ctx), called once at start-up (see the ctx typedef in fx.mjs). Numbers: config ui.fx.weather.
+// The night map (a darker, cooler night with a pool of screen light at every working seat, a comparison behind ?debug=nightmap) is web/fx-nightmap.mjs; this area creates it and syncs it.
 // It never invents activity: the weather and the light are the office's real ones (the `weather` and `daylight` events); the lightning
 // only decorates a real storm; the face light shows only on someone who is really seated (working, thinking or idle).
+
+import { createNightmap } from './fx-nightmap.mjs';
 
 /** A small seeded random generator (mulberry32): the same seed always draws the same tile. */
 export function seeded(seed) {
@@ -497,6 +500,20 @@ export function init(ctx) {
   // sets a mode, the timing and the picture. No lit file for a picture: nothing shows for that figure.
   const litUrl = (src) => litUrlOf(src, getNightLight(cfg), cfg);
 
+  // the night map: its pools follow the seats that work, so it asks for the face lights' own decision and ripple timing
+  const night = createNightmap({
+    ctx, cfg: cfg.night, doc,
+    modeOf: (rec) => (target?.glow > 0 ? litMode(rec, cfg) : ''),
+    timingOf: (rec) => {
+      const s = floorsState.get(rec.frec)?.lits.get(rec)?.style;
+      return s ? { ms: s.getPropertyValue('--fxw-lit-ms'), delay: s.getPropertyValue('--fxw-lit-delay') } : null;
+    },
+    resync: () => later(false),
+    debug: new URLSearchParams(globalThis.location?.search ?? '').get('debug') === 'nightmap',
+  });
+  const presetNight = new URLSearchParams(globalThis.location?.search ?? '').get('night'); // ?debug=nightmap&night=v1: starts in that variant (for a comparison page)
+  if (globalThis.__fxNight && presetNight) night.setVariant(presetNight);
+
   function litEl(rec, floorLits) {
     let el = floorLits.get(rec);
     if (!el) {
@@ -540,6 +557,7 @@ export function init(ctx) {
       el.remove();
       st.lits.delete(rec);
     }
+    night.sync(floor);
   }
 
   // ---- lightning ----
@@ -624,6 +642,7 @@ export function init(ctx) {
   }
 
   function tidy() {
+    night.tidy();
     stopLightning();
     if (syncTimer) ctx.timers.clearTimeout(syncTimer);
     syncTimer = 0;
@@ -646,6 +665,7 @@ export function init(ctx) {
     const st = floorsState.get(d.floor);
     if (!st) return;
     if (d.removed) {
+      night.drop(d.floor);
       st.root?.remove();
       st.shell?.remove();
       for (const el of st.lits.values()) el.remove();

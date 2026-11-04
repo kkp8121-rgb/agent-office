@@ -85,6 +85,15 @@
               },
               "lightning": { "minGapMs": 4000, "maxGapMs": 14000, "burstChance": 0.4, "maxPerBurst": 2, "peak": [0.22, 0.34], "flashMs": 420 },
               "glow": { "states": { "working": "work", "thinking": "work", "idle": "rest" }, "rippleMs": [1500, 2900], "fadeMs": 600, "color": [135, 188, 255], "strength": 0.5, "gain": 0.4, "default": "outline", "sets": { "outline": { "dir": "lit-outline", "mode": "multiply" }, "soft": { "dir": "lit", "mode": "screen" } }, "fall": [[0, 0.35], [0.36, 1], [0.52, 0.7], [0.68, 0.3], [0.86, 0]] },
+              "night": {
+                "dataUrl": "/assets/nightmap/nightmap.json", "fadeMs": 600,
+                "outside": { "color": [6, 14, 46], "opacity": 0.8 },
+                "pool": { "rx": 58, "ry": 44, "mix": 0.5, "faceY": 0.36, "falloff": [[0, 1], [0.32, 1], [0.55, 0.72], [0.78, 0.28], [1, 0]] },
+                "tint": { "color": [120, 185, 255], "alpha": 0.55, "scale": 0.85, "blend": "soft-light" },
+                "monitor": { "color": [6, 14, 46], "opacity": 0.8 },
+                "rim": { "color": [185, 225, 255], "falloff": [0.9, 0.5, 0.22], "opacity": 1 },
+                "flicker": { "dim": 0.3 }
+              },
               "kinds": {
                 "cloudy": { "overcast": "rgba(176, 186, 200, 0.72)", "haze": "rgba(140, 152, 170, 0.14)", "c": [{ "type": "cloud", "tone": "light", "n": 6, "gap": 1.15, "from": 0, "to": 0.6, "size": 1.2, "pxPerSec": 1.6, "opacity": 0.97, "seed": 11 }, { "type": "cloud", "tone": "light", "n": 5, "gap": 1.3, "from": 0.35, "to": 1, "size": 1, "pxPerSec": 0.9, "opacity": 0.9, "seed": 12 }], "p": [] },
                 "fog": { "overcast": "rgba(226, 232, 240, 0.4)", "haze": "rgba(226, 232, 240, 0.28)", "c": [{ "type": "fog", "tile": [180, 60], "tone": "light", "ms": 60000, "opacity": 0.85, "seed": 21 }, { "type": "fog", "tile": [140, 60], "tone": "light", "ms": 90000, "opacity": 0.65, "seed": 22 }], "p": [] },
