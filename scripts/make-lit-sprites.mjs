@@ -1,7 +1,8 @@
-// Draws the lit copy of every seated picture: assets/sprites/<key>-sit.png -> assets/sprites/lit/<key>-sit.png
-// (a separate folder, so no check that lists the sprites by name mistakes a lit copy for a character).
-// The lit copy is the same picture with the night monitor light screened onto the face and upper body (bakeLit in web/fx-weather.mjs, numbers in
-// config ui.fx.weather.glow). web/fx-weather.mjs lays it over the plain picture in dark mode, so the light can only fall on the figure itself.
+// Draws the lit copies of every seated picture, one set per night light of config ui.fx.weather.glow.sets:
+// assets/sprites/<key>-sit.png -> assets/sprites/<set dir>/<key>-sit.png  (lit-outline/ = multiplied light, lit/ = screened light;
+// separate folders, so no check that lists the sprites by name mistakes a lit copy for a character).
+// A lit copy is the same picture with the night monitor light laid onto the face and upper body (bakeLit in web/fx-weather.mjs, numbers in
+// config ui.fx.weather.glow). web/fx-weather.mjs lays the set the viewer chose over the plain picture in dark mode, so the light can only fall on the figure itself.
 // Run it again after changing the glow numbers or adding a seated picture:   node scripts/make-lit-sprites.mjs
 // (the test tests/fx-weather.test.mjs fails when a lit file is missing or no longer matches what bakeLit makes.) Zero dependencies.
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -15,7 +16,8 @@ export const SPRITES = join(ROOT, 'assets', 'sprites');
 
 /** Seated pictures that get a lit copy: every <key>-sit.png except the office cat's. */
 export const litSources = () => readdirSync(SPRITES).filter((n) => n.endsWith('-sit.png') && !n.startsWith('cat-')).sort();
-export const LIT = join(SPRITES, 'lit');
+/** The folder of one lit set (a key of config glow.sets). */
+export const litDir = (set, cfg) => join(SPRITES, cfg.glow.sets[set].dir);
 
 /** Reads an 8-bit RGBA, non-interlaced PNG (what every sprite is): {w, h, rgba}. */
 export function decodePng(buf) {
@@ -81,18 +83,20 @@ export function encodePng(w, h, rgba) {
   return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
 }
 
-/** The lit pixels of one seated picture file, as {w, h, rgba}. */
-export function litOf(name, cfg) {
+/** The lit pixels of one seated picture file in the lit set `set`, as {w, h, rgba}. */
+export function litOf(name, cfg, set) {
   const { w, h, rgba } = decodePng(readFileSync(join(SPRITES, name)));
-  return { w, h, rgba: bakeLit(rgba, w, h, cfg) };
+  return { w, h, rgba: bakeLit(rgba, w, h, cfg, set) };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const cfg = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8')).ui.fx.weather;
-  mkdirSync(LIT, { recursive: true });
-  for (const name of litSources()) {
-    const { w, h, rgba } = litOf(name, cfg);
-    writeFileSync(join(LIT, name), encodePng(w, h, rgba));
+  for (const set of Object.keys(cfg.glow.sets)) {
+    mkdirSync(litDir(set, cfg), { recursive: true });
+    for (const name of litSources()) {
+      const { w, h, rgba } = litOf(name, cfg, set);
+      writeFileSync(join(litDir(set, cfg), name), encodePng(w, h, rgba));
+    }
+    console.log(`${litSources().length} lit pictures (${set}) written to ${litDir(set, cfg)}`);
   }
-  console.log(`${litSources().length} lit pictures written to ${LIT}`);
 }

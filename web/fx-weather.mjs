@@ -274,42 +274,93 @@ export function litTiming(n, cfg) {
   return { ms, delayMs: -Math.round(g * ms) };
 }
 
-/** How strong the light is at a height t (0 = top of the picture, 1 = its feet): cfg.glow.strength times the piecewise-linear fall-off cfg.glow.fall = [[t, weight], ...]. */
-export function litAt(t, cfg) {
-  const { fall, strength } = cfg.glow;
-  if (t <= fall[0][0]) return strength * fall[0][1];
+/** How strong the light is at a height t (0 = top of the picture, 1 = its feet): `amount` (default cfg.glow.gain) times the piecewise-linear fall-off cfg.glow.fall = [[t, weight], ...]. */
+export function litAt(t, cfg, amount = cfg.glow.gain) {
+  const { fall } = cfg.glow;
+  if (t <= fall[0][0]) return amount * fall[0][1];
   for (let i = 1; i < fall.length; i++) {
     const [t1, w1] = fall[i];
     if (t <= t1) {
       const [t0, w0] = fall[i - 1];
-      return strength * (w0 + ((t - t0) / (t1 - t0)) * (w1 - w0));
+      return amount * (w0 + ((t - t0) / (t1 - t0)) * (w1 - w0));
     }
   }
-  return strength * fall[fall.length - 1][1];
+  return amount * fall[fall.length - 1][1];
+}
+
+/** The id of the night monitor light to use: the stored one when it names a set in cfg.glow.sets, else cfg.glow.default. */
+export function resolveNightLight(stored, cfg) {
+  return typeof stored === 'string' && Object.hasOwn(cfg.glow.sets, stored) ? stored : cfg.glow.default;
+}
+
+/** The picture of a seated figure in the lit set `id`: assets/sprites/<key>-sit.png -> assets/sprites/<set dir>/<key>-sit.png. */
+export function litUrlOf(src, id, cfg) {
+  return src.replace('/sprites/', `/sprites/${cfg.glow.sets[id].dir}/`);
 }
 
 /**
- * The lit copy of a seated picture: the same pixels with the monitor light screened onto them (c + L * p * (1 - c) per channel, p = litAt of the pixel's
- * row), the alpha untouched. Laid over the plain picture, it can only ever change pixels the picture itself covers. `rgba` is not modified.
+ * The lit copy of a seated picture: the same pixels with the monitor light laid on them, the alpha untouched. `set` is a key of cfg.glow.sets:
+ * mode 'multiply' lights a pixel the way light lands on a coloured object (c * (1 + p * L / 255), p = litAt of the pixel's row with cfg.glow.gain), so the
+ * dark outline and the hair shadow stay dark; mode 'screen' screens it on (c + L * p * (1 - c), p with cfg.glow.strength), which is softer and lifts the
+ * darkest pixels most. Laid over the plain picture, it can only ever change pixels the picture itself covers. `rgba` is not modified.
  * @param {Uint8ClampedArray|Uint8Array} rgba  w*h*4 bytes
  * @returns {Uint8ClampedArray}
  */
-export function bakeLit(rgba, w, h, cfg) {
+export function bakeLit(rgba, w, h, cfg, set = cfg.glow.default) {
   const out = new Uint8ClampedArray(rgba);
   const L = cfg.glow.color;
+  const multiply = cfg.glow.sets[set].mode === 'multiply';
+  const amount = multiply ? cfg.glow.gain : cfg.glow.strength;
   for (let y = 0; y < h; y++) {
-    const p = litAt((y + 0.5) / h, cfg);
+    const p = litAt((y + 0.5) / h, cfg, amount);
     if (p <= 0) continue;
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
       if (out[i + 3] === 0) continue;
       for (let k = 0; k < 3; k++) {
-        const c = out[i + k] / 255;
-        out[i + k] = Math.round((c + (L[k] / 255) * p * (1 - c)) * 255);
+        if (multiply) out[i + k] = Math.round(out[i + k] * (1 + p * (L[k] / 255)));
+        else {
+          const c = out[i + k] / 255;
+          out[i + k] = Math.round((c + (L[k] / 255) * p * (1 - c)) * 255);
+        }
       }
     }
   }
   return out;
+}
+
+// The viewer's choice of night light (localStorage 'agent-office.nightLight', this browser only). A blocked storage only means the choice lasts for this page.
+const NIGHT_LIGHT_KEY = 'agent-office.nightLight';
+let nightLightChoice = null; // the id chosen on this page (null = read the storage)
+const nightLightFns = new Set();
+
+/** The night light in use: this page's choice, else the stored one, else cfg.glow.default. */
+export function getNightLight(cfg, getStorage = () => localStorage) {
+  if (nightLightChoice) return resolveNightLight(nightLightChoice, cfg);
+  let stored = null;
+  try {
+    stored = getStorage().getItem(NIGHT_LIGHT_KEY);
+  } catch {
+    // storage blocked: the default
+  }
+  return resolveNightLight(stored, cfg);
+}
+
+/** Chooses a night light: remembered when the storage allows, every listener (the lit pictures on screen) is told at once. */
+export function setNightLight(cfg, id, getStorage = () => localStorage) {
+  nightLightChoice = resolveNightLight(id, cfg);
+  try {
+    getStorage().setItem(NIGHT_LIGHT_KEY, nightLightChoice);
+  } catch {
+    // storage blocked: this page keeps the choice
+  }
+  for (const fn of [...nightLightFns]) fn(nightLightChoice);
+}
+
+/** fn(id) is called when the night light changes. Returns the stop function. */
+export function onNightLight(fn) {
+  nightLightFns.add(fn);
+  return () => nightLightFns.delete(fn);
 }
 
 // ---------------------------------------------------------------- DOM part
@@ -432,11 +483,11 @@ export function init(ctx) {
 
   // ---- monitor light on the face ----
   // One div per seated character, laid inside its .spr exactly like the figure, holding the lit copy of the seated picture
-  // (assets/sprites/lit/<key>-sit.png, drawn ahead of time by scripts/make-lit-sprites.mjs with bakeLit: the same pixels with the light screened
-  // onto them). Over the plain picture it can only change pixels the picture covers, so nothing outside the figure is ever touched, and the desk
+  // (assets/sprites/lit/<key>-sit.png, drawn ahead of time by scripts/make-lit-sprites.mjs with bakeLit: the same pixels with the light laid
+  // onto them, one folder per night light the viewer can choose in the settings: cfg.glow.sets). Over the plain picture it can only change pixels the picture covers, so nothing outside the figure is ever touched, and the desk
   // and monitor in front of the figure hide it as they hide the figure. The ripple is a CSS animation of opacity (fxw-lit-i); the script only
   // sets a mode, the timing and the picture. No lit file for a picture: nothing shows for that figure.
-  const litUrl = (src) => src.replace('/sprites/', '/sprites/lit/');
+  const litUrl = (src) => litUrlOf(src, getNightLight(cfg), cfg);
 
   function litEl(rec, floorLits) {
     let el = floorLits.get(rec);
@@ -592,6 +643,9 @@ export function init(ctx) {
   ctx.onPauseChange(() => {
     if (ctx.paused()) stopLightning();
     else armLightning();
+  });
+  onNightLight(() => { // a new night light: every lit picture on screen changes its file at once (the small window shows the same elements)
+    for (const st of floorsState.values()) for (const el of st.lits.values()) if (el.dataset.src) el.firstChild.src = litUrl(el.dataset.src);
   });
   fx.onFxChange(({ fx: on }) => {
     if (on) sync();

@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { litSources, litOf, decodePng, encodePng, SPRITES, LIT } from '../scripts/make-lit-sprites.mjs';
-import { seeded, tileSvg, motion, layerBox, layersFor, lightTarget, fadePlan, planBurst, flashFrames, litMode, litTiming, litAt, bakeLit, cloudRuns, cloudSvg, resolveSpec, skyMaskFile, TONE } from '../web/fx-weather.mjs';
+import { litSources, litOf, decodePng, encodePng, SPRITES, litDir } from '../scripts/make-lit-sprites.mjs';
+import { seeded, tileSvg, motion, layerBox, layersFor, lightTarget, fadePlan, planBurst, flashFrames, litMode, litTiming, litAt, bakeLit, resolveNightLight, litUrlOf, getNightLight, setNightLight, onNightLight, cloudRuns, cloudSvg, resolveSpec, skyMaskFile, TONE } from '../web/fx-weather.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const cfg = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8')).ui.fx.weather;
@@ -237,7 +237,7 @@ test('face light fall-off: brightest at the face, weaker down the chest, none be
   assert.ok(at(0.36) > at(0.52) && at(0.52) > at(0.68) && at(0.68) > at(0.86), 'weaker and weaker going down');
   assert.equal(at(0.86), 0);
   assert.equal(at(1), 0);
-  assert.ok(Math.abs(at(0.36) - cfg.glow.strength) < 1e-9);
+  assert.ok(Math.abs(at(0.36) - cfg.glow.gain) < 1e-9);
 });
 
 test('baked lit picture: only covered pixels change, the alpha never, the face row gets lighter, the feet row stays, the source stays', () => {
@@ -267,6 +267,60 @@ test('baked lit picture: only covered pixels change, the alpha never, the face r
   assert.ok(face[2] > px(Math.floor(h * 0.6))[2], 'the face is lit more than the chest');
 });
 
+test('baked lit picture multiplies in the outline set: a dark outline pixel gains almost nothing, a bright pixel gains more, channels stop at 255', () => {
+  const h = 20;
+  const colours = [[10, 10, 14], [200, 160, 140], [250, 250, 250]];
+  const rows = new Uint8ClampedArray(3 * h * 4);
+  for (let y = 0; y < h; y++) colours.forEach((c, x) => rows.set([...c, 255], (y * 3 + x) * 4));
+  const out = bakeLit(rows, 3, h, cfg, 'outline');
+  const y = Math.floor(h * 0.36);
+  const px = (x) => [...out.slice((y * 3 + x) * 4, (y * 3 + x) * 4 + 3)];
+  const dark = px(0); const mid = px(1); const white = px(2);
+  assert.ok(dark[2] - 14 <= 6, 'the dark outline stays dark');
+  assert.ok(mid[2] - 140 > dark[2] - 14, 'a brighter pixel is lifted more');
+  assert.equal(white[2], 255);
+});
+
+test('baked lit picture screens in the soft set: the darkest pixel is lifted most of all, and the two sets differ', () => {
+  const h = 20;
+  const rows = new Uint8ClampedArray(2 * h * 4);
+  for (let y = 0; y < h; y++) { rows.set([10, 10, 14, 255], (y * 2) * 4); rows.set([200, 160, 140, 255], (y * 2 + 1) * 4); }
+  const y = Math.floor(h * 0.36);
+  const soft = bakeLit(rows, 2, h, cfg, 'soft');
+  const outline = bakeLit(rows, 2, h, cfg, 'outline');
+  const blue = (o, x) => o[(y * 2 + x) * 4 + 2];
+  const k = litAt((y + 0.5) / h, cfg, cfg.glow.strength); // the screen weight at that row
+  assert.equal(blue(soft, 0), Math.round((14 / 255 + (255 / 255) * k * (1 - 14 / 255)) * 255), 'screen formula');
+  assert.ok(blue(soft, 0) - 14 > blue(soft, 1) - 140, 'screen lifts the dark pixel more than the bright one');
+  assert.ok(blue(soft, 0) > blue(outline, 0), 'the soft set lifts the outline more than the outline set does');
+});
+
+test('night light choice: stored id wins, junk or nothing gives the default, a change tells the listeners and the storage, a blocked storage still works for the page', () => {
+  assert.equal(cfg.glow.default, 'outline');
+  assert.deepEqual(Object.keys(cfg.glow.sets), ['outline', 'soft']);
+  assert.equal(resolveNightLight(null, cfg), 'outline');
+  assert.equal(resolveNightLight('junk', cfg), 'outline');
+  assert.equal(resolveNightLight('toString', cfg), 'outline');
+  assert.equal(resolveNightLight('soft', cfg), 'soft');
+  assert.equal(litUrlOf('/assets/sprites/worker-sit.png', 'outline', cfg), '/assets/sprites/lit-outline/worker-sit.png');
+  assert.equal(litUrlOf('/assets/sprites/worker-sit.png', 'soft', cfg), '/assets/sprites/lit/worker-sit.png');
+  const mem = new Map();
+  const store = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
+  mem.set('agent-office.nightLight', 'soft');
+  assert.equal(getNightLight(cfg, () => store), 'soft', 'the stored choice beats the default');
+  const heard = [];
+  const stop = onNightLight((id) => heard.push(id));
+  setNightLight(cfg, 'outline', () => store);
+  assert.deepEqual(heard, ['outline']);
+  assert.equal(mem.get('agent-office.nightLight'), 'outline');
+  assert.equal(getNightLight(cfg, () => store), 'outline');
+  const blocked = () => { throw new Error('blocked'); };
+  setNightLight(cfg, 'soft', blocked);
+  assert.equal(getNightLight(cfg, blocked), 'soft', 'a blocked storage: this page keeps the choice');
+  assert.deepEqual(heard, ['outline', 'soft']);
+  stop();
+});
+
 test('face light css: the lit picture is an image laid over the figure (no mask, clip-path, blend, box shadow or radius), opacity only, off without a seated figure', () => {
   const css = readFileSync(join(ROOT, 'web/fx-weather.css'), 'utf8');
   const lit = css.slice(css.indexOf('.fxw-lit {'), css.indexOf('@media (prefers-reduced-motion'));
@@ -276,14 +330,16 @@ test('face light css: the lit picture is an image laid over the figure (no mask,
   assert.equal(cfg.glow.holes, undefined, 'the old box and its holes are gone');
 });
 
-test('lit pictures: every seated picture has its lit copy on disk, equal to what bakeLit makes now (run scripts/make-lit-sprites.mjs when this fails)', () => {
+test('lit pictures: every seated picture has its lit copy in every set on disk, equal to what bakeLit makes now (run scripts/make-lit-sprites.mjs when this fails)', () => {
   const names = litSources();
   assert.ok(names.length >= 30, `found ${names.length} seated pictures`);
-  for (const name of names) {
-    const lit = litOf(name, cfg);
-    const file = decodePng(readFileSync(join(LIT, name)));
-    assert.deepEqual([file.w, file.h], [lit.w, lit.h], `${name}: size`);
-    assert.ok(Buffer.from(file.rgba).equals(Buffer.from(lit.rgba)), `${name}: the lit copy is out of date`);
+  const dirs = Object.keys(cfg.glow.sets).map((set) => litDir(set, cfg));
+  assert.equal(new Set(dirs).size, dirs.length, 'one folder per set');
+  for (const set of Object.keys(cfg.glow.sets)) for (const name of names) {
+    const lit = litOf(name, cfg, set);
+    const file = decodePng(readFileSync(join(litDir(set, cfg), name)));
+    assert.deepEqual([file.w, file.h], [lit.w, lit.h], `${set}/${name}: size`);
+    assert.ok(Buffer.from(file.rgba).equals(Buffer.from(lit.rgba)), `${set}/${name}: the lit copy is out of date`);
     const plain = decodePng(readFileSync(join(SPRITES, name)));
     for (let i = 3; i < plain.rgba.length; i += 4) {
       if (plain.rgba[i] !== file.rgba[i]) assert.fail(`${name}: alpha differs at ${i}`);

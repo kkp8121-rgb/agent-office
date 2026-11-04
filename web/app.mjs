@@ -23,6 +23,7 @@ import { CHOICES as WX_CHOICES, buildWeather, effectKind, loadChoice, saveChoice
 import * as fxApi from './fx.mjs';
 import { emitFx, fxChoices, nextCombo, onFxChange, setFx, setSfx, startFx, trackDoc } from './fx.mjs';
 import { init as initFxWeather } from './fx-weather.mjs';
+import { getNightLight, setNightLight } from './fx-weather.mjs';
 import { init as initFxChars } from './fx-chars.mjs';
 import { init as initFxEvents } from './fx-events.mjs';
 import { init as initFxLed } from './fx-led.mjs';
@@ -3250,6 +3251,7 @@ function initWeather() {
     group.append(label);
   }
   initFxSwitches(S);
+  initNightLight(S);
   initSysSwitch(S);
   setText($('wx-now'), statusLine(S, ui.weather.enabled, wxReal, ui.weather.city));
   panel.addEventListener('toggle', (ev) => {
@@ -3285,6 +3287,26 @@ function initFxSwitches(S) {
   onFxChange(() => { // the reduced-motion default can flip while the panel exists
     for (const which of Object.keys(boxes)) boxes[which].checked = fxChoices()[which];
   });
+}
+
+/** The 「밤 모니터 빛」 choice: radios in the settings panel; the choice is kept in this browser and the lit pictures on screen change at once (web/fx-weather.mjs). */
+function initNightLight(S) {
+  const cfg = ui.ui.fx.weather;
+  const group = $('nl-choices');
+  setText(group.querySelector('legend'), S.lightGroup);
+  group.title = S.lightHint;
+  const current = getNightLight(cfg);
+  for (const id of Object.keys(cfg.glow.sets)) {
+    const label = el('label', 'wx-opt');
+    const radio = el('input');
+    radio.type = 'radio';
+    radio.name = 'nl';
+    radio.value = id;
+    radio.checked = id === current;
+    radio.addEventListener('change', () => setNightLight(cfg, id));
+    label.append(radio, ` ${S.lightChoices[id]}`);
+    group.append(label);
+  }
 }
 
 /** The 「CPU 를 작업 관리자 기준으로 표시」 switch. The choice is kept in this browser like the others and also sent to the server (the server computes the number), where the last choice wins. */

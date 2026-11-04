@@ -63,6 +63,7 @@
                        "now": "지금 {city}: {kind}", "unknown": "지금 {city}: 알 수 없음 (날씨 서비스에 닿지 않음)", "disabled": "실제 날씨는 config.json 에서 꺼져 있습니다",
                        "credit": "날씨 정보: Open-Meteo.com",
                        "fxGroup": "효과", "fxSwitch": "화려한 효과", "sfxSwitch": "효과음", "sfxHint": "화려한 효과가 꺼져 있으면 효과음도 나지 않습니다",
+                       "lightGroup": "밤 모니터 빛", "lightHint": "다크 모드에서 일하는 직원의 얼굴에 비치는 모니터 빛입니다. 화려한 효과가 꺼져 있으면 보이지 않습니다", "lightChoices": { "outline": "윤곽 살린 빛", "soft": "부드러운 빛" },
                        "sysGroup": "현황판", "sysSwitch": "CPU 를 작업 관리자 기준으로 표시", "sysHint": "끄면 코어가 일한 시간 기준으로 표시합니다. 명령을 많이 실행하는 동안에는 이쪽이 더 높게 나옵니다", "sysOnlyWin": "Windows 에서만 쓸 수 있습니다" },
           "fx": {
             "enabled": true, "sound": true, "volume": 0.25,
@@ -83,7 +84,7 @@
                 "greenhouse": { "band": [13, 107], "h": [22, 36] }
               },
               "lightning": { "minGapMs": 4000, "maxGapMs": 14000, "burstChance": 0.4, "maxPerBurst": 2, "peak": [0.22, 0.34], "flashMs": 420 },
-              "glow": { "states": { "working": "work", "thinking": "work", "idle": "rest" }, "rippleMs": [1500, 2900], "fadeMs": 600, "color": [135, 188, 255], "strength": 0.5, "fall": [[0, 0.35], [0.36, 1], [0.52, 0.7], [0.68, 0.3], [0.86, 0]] },
+              "glow": { "states": { "working": "work", "thinking": "work", "idle": "rest" }, "rippleMs": [1500, 2900], "fadeMs": 600, "color": [135, 188, 255], "strength": 0.5, "gain": 0.4, "default": "outline", "sets": { "outline": { "dir": "lit-outline", "mode": "multiply" }, "soft": { "dir": "lit", "mode": "screen" } }, "fall": [[0, 0.35], [0.36, 1], [0.52, 0.7], [0.68, 0.3], [0.86, 0]] },
               "kinds": {
                 "cloudy": { "overcast": "rgba(176, 186, 200, 0.72)", "haze": "rgba(140, 152, 170, 0.14)", "c": [{ "type": "cloud", "tone": "light", "n": 6, "gap": 1.15, "from": 0, "to": 0.6, "size": 1.2, "pxPerSec": 1.6, "opacity": 0.97, "seed": 11 }, { "type": "cloud", "tone": "light", "n": 5, "gap": 1.3, "from": 0.35, "to": 1, "size": 1, "pxPerSec": 0.9, "opacity": 0.9, "seed": 12 }], "p": [] },
                 "fog": { "overcast": "rgba(226, 232, 240, 0.4)", "haze": "rgba(226, 232, 240, 0.28)", "c": [{ "type": "fog", "tile": [180, 60], "tone": "light", "ms": 60000, "opacity": 0.85, "seed": 21 }, { "type": "fog", "tile": [140, 60], "tone": "light", "ms": 90000, "opacity": 0.65, "seed": 22 }], "p": [] },
