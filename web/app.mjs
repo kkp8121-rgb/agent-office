@@ -14,7 +14,7 @@ import { daypart, nextPoke, openBox, pickLine, playPartner, throwPath, throwVelo
 import { between, chooseFidget, chooseSpot, createFloorClock, rngFor, tripRange } from './ambient.mjs';
 import { chooseCatAct, openPoint, otherFloor } from './cat.mjs';
 import { legVars } from './walk.mjs';
-import { boardCapacity, boardFrame, boardSheet, itemWindow, quadFrame, sheetKey } from './board.mjs';
+import { boardCapacity, boardFrame, boardRows, boardSheet, itemWindow, quadFrame, rowKind, sheetKey } from './board.mjs';
 import { assignSpots, clipPhase, moodKind, patDue } from './meeting.mjs';
 import { clearBubbles } from './bubbles.mjs';
 import { lightAt, msToNextChange, placeSeason, seasonOn } from './season.mjs';
@@ -29,6 +29,7 @@ import { init as initFxLed } from './fx-led.mjs';
 import { init as initFxHit } from './fx-hit.mjs';
 import { init as initOfficeLife } from './officelife.mjs';
 import { bindTag, createCard } from './card.mjs';
+import { createBoardPanel } from './board-panel.mjs';
 
 // Visual constants (how things look/move, not planning numbers; those come from /api/ui).
 const WALK_PX_PER_SEC = 150;
@@ -44,8 +45,6 @@ const LIFT_PX = 28; // the held character's height above its shadow (--lift in s
 const BOARD_LINE_PX = 9; // line height of the text on the wall board (.wboard in style.css)
 const BOARD_PAD_PX = 2; // padding of the wall board (the same)
 const BOARD_MIN_ITEMS = 3; // the wall board always shows at least this many items
-const BIG_WIDTH_PX = 250; // width of the enlarged to-do list (.wbig)
-const BIG_GAP_PX = 6; // its distance from the floor edge and from the board
 const TODO_MARK = { in_progress: '▶', completed: '✓', pending: '☐' };
 const FX_URL = '/assets/fx/'; // the failure faces (sweat-drop, rain-cloud-1/2) and the snack sparkle (sparkle-1/2)
 const SNACK_URL = '/assets/snacks/snack-'; // + coffee|donut|cookie|fish + .png
@@ -1164,9 +1163,18 @@ function makeBoard(frec) {
   Object.assign(box.style, { left: `${f.x}px`, top: `${f.y}px`, width: `${f.w}px`, height: `${f.h}px`, transform: `matrix(1, ${f.slope}, 0, 1, 0, 0)` });
   box.tabIndex = 0;
   box.setAttribute('role', 'button');
+  box.setAttribute('aria-haspopup', 'dialog');
+  box.setAttribute('aria-expanded', 'false');
+  box.setAttribute('aria-label', ui.ui.boardPanel.tagLabel);
   const title = el('b');
+  const bar = el('div', 'wb-bar');
+  bar.append(el('i'));
   const list = el('ul');
-  box.append(title, list);
+  box.append(title, bar, list);
+  const B = ui.ui.board;
+  box.style.setProperty('--wb-bar', `${B.barPx}px`);
+  box.style.setProperty('--wb-gap', `${B.barGapPx}px`);
+  box.style.setProperty('--wb-mark', `${B.markPx}px`);
   box.addEventListener('click', () => toggleBig(frec));
   box.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
@@ -1174,7 +1182,9 @@ function makeBoard(frec) {
     toggleBig(frec);
   });
   frec.stage.append(box);
-  frec.wb = { el: box, title, list, cap: boardCapacity(f.h, BOARD_LINE_PX, BOARD_PAD_PX, BOARD_MIN_ITEMS), key: '', frame: f };
+  const cap = boardCapacity(f.h, BOARD_LINE_PX, BOARD_PAD_PX, BOARD_MIN_ITEMS);
+  const capBar = boardCapacity(f.h, BOARD_LINE_PX, BOARD_PAD_PX, BOARD_MIN_ITEMS, B.barPx + B.barGapPx); // the bar takes room under the heading
+  frec.wb = { el: box, title, bar, list, cap, capBar, key: '', frame: f };
 }
 
 /** One line of a to-do list: a mark and the (server-clipped) text; the status is a class (`plain`: a text without a mark, the title). */
@@ -1182,6 +1192,13 @@ function todoLine(item) {
   const li = el('li', item.status);
   if (item.status !== 'plain') li.append(el('span', 'mk', TODO_MARK[item.status] ?? TODO_MARK.pending));
   li.append(el('span', 'tx', item.text));
+  return li;
+}
+
+/** One line of the progress display: a pen-drawn marker (done, now, next) and the text; done lines are struck through and dimmed. */
+function progressLine(item) {
+  const li = el('li', `wb-row wb-${rowKind(item.status)}`);
+  li.append(el('span', 'wb-mk'), el('span', 'tx', item.text));
   return li;
 }
 
@@ -1195,61 +1212,32 @@ function renderBoard(frec) {
   const b = frec.sheet;
   wb.el.classList.toggle('empty', !b);
   setText(wb.title, b ? b.head : '');
-  wb.list.replaceChildren(...(b ? itemWindow(b.items, wb.cap).map(todoLine) : []));
-  if (bigBoard?.frec !== frec) return;
-  if (b) fillBig();
-  else closeBig();
+  const p = b?.progress;
+  wb.bar.hidden = !p;
+  if (p) wb.bar.firstChild.style.width = `${Math.round(p.frac * 100)}%`;
+  if (!p) { // sub-agents and the title keep the plain list
+    wb.list.replaceChildren(...(b ? itemWindow(b.items, wb.cap).map(todoLine) : []));
+  } else {
+    const { rows, hidden } = boardRows(b.items, b.more, wb.capBar);
+    const lines = rows.map(progressLine);
+    if (hidden > 0) lines.push(el('li', 'wb-rest', ui.ui.board.more.replace('{n}', hidden)));
+    wb.list.replaceChildren(...lines);
+  }
+  if (!b && boardPanel?.key() === frec.sid) closeBig();
 }
 
-let bigBoard = null; // the one enlarged list: {frec, el, title, list, close}
-
-function fillBig() {
-  const { frec, title, list } = bigBoard;
-  const b = frec.sheet;
-  setText(title, b.head);
-  const rows = b.items.map(todoLine);
-  if (b.more > 0) rows.push(el('li', 'more', ui.ui.board.more.replace('{n}', b.more)));
-  list.replaceChildren(...rows);
-}
+let boardPanel = null; // the whiteboard detail panel (web/board-panel.mjs)
 
 function closeBig() {
-  if (!bigBoard) return;
-  bigBoard.close();
-  bigBoard = null;
+  boardPanel?.close();
 }
 
-/** The board was clicked: the whole list in a readable size next to it. Closes on Esc, a click elsewhere, or the board again. */
+/** The board was clicked (or Enter / Space): the detail panel of that floor opens, or closes when it is that floor's own. */
 function toggleBig(frec) {
-  const again = bigBoard?.frec === frec;
+  const again = boardPanel.isOpen() && boardPanel.key() === frec.sid;
   closeBig();
   if (again || !frec.wb || !frec.sheet) return;
-  const doc = frec.stage.ownerDocument;
-  const pop = el('div', 'wbig');
-  pop.setAttribute('role', 'dialog');
-  const title = el('b');
-  const list = el('ul');
-  pop.append(title, list);
-  frec.stage.append(pop);
-  const onKey = (e) => e.key === 'Escape' && closeBig();
-  const onDown = (e) => {
-    if (!pop.contains(e.target) && !frec.wb.el.contains(e.target)) closeBig();
-  };
-  doc.addEventListener('keydown', onKey);
-  doc.addEventListener('pointerdown', onDown, true);
-  bigBoard = {
-    frec, el: pop, title, list,
-    close: () => {
-      doc.removeEventListener('keydown', onKey);
-      doc.removeEventListener('pointerdown', onDown, true);
-      pop.remove();
-    },
-  };
-  fillBig();
-  const [W, H] = frec.scene.r.size;
-  const f = frec.wb.frame;
-  pop.style.width = `${BIG_WIDTH_PX}px`;
-  pop.style.left = `${Math.min(Math.max(f.x + f.w / 2 - BIG_WIDTH_PX / 2, BIG_GAP_PX), W - BIG_WIDTH_PX - BIG_GAP_PX)}px`;
-  pop.style.top = `${Math.max(BIG_GAP_PX, Math.min(f.y + f.h + f.slope * f.w + BIG_GAP_PX, H - pop.offsetHeight - BIG_GAP_PX))}px`;
+  boardPanel.open(frec.sid, frec.wb.el, () => (floorRecs.get(frec.sid) === frec ? lastFloors.get(frec.sid) ?? null : null));
 }
 
 /** Characters that can be called to a meeting: present (seated or idle), not held, not in a scene, not finished or gone. */
@@ -2990,7 +2978,7 @@ function removeSession(sessionId, withLog = true) {
   const f = floorRecs.get(sessionId);
   if (f) {
     stopAmbient(f);
-    if (bigBoard?.frec === f) closeBig();
+    if (boardPanel?.key() === f.sid) closeBig();
     for (const a of f.agents.values()) cancelGrab(a);
     if (cat?.frec === f) catRemove();
     f.el.remove();
@@ -3062,6 +3050,7 @@ function render(state) {
   followPoke();
   lobbySync(list);
   card?.refresh();
+  boardPanel?.refresh();
 }
 
 async function refreshState() {
@@ -3318,6 +3307,7 @@ function initFxSwitches(S) {
 let card = null; // the card component, null while ui.card.enabled is off
 
 function initCard() {
+  boardPanel = createBoardPanel({ L: ui.ui.boardPanel, board: ui.ui.board, lobby: ui.ui.lobby, fx: fxApi, now: () => lastNow, reduced: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches });
   const cfg = ui.ui.card;
   if (!cfg.enabled) return;
   card = createCard({ cfg, lobbyLabels: ui.ui.lobby, server: ui, fx: fxApi, now: () => lastNow, reduced: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches });
@@ -3530,7 +3520,7 @@ function setOff(f, off) {
   f.off = off;
   f.el.hidden = off;
   if (off) {
-    if (bigBoard?.frec === f) closeBig();
+    if (boardPanel?.key() === f.sid) closeBig();
     stopAmbient(f);
     for (const a of f.agents.values()) settleNow(a);
     emitFx('floor-hidden', { floor: f, removed: false });
