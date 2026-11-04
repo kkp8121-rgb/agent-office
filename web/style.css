@@ -478,7 +478,7 @@ li.completed .tx { text-decoration: line-through; }
 .wboard li.wb-rest { color: #7a7466; font-weight: 400; }
 /* the in-progress line that is too long for one line: two lines, then cut with an ellipsis */
 .wboard li.wb-wrap { height: 18px; white-space: normal; }
-.wboard li.wb-wrap .tx { overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-overflow: clip; }
+.wboard li.wb-wrap .tx { overflow-wrap: anywhere; word-break: keep-all; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-overflow: clip; }
 /* the session title on a board without a list: a bold text that wraps, no mark; an empty heading takes no line */
 .wboard b:empty { display: none; }
 .wboard li.plain { height: auto; white-space: normal; overflow-wrap: anywhere; font-weight: 800; }
