@@ -1,5 +1,5 @@
-// Draws the two pictures per room design that the night map needs (web/fx-nightmap.mjs), from assets/nightmap/nightmap.json and the room's objects.png:
-//   assets/nightmap/<design>-mon.png  the monitor backs of every desk kind, as an opaque navy silhouette, on the same pixels as in objects.png
+// Draws the two pictures per room design that the real night needs (web/fx-nightmap.mjs), from assets/nightmap/nightmap.json and the room's objects.png:
+//   assets/nightmap/<design>-mon.png  the monitor backs of every desk kind, as a near-black silhouette (config night.monitor.color), on the same pixels as in objects.png
 //                                     (laid over the desk in a lit pool and faded in with it, it keeps the monitor back a dark shape)
 //   assets/nightmap/<design>-rim.png  a thin cool glow in the 1-3 pixels just outside those silhouettes, only where objects.png is transparent
 //                                     (laid under the desk, over the figure behind it, so light leaks round the monitor's edge)
