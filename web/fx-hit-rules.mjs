@@ -1,5 +1,5 @@
 // Hit feel rules (pure): which motion set a character has, how a poke is staged in time (hit-stop, squash, knockback, springs),
-// the particles of an impact, the combo counter, which persona line answers a situation. No DOM, no clock, no Math.random:
+// the particles of an impact, which persona line answers a situation. No DOM, no clock, no Math.random:
 // web/fx-hit.mjs draws what these return, the numbers come from config ui.fx.hit (and server/persona.mjs reuses TYPES and hashType).
 import { pickLine } from './play.mjs';
 
@@ -33,9 +33,9 @@ export const typeOf = (rec, persona) => (rec.isCat ? 'cat' : persona.type);
 // ---- lines ----
 
 const LEAD_KEYS = { poke: /^pokeLead([1-4])$/, lift: /^liftLead$/, grumble: /^grumbleLead$/ };
-const CAT_KEYS = { catCombo: 'combo', catSnackLove: 'snackLove', catSnackDislike: 'snackDislike' };
+const CAT_KEYS = { catSnackLove: 'snackLove', catSnackDislike: 'snackDislike' };
 
-/** The persona line key a situation asks for: a lead variant maps onto the plain one (pokeLead3 -> poke3, liftLead -> lift, grumbleLead -> grumble), the cat's generic combo and snack keys onto the persona's. */
+/** The persona line key a situation asks for: a lead variant maps onto the plain one (pokeLead3 -> poke3, liftLead -> lift, grumbleLead -> grumble), the cat's generic snack keys onto the persona's. */
 export function lineKeyFor(situation, rec) {
   const m = LEAD_KEYS.poke.exec(situation);
   if (m) return `poke${m[1]}`;
@@ -178,20 +178,18 @@ export function liftFrames(p, H) {
 }
 
 /**
- * The flight: a stretch along the throw velocity that relaxes, plus the type's spin over the whole flight (`spin` turns, the way it was thrown).
- * Everything turns about the body's middle (`H.throw.spinMidPx` above the feet), not about the feet. Frames share one transform list:
- * translate(0, -mid) rotate(spin) rotate(a) scale(sx, sy) rotate(-a) translate(0, mid).
+ * The flight: a stretch along the throw velocity that relaxes. The character never rotates in flight (the speech bubble and the name tag stay readable).
+ * Frames share one transform list: rotate(a) scale(sx, sy) rotate(-a), which nets out to a pure stretch along the velocity.
  */
 export function flightFrames(p, vx, vy, ms, H) {
   const a = Math.atan2(vy, vx) * (180 / Math.PI);
   const T = H.throw;
-  const spin = (vx < 0 ? -1 : 1) * 360 * p.spin;
-  const f = (turn, sx, sy) => `translate(0px, ${-T.spinMidPx}px) rotate(${r3(turn)}deg) rotate(${r3(a)}deg) scale(${r3(sx)}, ${r3(sy)}) rotate(${r3(-a)}deg) translate(0px, ${T.spinMidPx}px)`;
+  const f = (sx, sy) => `rotate(${r3(a)}deg) scale(${r3(sx)}, ${r3(sy)}) rotate(${r3(-a)}deg)`;
   return {
     frames: [
-      { offset: 0, transform: f(0, T.stretch[0], T.stretch[1]), easing: 'ease-out' },
-      { offset: T.relaxShare, transform: f(spin * T.relaxShare, 1 + (T.stretch[0] - 1) * 0.35, 1 + (T.stretch[1] - 1) * 0.35), easing: 'linear' },
-      { offset: 1, transform: f(spin, 1, 1) },
+      { offset: 0, transform: f(T.stretch[0], T.stretch[1]), easing: 'ease-out' },
+      { offset: T.relaxShare, transform: f(1 + (T.stretch[0] - 1) * 0.35, 1 + (T.stretch[1] - 1) * 0.35), easing: 'linear' },
+      { offset: 1, transform: f(1, 1) },
     ],
     ms: Math.max(ms, 1),
   };
@@ -258,16 +256,6 @@ export function burstPlan(count, distPx, rng) {
   }
   return out;
 }
-
-/** The label and size of the combo counter, or null below `H.combo.from`. The size grows with each further click up to maxScale. */
-export function comboView(n, H) {
-  const C = H.combo;
-  if (n < C.from) return null;
-  return { text: C.label.replace('{n}', String(n)), scale: Math.min(C.baseScale + C.stepScale * (n - C.from), C.maxScale) };
-}
-
-/** Whether the persona's combo line replaces the poke line: the clicks went on past the top level. */
-export const comboSpeaks = (combo, maxLevel) => combo > maxLevel;
 
 /** Which way a character is knocked: away from the click (+1 right, -1 left). `centerX` and `clickX` share a coordinate space; dead centre alternates with the combo. */
 export function knockDir(clickX, centerX, combo) {

@@ -2,14 +2,13 @@
 //
 // What it does, all on the GPU compositor (WAAPI element.animate with transform / translate / opacity only, no per-frame script, no rAF):
 //  - a poke (or a cat pet): hit-stop at the impact, then squash and stretch, a knockback away from the click with a springy return and a tilt on the
-//    character's .fx-hit wrapper; an impact burst, the impact word and (from level 3) a floor shake and a white flash; the combo counter; the persona's
-//    combo line past the top level; each of the ten personality types (and the cat) has its own motion set (web/fx-hit-rules.mjs, numbers in ui.fx.hit.types)
-//  - lift, dangling wiggle, throw (stretch along the flight, a spin per type), landing (dust, squash, hop), snacks (love: hearts and a bounce, dislike: "!?" and a head shake)
+//    character's .fx-hit wrapper; an impact burst, the impact word and (from level 3) a floor shake and a white flash; each of the ten personality types (and the cat) has its own motion set (web/fx-hit-rules.mjs, numbers in ui.fx.hit.types)
+//  - lift, dangling wiggle, throw (stretch along the flight, no rotation), landing (dust, squash, hop), snacks (love: hearts and a bounce, dislike: "!?" and a head shake)
 //  - persona lines: the page's line picker asks the persona first (createLinePicker); with no persona line today's generic line is used
 //  - sound: synthesized, only for the viewer's own clicks, drags and drops (fx-hit-sound.mjs), the AudioContext only after a gesture and only while 「효과음」 is on
 // While the effects are off (fxOn()) nothing here runs: the bus does not call the handlers, no element exists, no timer or listener is armed.
-// Particles are a small pool of detached elements put into the floor's .fx-layer while they play and taken out when they end, so the layer is empty (and not drawn) otherwise.
-import { bounceFrames, burstPlan, comboSpeaks, comboView, createLinePicker, flightFrames, headShakeFrames, hitStopMs, knockDir, landFrames, liftFrames, motionFrames, personaOf, snackMood, typeOf } from './fx-hit-rules.mjs';
+// Particles are a small pool of detached elements put into the floor's own .fxh-layer (under the name tags and bubbles) while they play and taken out when they end, so the layer is empty (and not drawn) otherwise.
+import { bounceFrames, burstPlan, createLinePicker, flightFrames, headShakeFrames, hitStopMs, knockDir, landFrames, liftFrames, motionFrames, personaOf, snackMood, typeOf } from './fx-hit-rules.mjs';
 import { createSound, soundPlan } from './fx-hit-sound.mjs';
 
 const px = (n) => `${Math.round(n * 100) / 100}px`;
@@ -42,8 +41,8 @@ export function init(ctx) {
   const hitAnims = new Map(); // rec -> its current reaction animation on .fx-hit
   const wiggles = new Map(); // rec -> the dangling wiggle while held
   const flashes = new Map(); // rec -> {node, anim}
-  const combos = new Map(); // rec -> its combo counter {node, anim}
   const shakes = new Map(); // floor -> shake animation
+  const hitLayers = new Map(); // floor -> the layer our particles live in: above the characters, below the name tags and bubbles, so nothing we draw covers their text
 
   const poolOf = (floor) => {
     let p = pools.get(floor);
@@ -62,15 +61,27 @@ export function init(ctx) {
     else idle.set(item.look, [item.node]);
   }
 
-  /** Takes the floor's idle particles out of its layer (the floor is not shown, or the effects went off). */
+  /** Takes the floor's idle particles and our layer away (the floor is not shown, or the effects went off). */
   function dropPool(floor) {
     const p = pools.get(floor);
-    if (!p) return;
-    for (const list of p.idle.values()) for (const node of list) node.remove();
+    if (p) for (const list of p.idle.values()) for (const node of list) node.remove();
     pools.delete(floor);
+    hitLayers.get(floor)?.remove();
+    hitLayers.delete(floor);
   }
 
-  /** Plays one particle on the floor's effects layer at (x, y) with `frames` (transforms relative to that point); null when the pool is used up (the effect is simply skipped). */
+  function layerOf(floor) {
+    let layer = hitLayers.get(floor);
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.className = 'fxh-layer';
+      floor.stage.append(layer);
+      hitLayers.set(floor, layer);
+    }
+    return layer;
+  }
+
+  /** Plays one particle on the floor's hit layer at (x, y) with `frames` (transforms relative to that point); null when the pool is used up (the effect is simply skipped). */
   function fly(floor, cls, text, x, y, frames, ms, { delay = 0, color = '', size = 0, easing = 'ease-out' } = {}) {
     if (!floor.layer || live.size >= H.pool.maxActive) return null;
     const look = `${cls}|${text ?? ''}|${color}|${size}`;
@@ -84,7 +95,7 @@ export function init(ctx) {
       node.textContent = text ?? '';
       if (size) node.style.fontSize = px(size);
       if (color) node.style.setProperty('--c', color);
-      floor.layer.append(node);
+      layerOf(floor).append(node);
     }
     const at = `translate(${px(x)}, ${px(y)}) `;
     const anim = node.animate(frames.map((f) => ({ ...f, transform: at + f.transform })), { duration: ms, delay, easing, fill: 'both' });
@@ -123,7 +134,7 @@ export function init(ctx) {
         release(item);
       }
     }
-    for (const map of [hitAnims, wiggles, flashes, combos]) {
+    for (const map of [hitAnims, wiggles, flashes]) {
       for (const [rec, v] of [...map]) {
         if (rec.frec !== floor) continue;
         (v.anim ?? v).cancel();
@@ -139,7 +150,7 @@ export function init(ctx) {
 
   function tidyAll() {
     for (const floor of new Set([...live].map((i) => i.floor).concat([...pools.keys()]))) tidyFloor(floor);
-    for (const map of [hitAnims, wiggles, flashes, combos]) {
+    for (const map of [hitAnims, wiggles, flashes]) {
       for (const [rec, v] of [...map]) {
         (v.anim ?? v).cancel();
         if (!v.look) v.node?.remove(); // particles go back to the pool, the flash copy goes away
@@ -201,23 +212,6 @@ export function init(ctx) {
         { offset: 1, transform: `translate(${px((side + jitter) * spreadPx)}, ${px(riseOrDrop)}) scale(1.15)`, opacity: 0 },
       ], ms, { color, delay: i * 40 });
     }
-  }
-
-  function comboCounter(rec, f, n, dir) {
-    const view = comboView(n, H);
-    if (!view) return;
-    const C = H.combo;
-    combos.get(rec)?.anim.cancel();
-    const [hx, y] = f.head;
-    const x = hx - dir * C.sidePx; // on the side that was hit, clear of the speech bubble above the head
-    const item = fly(f.floor, 'combo', view.text, x, y - C.gapPx, [
-      { offset: 0, transform: `translate(0px, 0px) scale(${view.scale * 0.5})`, opacity: 0 },
-      { offset: 0.15, transform: `translate(0px, ${px(-C.gapPx * 0.4)}) scale(${view.scale * 1.2})`, opacity: 1 },
-      { offset: 0.3, transform: `translate(0px, ${px(-C.gapPx * 0.6)}) scale(${view.scale})`, opacity: 1 },
-      { offset: 0.8, transform: `translate(0px, ${px(-C.gapPx * 1.2)}) scale(${view.scale})`, opacity: 1 },
-      { offset: 1, transform: `translate(0px, ${px(-C.gapPx * 1.8)}) scale(${view.scale * 0.9})`, opacity: 0 },
-    ], C.ms, { color: H.types[typeOf(rec, personaOf(personas, rec))]?.color ?? '' });
-    if (item) combos.set(rec, item);
   }
 
   const flashCopies = new WeakMap(); // rec -> {node, kids}: the whitened copy of its picture, kept in place (opacity 0) between flashes
@@ -308,9 +302,9 @@ export function init(ctx) {
   }
 
   // ---- sound: only the viewer's own gestures reach these events ----
-  function ping(kind, persona, combo = 1) {
+  function ping(kind, persona) {
     if (!ctx.fx.sfxOn()) return;
-    sound.play(soundPlan(kind, persona.voice, combo, H.sound));
+    sound.play(soundPlan(kind, persona.voice, H.sound));
   }
 
   // ---- the poke (and the cat's pet) ----
@@ -332,20 +326,17 @@ export function init(ctx) {
     const words = persona.hitWords.length > 0 ? persona.hitWords : T.words;
     if (miss) {
       word(f.floor, H.marks.miss, ix, iy, T.color);
-      ping(T.snd, persona, combo);
+      ping(T.snd, persona);
     } else {
       const heartsOnly = T.hearts === true;
       if (!heartsOnly || level >= H.flash.fromLevel) burst(f.floor, heartsOnly ? H.burst.heartGlyph : H.burst.glyphs[li], H.burst.counts[li], H.burst.distPx[li], ix, iy, heartsOnly ? '#ff5d8f' : T.color);
       word(f.floor, words[(combo - 1) % words.length], ix, iy, T.color);
-      ping(T.snd, persona, combo);
+      ping(T.snd, persona);
       if (T.thud) puffs(f.floor, 'puff dust', H.land.dropDust, f.feet[0], f.feet[1], H.land.dustDistPx * 0.6, -3, H.land.dustMs * 0.7);
       if (level >= H.flash.fromLevel && !reduced()) whiteFlash(rec, f.floor);
       if (level >= H.shake.fromLevel && !reduced()) shakeFloor(f.floor);
       extras(rec, f, T, level, persona);
     }
-    comboCounter(rec, f, combo, dir);
-    const P = rec.isCat ? ctx.ui.cat.pet : ctx.ui.poke;
-    if (comboSpeaks(combo, P.maxLevel)) ctx.sayFor(rec, ctx.line(rec.isCat ? 'catCombo' : 'combo', undefined, rec), P.sayMs);
   }
 
   // ---- grab, throw, landing ----
@@ -365,7 +356,7 @@ export function init(ctx) {
         if (wiggles.get(rec) === w) wiggles.delete(rec);
       };
     };
-    ping('pop', persona, 1);
+    ping('pop', persona);
   }
 
   function onThrown({ rec, vx, vy }) {
@@ -378,7 +369,7 @@ export function init(ctx) {
     const ms = typeof timing?.duration === 'number' ? timing.duration : H.throw.fallbackMs;
     const ff = flightFrames(T, vx, vy, ms, H);
     playOn(rec, ff.frames, ff.ms);
-    ping('whoosh', persona, 1);
+    ping('whoosh', persona);
   }
 
   /** The landing look runs once the office has put the character down (a microtask later): the dust sits at the real feet, the type's own squash rides on top of the office's thump. */
@@ -395,7 +386,7 @@ export function init(ctx) {
       playOn(rec, lf.frames, lf.ms);
       const f = frame(rec);
       puffs(f.floor, 'puff dust', thrown ? H.land.dust : H.land.dropDust, f.feet[0], f.feet[1], H.land.dustDistPx, -4, H.land.dustMs);
-      ping(T.thud || thrown ? 'thump' : 'pop', persona, 1);
+      ping(T.thud || thrown ? 'thump' : 'pop', persona);
     });
   }
 
@@ -411,7 +402,7 @@ export function init(ctx) {
       picker.setMood(rec, null);
       const hs = headShakeFrames(H);
       playOn(rec, hs.frames, hs.ms);
-      ping('buzz', persona, 1);
+      ping('buzz', persona);
       return;
     }
     const mood = snackMood(persona, kind);
@@ -420,14 +411,14 @@ export function init(ctx) {
       burst(f.floor, H.burst.heartGlyph, S.hearts, S.heartDistPx, f.head[0], f.head[1] + 8, '#ff5d8f', S.heartMs);
       const bf = bounceFrames(T, H);
       playOn(rec, bf.frames, bf.ms);
-      ping('chime', persona, 1);
+      ping('chime', persona);
     } else if (mood === 'dislike') {
       word(f.floor, H.marks.dislike, f.head[0], f.head[1] - 4, T.color);
       const hs = headShakeFrames(H);
       playOn(rec, hs.frames, hs.ms);
-      ping('buzz', persona, 1);
+      ping('buzz', persona);
     } else {
-      ping('pop', persona, 1);
+      ping('pop', persona);
     }
   }
 

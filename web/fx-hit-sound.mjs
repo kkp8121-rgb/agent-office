@@ -4,15 +4,14 @@
 // soundPlan is pure (tests read it); createSound takes the AudioContext constructor and the switches as dependencies.
 
 /**
- * The voices of a sound: the recipe of `kind` (config ui.fx.hit.sound.recipes) with its pitch multiplied by the persona voice and
- * the combo (each further click raises it a little, up to comboPitchMax). Returns [] for an unknown kind.
+ * The voices of a sound: the recipe of `kind` (config ui.fx.hit.sound.recipes) with its pitch multiplied by the persona voice.
+ * Returns [] for an unknown kind.
  * @returns {{wave?: string, noise: boolean, f0: number, f1: number, ms: number, at: number, gain: number, q: number}[]}
  */
-export function soundPlan(kind, voice, combo, S) {
+export function soundPlan(kind, voice, S) {
   const recipe = S.recipes[kind];
   if (!recipe) return [];
-  const pitch = voice * Math.min(1 + S.comboPitchStep * Math.max(combo - 1, 0), S.comboPitchMax);
-  return recipe.map((v) => ({ wave: v.wave, noise: !!v.noise, f0: v.f0 * pitch, f1: v.f1 * pitch, ms: v.ms, at: v.at ?? 0, gain: v.gain * S.master, q: v.q ?? 1 }));
+  return recipe.map((v) => ({ wave: v.wave, noise: !!v.noise, f0: v.f0 * voice, f1: v.f1 * voice, ms: v.ms, at: v.at ?? 0, gain: v.gain * S.master, q: v.q ?? 1 }));
 }
 
 const SILENCE = 0.0001; // the lowest gain an exponential ramp can reach (it cannot reach 0)

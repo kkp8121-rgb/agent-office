@@ -12,11 +12,11 @@ const persona = JSON.parse(read('persona.json'));
 const P = persona.personas;
 
 const TYPES = ['flinch', 'angry', 'dodge', 'proud', 'lazy', 'bubbly', 'tough', 'dramatic', 'shy', 'goofy'];
-const PEOPLE_REQUIRED = ['poke1', 'poke2', 'poke3', 'poke4', 'lift', 'heldLong', 'grumble', 'thrown', 'landed', 'combo',
+const PEOPLE_REQUIRED = ['poke1', 'poke2', 'poke3', 'poke4', 'lift', 'heldLong', 'grumble', 'thrown', 'landed',
   'snackEat', 'snackLove', 'snackDislike', 'snackDone', 'snackFull', 'snackNoFish'];
 const PEOPLE_OPTIONAL = ['smallTalk', 'idleMutter', 'highFive', 'patReply'];
 const CAT_REQUIRED = ['catPet1', 'catPet2', 'catPet3', 'catPet4', 'catLift', 'catHeldLong', 'catLanded', 'catSnackDone',
-  'combo', 'snackLove', 'snackDislike'];
+  'snackLove', 'snackDislike'];
 const PEOPLE_SNACKS = ['coffee', 'donut', 'cookie'];
 const len = (s) => [...s].length;
 
