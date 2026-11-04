@@ -433,6 +433,14 @@ export function init(ctx) {
 
   const px = (n) => `${n}px`;
 
+  /** A floor without a window (the lobby) has no weather to draw, but its seated figures get the same monitor light as on any floor. */
+  function glowState(floor) {
+    if (!floor.stage) return null;
+    const st = { root: null, shell: null, lits: new Map(), glowOnly: true };
+    floorsState.set(floor, st);
+    return st;
+  }
+
   function build(floor) {
     const sc = floor.scene;
     if (!floor.stage || !sc?.raw?.windows?.length) return null;
@@ -538,7 +546,7 @@ export function init(ctx) {
   function flashNow(f) {
     if (ctx.paused() || reduced()) return;
     for (const [floor, st] of floorsState) {
-      if (!ctx.floorActive(floor)) continue;
+      if (st.glowOnly || !ctx.floorActive(floor)) continue; // a floor without a window has no sky to flash
       st.flash.animate(flashFrames(f.peak), { duration: f.ms, easing: 'ease-out' });
     }
   }
@@ -587,8 +595,12 @@ export function init(ctx) {
     kind = nextKind;
     for (const floor of ctx.floors()) {
       if (floor.off) continue;
-      const st = floorsState.get(floor) ?? build(floor);
+      const st = floorsState.get(floor) ?? build(floor) ?? glowState(floor);
       if (!st) continue;
+      if (st.glowOnly) {
+        syncGlow(floor, st);
+        continue;
+      }
       if (kindChanged || !st.dressed) {
         dress(st);
         st.dressed = true;
@@ -616,8 +628,8 @@ export function init(ctx) {
     if (syncTimer) ctx.timers.clearTimeout(syncTimer);
     syncTimer = 0;
     for (const st of floorsState.values()) {
-      st.root.remove();
-      st.shell.remove();
+      st.root?.remove();
+      st.shell?.remove();
       for (const el of st.lits.values()) el.remove();
     }
     floorsState.clear();
@@ -634,8 +646,8 @@ export function init(ctx) {
     const st = floorsState.get(d.floor);
     if (!st) return;
     if (d.removed) {
-      st.root.remove();
-      st.shell.remove();
+      st.root?.remove();
+      st.shell?.remove();
       for (const el of st.lits.values()) el.remove();
       floorsState.delete(d.floor);
     }

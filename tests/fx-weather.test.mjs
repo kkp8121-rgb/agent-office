@@ -352,3 +352,14 @@ test('png helpers: encode then decode gives the same pixels', () => {
   const back = decodePng(encodePng(2, 2, rgba));
   assert.deepEqual([back.w, back.h, ...back.rgba], [2, 2, ...rgba]);
 });
+
+test('night light: a floor without a window (the lobby) gets the same monitor light on its seated figures, and no weather layer', () => {
+  const src = readFileSync(join(ROOT, 'web', 'fx-weather.mjs'), 'utf8');
+  assert.match(src, /const st = floorsState\.get\(floor\) \?\? build\(floor\) \?\? glowState\(floor\);/);
+  const glow = src.slice(src.indexOf('function glowState('), src.indexOf('function build('));
+  assert.match(glow, /root: null, shell: null, lits: new Map\(\), glowOnly: true/);
+  assert.match(src, /if \(st\.glowOnly\) \{\n\s+syncGlow\(floor, st\);\n\s+continue;/, 'no sky, light or dress for it');
+  assert.match(src, /st\.glowOnly \|\| !ctx\.floorActive\(floor\)/, 'no lightning flash for it');
+  assert.equal((src.match(/st\.root\?\.remove\(\)/g) ?? []).length, 2, 'cleaning up copes with a state without layers');
+});
+
