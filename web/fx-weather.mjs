@@ -504,8 +504,7 @@ export function init(ctx) {
   const night = createNightmap({
     ctx, cfg: cfg.night, doc,
     modeOf: (rec) => (target?.glow > 0 ? litMode(rec, cfg) : ''),
-    resync: () => later(false),
-    debug: new URLSearchParams(globalThis.location?.search ?? '').get('debug') === 'nightmap',
+    resync: () => { if (fx.fxOn()) later(false); }, // effects off: no timer, no layer
   });
 
   function litEl(rec, floorLits) {

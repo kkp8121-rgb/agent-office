@@ -137,16 +137,16 @@ const CLS = { fill: 'fxn-f', tint: 'fxn-t', mon: 'fxn-m', rim: 'fxn-r' };
 
 /**
  * Creates the real night. deps: ctx (the effects' ctx), cfg (ui.fx.weather.night), doc, modeOf(rec) -> 'work'|'rest'|'' (the face light's own decision),
- * resync() -> asks the weather area for a sync, debug -> true under ?debug=nightmap.
+ * resync() -> asks the weather area for a sync (it does nothing while the effects are off).
  */
-export function createNightmap({ ctx, cfg, doc, modeOf, resync, debug }) {
+export function createNightmap({ ctx, cfg, doc, modeOf, resync }) {
   let enabled = false; // the viewer's choice (the settings): off = the page as it was
   let data = null; // the data file, loaded the first time the real night is chosen
   let loading = false;
   let observer = null;
   let lastDark = null;
   const baseUrl = cfg.dataUrl.replace(/[^/]*$/, '');
-  const floors = new Map(); // floor record -> {stage, pools: Map(rec -> pool), leaving: Set(pool), timers: Set, lamps: [], sig: string, seq: number}
+  const floors = new Map(); // floor record -> {stage, pools: Map(rec -> pool), leaving: Set(pool), timers: Set, lamps: [], sig: string, seq: number, img, plaque, ro}
   const roomDim = () => Number.parseFloat(globalThis.getComputedStyle(doc.documentElement).getPropertyValue('--room-dim')) || 0;
   const fillImage = fillGradient(cfg);
   const tintImage = tintGradient(cfg);
@@ -232,12 +232,12 @@ export function createNightmap({ ctx, cfg, doc, modeOf, resync, debug }) {
    * Draws the veil picture of a stage for the pools it has (the ones fading out keep their hole until they are gone) and its lamps. The new picture is decoded first, so the stage never
    * shows a frame without a veil; then `then` runs (the pools that wait for it fade in).
    */
-  function applyVeil(st, floor, then) {
+  function applyVeil(st, floor) {
     const plan = { size: floor.scene.r.size, pools: [...st.pools.values(), ...st.leaving].map((p) => p.plan), lamps: st.lamps, sign: signBox(st.stage) };
     const svg = veilSvg(plan, cfg);
-    plaqueEl(st, plan.sign);
     if (svg === st.sig) {
-      then?.();
+      plaqueEl(st, plan.sign);
+      lightUp(st);
       return;
     }
     st.sig = svg;
@@ -245,9 +245,10 @@ export function createNightmap({ ctx, cfg, doc, modeOf, resync, debug }) {
     const seq = ++st.seq;
     const go = () => {
       if (st.seq !== seq) return;
+      plaqueEl(st, plan.sign); // the plain veil under the plaque changes in the same frame as the picture's hole
       st.stage.style.setProperty('--fxn-img', url);
       st.stage.classList.add('fxn-on');
-      then?.();
+      lightUp(st);
     };
     const img = (st.img ??= doc.createElement('img')); // one picture element per stage, so no node is left behind for every new veil
     img.src = `data:image/svg+xml,${encodeURIComponent(svg)}`;
@@ -255,8 +256,18 @@ export function createNightmap({ ctx, cfg, doc, modeOf, resync, debug }) {
     else go();
   }
 
+  /** The pools that wait for a picture fade in. Every picture that lands turns on all of them, so a newer picture that was built for another reason (lamp, plaque) cannot leave one dark. */
+  function lightUp(st) {
+    const waiting = [...st.pools.values()].filter((p) => !p.on);
+    if (!waiting.length) return;
+    void st.stage.offsetWidth; // one reflow so the first change of opacity is a fade
+    for (const pool of waiting) setOn(pool, true);
+  }
+
   function clearStage(st) {
     st.seq++;
+    st.ro?.disconnect();
+    st.ro = null;
     for (const timer of st.timers) ctx.timers.clearTimeout(timer);
     for (const pool of [...st.pools.values(), ...st.leaving]) for (const e of pool.els) e.remove();
     st.timers.clear();
@@ -304,6 +315,7 @@ export function createNightmap({ ctx, cfg, doc, modeOf, resync, debug }) {
   /** Called by the weather area after it synced the face lights of a floor. */
   function sync(floor) {
     let st = floors.get(floor);
+    if (enabled && !data && ctx.fx.fxOn()) load(); // the data file is fetched the first time the effects are on
     const known = !!(data?.monitors?.[floor.design] || data?.lamps?.[floor.design]);
     const active = enabled && !!floor.stage && !floor.off && known && ctx.fx.fxOn() && roomDim() > 0;
     if (!active) {
@@ -313,24 +325,26 @@ export function createNightmap({ ctx, cfg, doc, modeOf, resync, debug }) {
       }
       return;
     }
-    if (!st) floors.set(floor, (st = { stage: floor.stage, pools: new Map(), leaving: new Set(), timers: new Set(), lamps: lampPlans(data.lamps?.[floor.design], cfg), sig: '', seq: 0, img: null, plaque: null }));
+    if (!st) floors.set(floor, (st = { stage: floor.stage, pools: new Map(), leaving: new Set(), timers: new Set(), lamps: lampPlans(data.lamps?.[floor.design], cfg), sig: '', seq: 0, img: null, plaque: null, ro: null }));
     const want = wanted(floor);
     st.stage.style.setProperty('--fxn-fade', `${cfg.fadeMs}ms`);
     for (const pool of [...st.pools.values()]) {
       const w = want.get(pool.rec);
       if (!w || poolKey(w.plan) !== pool.key) retire(st, floor, pool);
     }
-    const fresh = [];
     for (const [rec, w] of want) {
       if (st.pools.has(rec)) continue;
       const pool = makePool(st, floor, rec, w.plan, w.obj);
       st.pools.set(rec, pool);
-      fresh.push(pool);
     }
-    applyVeil(st, floor, fresh.length ? () => {
-      void st.stage.offsetWidth; // one reflow so the first change of opacity is a fade
-      for (const pool of fresh) if (st.pools.get(pool.rec) === pool) setOn(pool, true);
-    } : undefined);
+    applyVeil(st, floor);
+    if (typeof globalThis.ResizeObserver === 'function' && !st.ro) {
+      const sign = st.stage.querySelector('.sign');
+      if (sign) { // the plaque changes its size with its text: draw the hole again at once, not at the next sync
+        st.ro = new globalThis.ResizeObserver(() => { if (floors.get(floor) === st) applyVeil(st, floor); });
+        st.ro.observe(sign);
+      }
+    }
   }
 
   function tidy() {
@@ -350,7 +364,7 @@ export function createNightmap({ ctx, cfg, doc, modeOf, resync, debug }) {
     enabled = on;
     tidy();
     if (on) {
-      load();
+      if (ctx.fx.fxOn()) load();
       if (!observer && typeof MutationObserver === 'function') {
         // the theme changes the veil (--room-dim on the root): sync again when dark mode turns on or off
         observer = new MutationObserver(() => {
@@ -365,15 +379,6 @@ export function createNightmap({ ctx, cfg, doc, modeOf, resync, debug }) {
       lastDark = roomDim() > 0;
     }
     resync();
-  }
-
-  if (debug) {
-    globalThis.__fxNight = {
-      enabled: () => enabled,
-      ready: () => !!data,
-      /** the pools of every floor that has some: [{design, shown, pools: [{cx, cy, rx, ry, x, y, w, h, deskId, on}], lamps: [{kind, cx, cy, x, y, w, h}]}] */
-      pools: () => [...floors].map(([floor, st]) => ({ design: floor.design, shown: !!floor.stage?.offsetParent, pools: [...st.pools.values()].map((p) => ({ ...p.plan, on: p.on, nodes: p.nodes })), lamps: st.lamps })),
-    };
   }
 
   return { sync, tidy, drop, setEnabled, enabled: () => enabled };

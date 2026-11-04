@@ -184,12 +184,13 @@ function fakeEl(tag = 'div') {
 test('disabled (the other night lights, day mode, effects off, an unknown room): nothing is built or read', () => {
   const boom = new Proxy({}, { get(_, k) { throw new Error(`touched the stage: ${String(k)}`); } });
   const ctx = { fx: { fxOn: () => true }, chars: () => { throw new Error('read the characters'); }, timers: {}, server: { sitHeight: 50 }, floors: () => [] };
-  const night = createNightmap({ ctx, cfg, doc: { documentElement: {} }, modeOf: () => 'work', resync: () => {}, debug: false });
+  const night = createNightmap({ ctx, cfg, doc: { documentElement: {} }, modeOf: () => 'work', resync: () => {} });
   assert.equal(night.enabled(), false);
   night.sync({ stage: boom, off: false, design: 'library', scene: {} });
   night.tidy();
   night.drop({});
-  assert.equal(globalThis.__fxNight, undefined, 'no debug handle without ?debug=nightmap');
+  assert.equal(globalThis.__fxNight, undefined, 'no debug handle is left in the shipped code');
+  assert.doesNotMatch(readFileSync(join(ROOT, 'web', 'fx-nightmap.mjs'), 'utf8') + readFileSync(join(ROOT, 'web', 'fx-weather.mjs'), 'utf8'), /__fxNight|debug=nightmap/);
 });
 
 test('enabled: a working seat gets a fill, a cool light, a monitor copy and an edge light, the veil picture is set once decoded, and everything goes when the choice is switched off', async () => {
@@ -208,15 +209,16 @@ test('enabled: a working seat gets a fill, a cool light, a monitor copy and an e
     let resyncs = 0;
     const doc = { documentElement: {}, createElement: (t) => { const e = fakeEl(t); if (t === 'img') e.decode = () => Promise.resolve(); return e; } };
     const ctx = { fx: { fxOn: () => true }, chars: () => [rec], timers: { setTimeout: (fn) => { fn.__t = true; return 1; }, clearTimeout: () => {} }, server: { sitHeight: 50 } };
-    const night = createNightmap({ ctx, cfg, doc, modeOf: () => 'work', resync: () => { resyncs++; }, debug: false });
+    const night = createNightmap({ ctx, cfg, doc, modeOf: () => 'work', resync: () => { resyncs++; } });
     night.setEnabled(true);
     await new Promise((r) => setTimeout(r, 10));
     assert.ok(resyncs >= 2, 'the data file arrived and asked for a sync');
     night.sync(floor);
+    assert.equal(stage.children.some((c) => c.className === 'fxn-p'), false, 'the plain veil under the plaque comes with the picture, in the same frame');
+    await new Promise((r) => setTimeout(r, 10));
     const kinds = stage.children.map((c) => c.className);
     assert.ok(['fxn-f', 'fxn-t', 'fxn-m', 'fxn-r', 'fxn-p'].every((k) => kinds.includes(k)), kinds.join(' '));
     assert.equal(stage.children.find((c) => c.className === 'fxn-p').style.width, '298px', 'the plain veil under the plaque is a pixel wider all round');
-    await new Promise((r) => setTimeout(r, 10));
     assert.ok(stage.classes.has('fxn-on'));
     assert.match(stage.style['--fxn-img'], /^url\("data:image\/svg\+xml,/);
     assert.ok(stage.children.filter((c) => c.className !== 'fxn-p').every((c) => c.dataset.on === '1'), 'the pool fades in once the picture is there');
@@ -233,6 +235,56 @@ test('enabled: a working seat gets a fill, a cool light, a monitor copy and an e
     globalThis.fetch = realFetch;
     globalThis.getComputedStyle = realGcs;
   }
+});
+
+test('a newer picture built for another reason (the plaque grows) does not leave a pool dark, and the plaque follows its size at once', async () => {
+  const realFetch = globalThis.fetch;
+  const realGcs = globalThis.getComputedStyle;
+  const realRo = globalThis.ResizeObserver;
+  globalThis.fetch = async () => ({ json: async () => data });
+  globalThis.getComputedStyle = () => ({ getPropertyValue: () => '0.5' });
+  let roCallback = null;
+  let roSeen = 0;
+  globalThis.ResizeObserver = class { constructor(cb) { roCallback = cb; } observe() { roSeen++; } disconnect() { roCallback = null; } };
+  try {
+    const stage = fakeEl();
+    const sign = fakeEl();
+    Object.assign(sign, { offsetWidth: 296, offsetHeight: 33, offsetLeft: 700, offsetTop: 7 });
+    stage.querySelector = (q) => (q === '.sign' ? sign : null);
+    const obj = { id: 'desk-1', kind: 'desk', rect: [0, 0, 83, 57], at: [322, 250], anchor: [41, 56], flipX: false };
+    const floor = { stage, off: false, design: 'library', scene: { r: { size: [1024, 576], objects: [obj], lead: { deskId: 'lead-desk' }, seats: [{ deskId: 'desk-1', at: [1, 1] }] }, nodes: [{ id: 'desk-1', objId: 'desk-1', x: 281, y: 194, w: 83, h: 57, bgX: 0, bgY: 0, z: 1500, flipX: false }] } };
+    const rec = { x: 322, y: 212, slot: { kind: 'seat', i: 0 } };
+    const decodes = [];
+    const doc = { documentElement: {}, createElement: (t) => { const e = fakeEl(t); if (t === 'img') e.decode = () => new Promise((res) => decodes.push(res)); return e; } };
+    const ctx = { fx: { fxOn: () => true }, chars: () => [rec], timers: { setTimeout: () => 1, clearTimeout: () => {} }, server: { sitHeight: 50 } };
+    const night = createNightmap({ ctx, cfg, doc, modeOf: () => 'work', resync: () => {} });
+    night.setEnabled(true);
+    await new Promise((r) => setTimeout(r, 10));
+    night.sync(floor); // picture A (with the new pool) starts decoding
+    assert.equal(roSeen, 1, 'the plaque is watched');
+    sign.offsetWidth = 316; // the plaque grows while A decodes
+    roCallback(); // picture B, built for the new plaque only (no new pool)
+    assert.equal(decodes.length, 2);
+    decodes[0](); // A lands late and is out of date: it shows nothing
+    await new Promise((r) => setTimeout(r, 5));
+    assert.equal(stage.classes.has('fxn-on'), false);
+    decodes[1]();
+    await new Promise((r) => setTimeout(r, 5));
+    assert.ok(stage.classes.has('fxn-on'));
+    assert.ok(stage.children.filter((c) => c.className !== 'fxn-p').every((c) => c.dataset.on === '1'), 'the pool is lit by the picture that did land');
+    assert.equal(stage.children.find((c) => c.className === 'fxn-p').style.width, '318px', 'the plain veil under the plaque has the new size');
+    night.setEnabled(false);
+    assert.equal(roCallback, null, 'the watcher goes with the stage');
+  } finally {
+    globalThis.fetch = realFetch;
+    globalThis.getComputedStyle = realGcs;
+    globalThis.ResizeObserver = realRo;
+  }
+});
+
+test('effects off with the real night chosen: the weather area asks for no sync (no timer, no layer)', () => {
+  const src = readFileSync(join(ROOT, 'web', 'fx-weather.mjs'), 'utf8');
+  assert.match(src, /resync: \(\) => \{ if \(fx\.fxOn\(\)\) later\(false\); \}/);
 });
 
 test('css: the module prefix, plain alpha (no blend, no mask, no contain), opacity fades only, the veil one layer under the fills, no motion under reduced motion', () => {
