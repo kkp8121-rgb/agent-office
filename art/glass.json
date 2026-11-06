@@ -1425,5 +1425,17 @@
     "keep": 45
    }
   ]
+ },
+ "ceo": {
+  "mode": "poly",
+  "grow": 1,
+  "rim": {
+   "band": 6,
+   "max": 150,
+   "rb": 10
+  },
+  "islands": 24,
+  "ring": 0,
+  "members": []
  }
 }
