@@ -229,8 +229,8 @@ test('the pages link the six area style sheets right after style.css, scripts st
   const css = ['fx-weather', 'fx-chars', 'fx-events', 'fx-led', 'fx-hit', 'officelife', 'handoff', 'decor'];
   const links = css.map((n) => `<link rel="stylesheet" href="/web/${n}.css">`).join('\n');
   assert.ok(INDEX_HTML.includes(`<link rel="stylesheet" href="/web/style.css">\n${links}\n<link rel="stylesheet" href="/web/card.css">\n`)); // the character card's sheet follows the six (later packages' sheets may follow it)
-  const tail = ['conflict', 'actor', 'commute'].map((n) => `<link rel="stylesheet" href="/web/${n}.css">\n`).join('') + '</head>';
-  assert.ok(INDEX_HTML.includes(`<link rel="stylesheet" href="/web/card.css">\n${tail}`)); // after card.css the later packages' sheets in merge order (k, j, l), then the head ends
+  const tail = ['conflict', 'actor', 'commute', 'building'].map((n) => `<link rel="stylesheet" href="/web/${n}.css">\n`).join('') + '</head>';
+  assert.ok(INDEX_HTML.includes(`<link rel="stylesheet" href="/web/card.css">\n${tail}`)); // after card.css the later packages' sheets in merge order (k, j, l, n), then the head ends
   assert.match(INDEX_HTML, /<fieldset id="wx-choices"><legend><\/legend><\/fieldset>\s*<fieldset id="fx-choices"><legend><\/legend><\/fieldset>/);
   for (const n of css) assert.ok(existsSync(join(ROOT, 'web', `${n}.css`)), `${n}.css exists`);
 });
@@ -334,4 +334,24 @@ test('walk events: start once per walk however many pieces, end once when it sto
   ctx.rec = rec;
   vm.runInContext('noteWalk(rec, true); noteWalk(rec, true); noteWalk(rec, true); noteWalk(rec, false); noteWalk(rec, false); noteWalk(rec, true)', ctx);
   assert.deepEqual(events, [['walk-start', 'r1'], ['walk-end', 'r1'], ['walk-start', 'r1']]);
+});
+
+// ---- the building view's pieces of the context (package N) ----
+
+test('ctx: a floor that stands still in the building is not active, and the meeting, building and room members are documented', () => {
+  assert.ok(appSrc.includes('floorActive: (f) => !f.off && !f.still && !paused(),'));
+  assert.match(appSrc, /const idle = \(f\) => f\.off \|\| f\.still === true;/);
+  assert.match(appSrc, /function startAmbient\(frec, fresh = false\) \{\s*if \(idle\(frec\)/);
+  const doc = read('web', 'fx.mjs');
+  for (const name of ['meeting', 'building', 'room']) assert.match(doc, new RegExp(`\} ${name}\n`), `${name} is documented in the FxCtx typedef`);
+  const ctxSrc = appSrc.slice(appSrc.indexOf('function buildFxCtx()'), appSrc.indexOf('/** A character of the screen only'));
+  for (const re of [/meeting: \{[\s\S]*start: startFloorMeeting,\s*end: endFloorMeeting,\s*active:/, /building: \{[\s\S]*active:[\s\S]*floorBox:[\s\S]*elevator:[\s\S]*entryOf:[\s\S]*setEmptyRenderer:[\s\S]*onLayout:/, /room: \{[^}]*createVisitor,\s*removeVisitor,/]) assert.match(ctxSrc, re);
+});
+
+test('the building view draws the lobby without its figures and keeps the phase meeting on the shared machine', () => {
+  assert.match(appSrc, /if \(lb\.noFigures\) continue;/);
+  assert.match(appSrc, /const noFigures = building && !ui\.ui\.building\.lobbyFigures;/);
+  assert.match(appSrc, /function startFloorMeeting\(frec, opts = \{\}\)/);
+  assert.match(appSrc, /startFloorMeeting\(frec, \{ phase \}\);/, 'onPhase starts its meeting on the shared machine');
+  assert.ok(appSrc.includes("emitFx('meeting-start', { floor: frec, title: phase });"));
 });

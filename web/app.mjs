@@ -6,7 +6,7 @@ import { createNav } from './nav.mjs';
 import { charZ, objectNodes, splitWalk } from './depth.mjs';
 import { localPlacement, planFloor, withPersonal } from './decor.mjs';
 import { fitZoom } from './pip.mjs';
-import { LOBBY_ID, orderFloors, nextFloor, fallbackFloor, fitBox, pruneEvents, activityScore, busiestFloor, chooseFollow, viewOrder } from './view.mjs';
+import { CEO_ID, LOBBY_ID, orderFloors, nextFloor, fallbackFloor, fitBox, pruneEvents, activityScore, busiestFloor, chooseFollow, viewOrder } from './view.mjs';
 import { canStroll, nextStrollAt, scaleLife, strollTarget } from './lobbylife.mjs';
 import { assignLobbySeats, backRowSeats, changeOf, clockParts, employeeRows, headline, indexRows, lobbyRoster, msToNextMinute, newsText, officeScore, pageCount, pageRows, pushSample, tableCapacity } from './lobby.mjs';
 import { dropPoint, restSpotNear, shouldLift } from './grab.mjs';
@@ -34,6 +34,7 @@ import { createGestures } from './gesture.mjs';
 import { keepOpen, takeWhilePaused } from './keepalive.mjs';
 import { bindTag, createCard } from './card.mjs';
 import { createBoardPanel } from './board-panel.mjs';
+import { createBuildingView } from './building-view.mjs';
 
 // Visual constants (how things look/move, not planning numbers; those come from /api/ui).
 const WALK_PX_PER_SEC = 150;
@@ -64,6 +65,7 @@ const LED_ROW_PX = 10; // line height of the wall's tables (.led .lr in style.cs
 const LED_PAD_PX = 2; // padding of a wall panel (the same)
 const LED_INDEX_MIN_ROWS = 3; // the 층별 활동 지수 board always shows at least this many floors
 const LOBBY_COLOR = '#c9a227'; // the lobby's own neutral gold (its tab and plaque), not a session colour
+const CEO_COLOR = '#1f3a6e'; // the CEO room's own dark navy (its tab), not a session colour
 const SNACK_PIP_TIP = '작은 창에서는 간식을 줄 수 없습니다 (창 사이로는 끌 수 없어요)';
 
 const QUERY = new URLSearchParams(location.search);
@@ -108,7 +110,7 @@ const recOf = new WeakMap(); // character element -> rec
 // ---------- small helpers ----------
 
 /** Scales the floors (CSS zoom) to the room: the widest one down to fit beside the panel (or above it in a narrow window); the single floor shown, or the stack once the panel is hidden, up or down. */
-function fitFloors() {
+function fitFloors(sync = false) {
   const doc = floorsEl.ownerDocument; // the small window's document while the floors are there
   const mini = doc.body.classList.contains('pip-mini');
   let availW;
@@ -125,7 +127,11 @@ function fitFloors() {
       - (sideBySide && panelEl.offsetWidth ? panelEl.offsetWidth + parseFloat(cs.columnGap) : 0);
     availH = window.innerHeight - topbarEl.offsetHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   }
-  const shown = shownId === null ? null : shownId === LOBBY_ID ? lobby : floorRecs.get(shownId);
+  if (bv?.active()) {
+    bv.fit(availW, availH, sync);
+    return;
+  }
+  const shown = shownId === null ? null : shownId === LOBBY_ID ? lobby : shownId === CEO_ID ? ceo : floorRecs.get(shownId);
   if (shown) {
     floorsEl.style.zoom = String(fitBox(availW, availH, ...shown.scene.r.size, SINGLE_MAX_ZOOM));
     return;
@@ -143,6 +149,10 @@ function showConn(text) {
 
 const scenes = new Map(); // design -> {r: resolved scene, raw, url, nodes: object draw nodes}
 let nav = null; // createNav over every scene
+let bv = null; // the building cross-section (web/building-view.mjs), null while ui.building.enabled is off
+let ceo = null; // the CEO room's floor record (a screen-only floor like the lobby), null without its scene or without the building
+let fxCtx = null; // the effects context (built once the scenes are up)
+let emptyFn = null; // ctx.building.setEmptyRenderer: draws the empty-office screen (null = the old one-line notice)
 let amb = null; // ui.ui.ambient (scaled down under ?debug=ambient)
 let catC = null; // ui.ui.cat (scaled down under ?debug=ambient)
 let cat = null; // the office cat: {rec, frec, timer, leaveAt, spotId, poke, force}; see "office cat"
@@ -177,6 +187,8 @@ const clockTimers = {
 const sceneOf = (design) => scenes.get(design) ?? null;
 const sitUrl = (key) => `/assets/sprites/${encodeURIComponent(key)}-sit.png`;
 const same = (a, b) => a[0] === b[0] && a[1] === b[1];
+/** A floor that does not run: hidden (off) or, in the building, out of the live set (still: its picture stays, nothing moves). */
+const idle = (f) => f.off || f.still === true;
 
 /** Every range of the ambient block times `k`: ?debug=ambient makes the life visible within seconds. */
 function scaleAmbient(a, k) {
@@ -208,7 +220,35 @@ function setupScenes() {
   amb = DEBUG_AMBIENT ? scaleAmbient(ui.ui.ambient, 0.1) : ui.ui.ambient;
   catC = DEBUG_AMBIENT ? scaleCat(ui.ui.cat, 0.1) : ui.ui.cat;
   document.documentElement.style.setProperty('--sit-h', `${ui.sitHeight}px`);
+  if (ui.ui.building.enabled) {
+    bv = createBuildingView({
+      host: floorsEl,
+      cfg: ui.ui.building,
+      commute: ui.ui.commute,
+      sysText: ui.ui.lobby.sysText,
+      timers: clockTimers,
+      rooms: buildingRooms,
+      roomRec: viewRec,
+      isNight: () => light === 'night',
+      fxOn: () => fxApi.fxOn(),
+      reduced: prefersLessMotion,
+      paused,
+      setStill,
+      ctx: () => fxCtx,
+    });
+    bv.setActive(shownId === null);
+    floorsEl.addEventListener('scroll', () => bv.scheduleLive(), { passive: true });
+    setAttr(allBtn, 'title', ui.ui.building.allTitle);
+  }
   if (ui.lobby) createLobby();
+  createCeo();
+  if (bv) applyView(); // the lobby and the CEO room are made hidden: show them in the building
+  if (DEBUG === 'building' || DEBUG_AMBIENT) { // ?debug=building (or ambient): the effects context and what the building view keeps alive, for checking it from outside
+    window.__building = {
+      ctx: () => fxCtx,
+      state: () => ({ active: bv?.active() ?? false, zoom: bv?.zoom() ?? null, scrolls: bv?.scrolls() ?? false, stills: [...floorRecs.values(), ...(lobby ? [lobby] : []), ...(ceo ? [ceo] : [])].filter((f) => f.still).map((f) => f.sid) }),
+    };
+  }
   if (DEBUG === 'follow') { // ?debug=follow: what the follow mode sees, for checking it from outside
     window.__follow = { state: () => ({ on: following, rotating, shown: shownId, timer: followTimer !== 0, timers: liveTimers.size, scores: [...followScores(Date.now())] }) };
   }
@@ -404,7 +444,7 @@ function walkPath(rec, frec, points, onArrive) {
   frec.dbg?.path(rec, points);
   rec.x = last[0];
   rec.y = last[1];
-  if (pieces.length === 0 || frec.off) { // a floor that is not shown has no transitions to wait for
+  if (pieces.length === 0 || idle(frec)) { // a floor that is not shown (or stands still in the building) has no transitions to wait for
     placeAt(rec, last);
     onArrive?.();
     return 0;
@@ -716,7 +756,7 @@ function makeClock(frec) {
 }
 
 function startAmbient(frec, fresh = false) {
-  if (frec.off || document.body.classList.contains('paused')) return;
+  if (idle(frec) || !frec.clock || document.body.classList.contains('paused')) return;
   if (fresh) for (const r of frec.agents.values()) if (r.m) freshTimes(frec, r);
   frec.clockOn = true;
   frec.clock.start();
@@ -724,7 +764,7 @@ function startAmbient(frec, fresh = false) {
 
 function stopAmbient(frec) {
   frec.clockOn = false;
-  frec.clock.stop();
+  frec.clock?.stop();
 }
 
 // ---------- grabbing: pick a character up and drop it (screen play only: nothing is sent or saved) ----------
@@ -1241,7 +1281,7 @@ function progressLine(item) {
 /** Redraws the wall board when what it shows really changed. A floor that is not shown draws it when it comes back (setOff). */
 function renderBoard(frec) {
   const wb = frec.wb;
-  if (!wb || frec.off) return;
+  if (!wb || idle(frec)) return;
   const key = sheetKey(frec.sheet);
   if (key === wb.key) return;
   wb.key = key;
@@ -1302,30 +1342,29 @@ function notePause(on) {
 }
 
 /**
- * A workflow went on to its next phase (SSE "phase"): the floor's characters walk to the meeting spots in front of the board, the boss
- * announces the phase, and after ui.meeting.seconds they walk back. Only a floor on show meets; there is no queue for the others.
+ * The one meeting machine (ctx.meeting): the characters of a floor walk to the meeting spots in front of the board, stand there
+ * (`hold`), and walk back. A workflow phase (`kind: 'phase'`, the default) is announced by the boss and ends ui.meeting.seconds later;
+ * a bell meeting (`kind: 'bell'`) says what it wants in `onHold` and ends when its caller says so (`endFloorMeeting`).
+ * @param {object} frec
+ * @param {{kind?: 'phase'|'bell', chair?: object|null, crew?: object[], phase?: string, onHold?: Function, onEnd?: Function, onSwitch?: Function}} opts
+ *   chair: who stands at the boss spot (default the lead; null = nobody; a visitor of ctx.room is fine); crew: who is called (default every character that can);
+ *   onHold(mt): everybody stands there now; onEnd(mt): the meeting is over; onSwitch(mt): a workflow phase took the meeting over (the chair is the lead from then on).
+ * @returns {object|null} the meeting, or null when there is none to hold (no meeting spots, nobody to call, a meeting is running already)
  */
-function onPhase(sig) {
-  noteActivity(sig.sessionId, Date.now(), ui.ui.follow.phaseWeight);
-  followPoke();
-  const frec = floorRecs.get(sig.sessionId);
-  if (frec) emitFx('phase', { floor: frec, title: clipPhase(sig.phase, ui.ui.meeting.phaseMaxChars) });
-  const spots = frec?.scene.raw.meeting;
-  if (!spots || frec.off || paused() || frec.status === 'leaving') return;
+function startFloorMeeting(frec, opts = {}) {
+  const spots = frec.scene.raw.meeting;
+  if (!spots || idle(frec) || paused() || frec.status === 'leaving' || frec.meeting) return null;
   const M = ui.ui.meeting;
-  const mt = frec.meeting;
-  const phase = clipPhase(sig.phase, M.phaseMaxChars);
-  if (mt) { // a new phase during a meeting: the boss says the new one and the time starts again
-    mt.phase = phase;
-    if (mt.hold) holdMeeting(mt);
-    return;
-  }
-  const crew = [...frec.agents.values()].filter(meetable);
-  const boss = crew.find((a) => a.isLead) ?? null;
-  const place = assignSpots(crew.filter((a) => !a.isLead).map((a) => ({ id: a, x: a.x, y: a.y })), spots.spots);
-  if (place.size === 0) return;
-  if (boss) place.set(boss, spots.boss);
-  const next = { kind: 'meeting', frec, members: new Set(), boss, phase, hold: false, timer: 0 };
+  const crew = opts.crew ?? [...frec.agents.values()].filter(meetable);
+  const chair = opts.chair === undefined ? crew.find((a) => a.isLead) ?? null : opts.chair;
+  const place = assignSpots(crew.filter((a) => a !== chair).map((a) => ({ id: a, x: a.x, y: a.y })), spots.spots);
+  if (place.size === 0) return null;
+  if (chair) place.set(chair, spots.boss);
+  const phase = opts.phase ?? '';
+  const next = {
+    kind: 'meeting', type: opts.kind ?? 'phase', frec, members: new Set(), boss: chair, phase, hold: false, timer: 0,
+    onHold: opts.onHold ?? null, onEnd: opts.onEnd ?? null, onSwitch: opts.onSwitch ?? null,
+  };
   frec.meeting = next;
   emitFx('meeting-start', { floor: frec, title: phase });
   let walkMs = 0;
@@ -1339,13 +1378,50 @@ function onPhase(sig) {
     walkMs = Math.max(walkMs, goTo(rec, frec, { x: spot.at[0], y: spot.at[1], face: spot.face, seated: false, seat: null }));
   }
   next.timer = clockTimers.setTimeout(() => holdMeeting(next), walkMs + M.gatherPauseMs);
+  return next;
 }
 
-/** Everyone stands in place: the boss says the phase, and the meeting ends ui.meeting.seconds from now. */
+/** Ends the floor's meeting now (everybody walks back); false when there was none. */
+function endFloorMeeting(frec) {
+  const mt = frec.meeting;
+  if (!mt) return false;
+  clockTimers.clearTimeout(mt.timer);
+  endMeeting(mt);
+  return true;
+}
+
+/**
+ * A workflow went on to its next phase (SSE "phase"): the floor's characters walk to the meeting spots in front of the board, the boss
+ * announces the phase, and after ui.meeting.seconds they walk back. Only a floor on show meets; there is no queue for the others.
+ */
+function onPhase(sig) {
+  noteActivity(sig.sessionId, Date.now(), ui.ui.follow.phaseWeight);
+  followPoke();
+  const frec = floorRecs.get(sig.sessionId);
+  if (frec) emitFx('phase', { floor: frec, title: clipPhase(sig.phase, ui.ui.meeting.phaseMaxChars) });
+  if (!frec?.scene.raw.meeting || idle(frec) || paused() || frec.status === 'leaving') return;
+  const phase = clipPhase(sig.phase, ui.ui.meeting.phaseMaxChars);
+  const mt = frec.meeting;
+  if (mt) { // a new phase during a meeting: the boss says the new one and the time starts again
+    if (mt.type === 'bell') { // a bell meeting is taken over: the lead announces the phase from the boss spot
+      mt.onSwitch?.(mt);
+      mt.type = 'phase';
+      mt.onHold = mt.onEnd = mt.onSwitch = null;
+      mt.boss = [...mt.members].find((a) => a.isLead) ?? null;
+    }
+    mt.phase = phase;
+    if (mt.hold) holdMeeting(mt);
+    return;
+  }
+  startFloorMeeting(frec, { phase });
+}
+
+/** Everyone stands in place: a phase meeting has the boss say the phase and ends ui.meeting.seconds from now; a bell meeting hands over to its own onHold. */
 function holdMeeting(mt) {
-  const ms = ui.ui.meeting.seconds * 1000;
   mt.hold = true;
   clockTimers.clearTimeout(mt.timer);
+  if (mt.onHold) return mt.onHold(mt);
+  const ms = ui.ui.meeting.seconds * 1000;
   if (mt.boss && mt.members.has(mt.boss)) sayFor(mt.boss, line('meetingBoss', mt.phase), ms);
   mt.timer = clockTimers.setTimeout(() => endMeeting(mt), ms);
 }
@@ -1367,6 +1443,7 @@ function finishMeeting(mt) {
   if (mt.frec.meeting !== mt) return;
   mt.frec.meeting = null;
   emitFx('meeting-end', { floor: mt.frec });
+  mt.onEnd?.(mt);
 }
 
 /** One character leaves the meeting for its own reasons (picked up, finished, moved by the server, floor hidden); the caller deals with it from there. */
@@ -1409,7 +1486,7 @@ function onFail(sig) {
   followPoke();
   const frec = floorRecs.get(sig.sessionId);
   const rec = frec?.agents.get(sig.agent);
-  if (!rec || frec.off || paused() || rec.state === 'done' || rec.el.classList.contains('gone')) return;
+  if (!rec || idle(frec) || paused() || rec.state === 'done' || rec.el.classList.contains('gone')) return;
   showMood(rec, sig.streak);
   const boss = frec.agents.get('lead');
   if (rec.isLead || !boss || !patDue(sig.streak, frec.patAt ?? -Infinity, Date.now(), ui.ui.fail) || !playable(boss) || !playable(rec)) return;
@@ -1459,7 +1536,7 @@ function decorZ(frec, anchor) {
 
 /** Brings one floor in step with the season and the light. A floor that is not shown is left as it is and catches up when it is shown. */
 function syncDecor(frec) {
-  if (frec.off) return;
+  if (idle(frec)) return;
   setAttr(frec.stage, 'data-light', light);
   if (frec.decorSeason === season) return;
   frec.decorSeason = season;
@@ -1492,6 +1569,7 @@ function setLight(next) {
   if (next === light) return;
   light = next;
   emitFx('daylight', { phase: next });
+  bv?.paint(); // the facade windows and the dimming of idle floors follow the light
 }
 
 /** Reads the date and the hour (or the query), updates every shown floor, and sets the one timer for the next change. */
@@ -1501,7 +1579,7 @@ function applyTime() {
   const now = new Date();
   season = seasonQuery ?? seasonOn(now, ui.ui.season);
   setLight(currentLight(now));
-  for (const f of floorRecs.values()) syncDecor(f);
+  for (const f of ceo ? [...floorRecs.values(), ceo] : floorRecs.values()) syncDecor(f);
   if (!paused()) skyTimer = clockTimers.setTimeout(applyTime, msToNextChange(now, ui.ui.daylight));
 }
 
@@ -1537,8 +1615,8 @@ function snackTargetAt(cx, cy) {
     const r = rec.body.getBoundingClientRect();
     if (r.width) rects.push({ id: rec, left: r.left, top: r.top, right: r.right, bottom: r.bottom });
   };
-  for (const f of floorRecs.values()) if (!f.off) for (const a of f.agents.values()) add(a);
-  if (cat && !cat.frec.off) add(cat.rec);
+  for (const f of floorRecs.values()) if (!idle(f)) for (const a of f.agents.values()) add(a);
+  if (cat && !idle(cat.frec)) add(cat.rec);
   return pickAt(rects, cx, cy, ui.ui.snack.dropMarginPx);
 }
 
@@ -1658,12 +1736,12 @@ function catSync() {
   if (!catC || document.body.classList.contains('paused')) return;
   if (cat && !floorRecs.has(cat.frec.sid)) catRemove();
   if (!floorRecs.size) return;
-  const shown = [...floorRecs.values()].filter((f) => !f.off);
+  const shown = [...floorRecs.values()].filter((f) => !idle(f));
   if (!shown.length) return catHalt(); // the lobby is on show: no room to wander in
   if (!cat) return catSpawn(shown[Math.floor(Math.random() * shown.length)]);
-  if (cat.frec.off) { // its floor is not shown: it stops where it is and comes out of another floor's door
+  if (idle(cat.frec)) { // its floor is not shown: it stops where it is and comes out of another floor's door
     catSettle();
-    if (cat.frec.off) catRelocate();
+    if (idle(cat.frec)) catRelocate();
     return;
   }
   const { rec } = cat;
@@ -1749,7 +1827,7 @@ function catNext() {
 /** The cat comes out of the door of another floor (the same floor when there is no other). */
 function catRelocate() {
   const { rec } = cat;
-  const id = otherFloor(Math.random, [...floorRecs.values()].filter((f) => !f.off).map((f) => f.sid), cat.frec.sid) ?? cat.frec.sid;
+  const id = otherFloor(Math.random, [...floorRecs.values()].filter((f) => !idle(f)).map((f) => f.sid), cat.frec.sid) ?? cat.frec.sid;
   const frec = floorRecs.get(id);
   const { door } = frec.scene.r;
   frec.stage.append(rec.el, rec.tagRoot);
@@ -2193,7 +2271,7 @@ function clearBubbleOverlap() {
   if (!paused()) {
     const win = floorsEl.ownerDocument.defaultView;
     for (const floor of floorsEl.children) {
-      if (floor.hidden) continue; // a floor off show (the attribute, not offsetParent: that read forces a style recalculation under the running animations)
+      if (floor.hidden || floor.classList.contains('still') || floor.classList.contains('b-piece')) continue; // a floor off show (the attribute, not offsetParent: that read forces a style recalculation under the running animations), standing still in the building, or a piece of the building itself
       const bubs = floor.querySelectorAll(floor.classList.contains('lobby') ? LOBBY_BUBBLES : '.bub:not(.empty)');
       if (bubs.length < 2) { // nothing to overlap, and the style and layout reads below would force a recalculation under the running animations
         for (const b of bubs) {
@@ -2476,6 +2554,35 @@ function createLobby() {
   }
 }
 
+// ---------- the CEO room: the top floor of the building (a screen-only floor like the lobby; its behaviour is web/ceo-floor.mjs) ----------
+
+const ceoBtn = $('tab-ceo');
+
+function createCeo() {
+  const sc = sceneOf(ui.ceo?.design);
+  if (!sc || !bv) return;
+  const C = ui.ui.ceo;
+  const { r } = sc;
+  const root = el('section', 'floor ceo-room');
+  root.dataset.sid = CEO_ID;
+  root.hidden = true;
+  root.style.setProperty('--c', CEO_COLOR);
+  root.style.width = `${r.size[0]}px`;
+  root.style.height = `${r.size[1]}px`;
+  root.setAttribute('aria-label', C.tab);
+  const stage = buildStage(sc, ui.ceo.design, 0);
+  const layer = addFxLayer(stage);
+  root.append(stage);
+  floorsEl.append(root);
+  ceo = { el: root, stage, layer, sid: CEO_ID, scene: sc, off: true, still: false, design: ui.ceo.design, status: 'busy', agents: new Map(), chars: new Map(), populated: true, clock: null, dbg: null };
+  makeSky(ceo);
+  setText(ceoBtn, C.tab);
+  setAttr(ceoBtn, 'aria-label', C.tab);
+  ceoBtn.style.setProperty('--c', CEO_COLOR);
+  ceoBtn.hidden = false;
+  ceoBtn.addEventListener('click', () => pickFloor(CEO_ID));
+}
+
 /** The ink (white or dark) that reads on a #rrggbb colour: the floor number sits on a chip in the team colour. */
 function readableOn(hex) {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
@@ -2578,6 +2685,7 @@ function drawLobby() {
       unseated++;
       continue;
     }
+    if (lb.noFigures) continue; // the building view draws the lobby without its crowd: the same people already stand on their own floors
     keep.add(e.key);
     lobbyFigure(e, slot);
   }
@@ -2720,7 +2828,7 @@ function lobbySync(list) {
   if (!lb) return;
   lb.floors = list;
   lb.dirty = true;
-  if (!lb.off) drawLobby();
+  if (!idle(lb)) drawLobby();
 }
 
 function clearLobbyTimer() {
@@ -2733,7 +2841,7 @@ function clearLobbyTimer() {
 function armLobby() {
   clearLobbyTimer();
   const lb = lobby;
-  if (!lb || lb.off || paused()) return;
+  if (!lb || idle(lb) || paused()) return;
   const now = Date.now();
   let ms = msToNextMinute(now);
   if (lb.pages > 1) ms = Math.min(ms, Math.max(500, lb.pageAt - now));
@@ -2999,7 +3107,8 @@ let lastFloors = new Map();
 
 /** The notice for no sessions: not while the lobby is shown (its wall says 0 and stands on its own). */
 function syncEmpty() {
-  emptyEl.hidden = floorRecs.size > 0 || shownId === LOBBY_ID;
+  emptyEl.hidden = emptyFn !== null || floorRecs.size > 0 || shownId === LOBBY_ID;
+  emptyFn?.({ floorCount: floorRecs.size, view: shownId === null ? 'building' : shownId }); // the empty-office screen (ctx.building.setEmptyRenderer) is told whenever the count or the view may have changed
 }
 
 function removeSession(sessionId, withLog = true) {
@@ -3009,8 +3118,9 @@ function removeSession(sessionId, withLog = true) {
     if (boardPanel?.key() === f.sid) closeBig();
     for (const a of f.agents.values()) cancelGrab(a);
     if (cat?.frec === f) catRemove();
-    f.el.remove();
     floorRecs.delete(sessionId);
+    if (bv) bv.collapse(sessionId, f.el); // the floor folds away when the whole building is shown, else it goes at once
+    else f.el.remove();
     emitFx('floor-hidden', { floor: f, removed: true });
   }
   const r = rowRecs.get(sessionId);
@@ -3073,7 +3183,7 @@ function render(state) {
   if (viewMoved) {
     applyView();
     if (following) shownSince = 0; // the floor was fallen back to, not chosen: a clearly busier one may take over at once
-  } else fitFloors();
+  } else fitFloors(true);
   catSync();
   followPoke();
   lobbySync(list);
@@ -3192,7 +3302,7 @@ function connect() {
   es.addEventListener('phase', (ev) => { if (!drop('phase')) onPhase(JSON.parse(ev.data)); });
   es.addEventListener('fail', (ev) => { if (!drop('fail')) onFail(JSON.parse(ev.data)); });
   es.addEventListener('weather', (ev) => { if (!drop('weather')) onWeather(JSON.parse(ev.data)); });
-  es.addEventListener('sysload', (ev) => { if (drop('sysload')) return; sysLoad = JSON.parse(ev.data); emitFx('sysload', { cpu: sysLoad.cpu, mem: sysLoad.mem }); if (lobby?.wall) drawSys(); });
+  es.addEventListener('sysload', (ev) => { if (drop('sysload')) return; sysLoad = JSON.parse(ev.data); emitFx('sysload', { cpu: sysLoad.cpu, mem: sysLoad.mem }); if (lobby?.wall) drawSys(); bv?.drawSys(sysLoad); });
   for (const type of SERVER_EVENTS) es.addEventListener(type, (ev) => { if (!drop(type)) for (const fn of serverFns.get(type) ?? []) fn(JSON.parse(ev.data)); });
   es.addEventListener('error', () => {
     showConn('연결이 끊겼습니다. 다시 연결하는 중…');
@@ -3250,7 +3360,7 @@ const wxStorage = () => localStorage; // a getter, so a blocked storage throws i
 
 /** Brings one floor's window overlay in step with the choice and the real weather. A floor that is not shown is left as it is and catches up when it is shown. */
 function syncWeather(frec) {
-  if (frec.off) return;
+  if (idle(frec)) return;
   const kind = effectKind(wxChoice, wxReal?.kind);
   if (!frec.wx) {
     const windows = frec.scene.raw.windows;
@@ -3266,7 +3376,7 @@ function syncWeather(frec) {
 let wxSaid = ''; // the last 'weather' effect event, so only a real change is announced
 
 function applyWeather() {
-  for (const f of floorRecs.values()) syncWeather(f);
+  for (const f of ceo ? [...floorRecs.values(), ceo] : floorRecs.values()) syncWeather(f);
   const kind = effectKind(wxChoice, wxReal?.kind);
   const real = wxReal?.kind ?? null;
   if (wxSaid === `${kind}|${real}`) return;
@@ -3453,18 +3563,18 @@ function buildFxCtx() {
   gestures = createGestures(ui.ui.gesture.priority, clearGestures);
   let stateAt = Date.now(); // when the last state frame (shown or not) arrived: ctx.serverNow() counts on from lastNow
   stateFns.add(() => { stateAt = Date.now(); });
-  const floorList = () => [...floorRecs.values(), ...(lobby ? [lobby] : [])];
+  const floorList = () => [...floorRecs.values(), ...(lobby ? [lobby] : []), ...(ceo ? [ceo] : [])];
   const charList = (floor) => (floor ? [...(floor.agents ?? floor.chars).values()] : [...floorList().flatMap((f) => [...(f.agents ?? f.chars).values()]), ...(cat ? [cat.rec] : [])]);
   const hook = (set) => (fn) => {
     set.add(fn);
     return () => set.delete(fn);
   };
-  return {
+  const ctx = {
     ui: ui.ui,
     server: ui,
     fx: fxApi,
     floors: floorList,
-    floor: (id) => (id === LOBBY_ID ? lobby : floorRecs.get(id) ?? null),
+    floor: viewRec,
     lobby: () => lobby,
     chars: charList,
     bySprite: (key) => charList().filter((r) => r.sprite === key),
@@ -3506,7 +3616,7 @@ function buildFxCtx() {
     sayFor,
     clearSay,
     chatter,
-    floorActive: (f) => !f.off && !paused(),
+    floorActive: (f) => !f.off && !f.still && !paused(),
     paused,
     onPauseChange: hook(pauseFns),
     now: Date.now,
@@ -3524,6 +3634,26 @@ function buildFxCtx() {
     freeze,
     clearGestures,
     nav: { path: (d, a, b) => nav.path(d, a, b), snap: (d, p) => nav.snap(d, p), grid: (d) => nav.grid(d) },
+    meeting: { // the one meeting machine (startFloorMeeting): a workflow phase and a bell meeting both run on it
+      start: startFloorMeeting,
+      end: endFloorMeeting,
+      active: (frec) => frec.meeting?.type ?? null,
+    },
+    building: { // the building cross-section (web/building-view.mjs); every call is a harmless no-op while ui.building.enabled is off
+      active: () => bv?.active() ?? false,
+      floorBox: (id) => bv?.floorBox(id) ?? null,
+      elevator: (fromId, toId, opts) => (bv ? bv.elevator(fromId, toId, opts) : Promise.resolve(false)),
+      entryOf: (id) => bv?.entryOf(id) ?? null,
+      setEmptyRenderer: (fn) => {
+        emptyFn = fn;
+        syncEmpty();
+      },
+      onLayout: (fn) => (bv ? bv.onLayout(fn) : () => {}),
+    },
+    room: { // characters of the screen only (no session behind them): the CEO and the visitors of its room
+      createVisitor,
+      removeVisitor,
+    },
     life: {
       get ambient() { return amb; },
       get cat() { return catC; },
@@ -3534,6 +3664,29 @@ function buildFxCtx() {
       members: (f) => [...f.agents.values()].filter((r) => r.m && r.state !== 'done' && !r.el.classList.contains('gone')),
     },
   };
+  fxCtx = ctx;
+  return ctx;
+}
+
+/** A character of the screen only on a floor's stage (ctx.room.createVisitor): it looks and walks like a session's character but belongs to none (no ambient life, no server state). */
+function createVisitor(frec, { sprite, name, role = '' }) {
+  const rec = createChar({ sprite, slot: null }, frec.stage, { x: 0, y: 0 }, frec.scene, false, false);
+  rec.frec = frec;
+  rec.visitor = true;
+  rec.state = 'idle';
+  for (const n of [rec.el, rec.tagRoot]) n.classList.add('visitor', 'st-idle');
+  setText(rec.tag, name);
+  rec.tag.title = role;
+  tagLabel(rec, name);
+  return rec;
+}
+
+/** Takes a visitor off its floor. */
+function removeVisitor(rec) {
+  cancelGrab(rec);
+  rec.walk = null;
+  rec.el.remove();
+  rec.tagRoot.remove();
 }
 
 /** Starts every effects area once; an area that fails to start is reported and skipped, the office goes on. */
@@ -3593,7 +3746,7 @@ function toast(text) {
 function reconcileView(list) {
   const ids = orderFloors(list);
   let moved = false;
-  if (shownId !== null && shownId !== LOBBY_ID) { // the lobby stays whatever floors come and go
+  if (shownId !== null && shownId !== LOBBY_ID) { // the lobby stays whatever floors come and go (the CEO room too: fallbackFloor keeps it)
     const keep = fallbackFloor(viewIds, shownId, ids);
     moved = keep !== shownId;
     shownId = keep;
@@ -3643,10 +3796,23 @@ function applyView() {
     shownSince = Date.now();
   }
   document.body.classList.toggle('single', shownId !== null);
+  const building = bv !== null && shownId === null;
+  bv?.setActive(building);
   for (const [id, f] of floorRecs) setOff(f, shownId !== null && id !== shownId);
-  setLobbyOff(shownId !== LOBBY_ID);
+  if (ceo) setOff(ceo, !building && shownId !== CEO_ID);
+  if (lobby) { // the building shows the lobby, but without its crowd
+    const noFigures = building && !ui.ui.building.lobbyFigures;
+    const flip = lobby.noFigures !== noFigures;
+    lobby.noFigures = noFigures;
+    setLobbyOff(!building && shownId !== LOBBY_ID);
+    if (flip && !lobby.off) {
+      lobby.populated = false;
+      drawLobby();
+    }
+  }
   for (const [id, b] of tabRecs) setAttr(b, 'aria-pressed', String(id === shownId));
   setAttr(lobbyBtn, 'aria-pressed', String(shownId === LOBBY_ID));
+  setAttr(ceoBtn, 'aria-pressed', String(shownId === CEO_ID));
   syncEmpty();
   setAttr(allBtn, 'aria-pressed', String(shownId === null));
   markFollow();
@@ -3673,12 +3839,76 @@ function setOff(f, off) {
   }
 }
 
+/**
+ * A floor of the building that is out of the live set stands still: its picture stays (it is shown, not hidden), but its clock, walks and effects stop,
+ * like a hidden floor's. Back in the live set it comes back as setOff(false) does.
+ */
+function setStill(id, still) {
+  const f = viewRec(id);
+  if (!f || f.still === still) return;
+  f.still = still;
+  f.el.classList.toggle('still', still);
+  if (f.off) return;
+  if (f === lobby) {
+    if (still) clearLobbyTimer();
+    else {
+      if (lobby.dirty) drawLobby();
+      armLobby();
+    }
+  }
+  if (still) {
+    stopAmbient(f);
+    for (const a of f.agents.values()) settleNow(a);
+    emitFx('floor-hidden', { floor: f, removed: false });
+  } else {
+    renderBoard(f);
+    syncDecor(f);
+    syncWeather(f);
+    startAmbient(f, true);
+    emitFx('floor-shown', { floor: f });
+  }
+  catSync();
+}
+
+/** The floor record of a view id (a session id, the lobby or the CEO room). */
+const viewRec = (id) => (id === LOBBY_ID ? lobby : id === CEO_ID ? ceo : floorRecs.get(id) ?? null);
+
+/** The room floors of the building (ui.building): the CEO room, every session floor, the lobby. */
+function buildingRooms() {
+  const rooms = [];
+  const add = (id, f, extra = {}) => rooms.push({ id, slot: f.el, w: f.scene.r.size[0], h: f.scene.r.size[1], design: f.design, ...extra });
+  if (ceo) add(CEO_ID, ceo, { status: 'busy' });
+  for (const [id, f] of floorRecs) add(id, f, { floorNo: lastFloors.get(id)?.floorNo ?? 0, status: f.status });
+  if (lobby) add(LOBBY_ID, lobby, { status: 'busy' });
+  return rooms;
+}
+
+/**
+ * Shows `next` (a view id, or null for the whole stack). In the building the change slides like a lift (ui.building.slideMs): the building moves to the
+ * chosen floor before the single view shows it, or one floor slides out while the next slides in. Without the effects it is instant.
+ */
+function switchView(next) {
+  const from = shownId;
+  const go = () => {
+    shownId = next;
+    applyView();
+  };
+  if (!bv || next === null || next === from) return go();
+  if (from === null) return bv.slideTo(next, go);
+  const old = viewRec(from);
+  go();
+  const now = viewRec(next);
+  if (old && now) {
+    old.el.hidden = false;
+    bv.slidePair(old.el, now.el, bv.slideDir(from, next), () => { old.el.hidden = old.off; });
+  }
+}
+
 function pickFloor(id) {
-  if (id === LOBBY_ID && !lobby) return;
+  if ((id === LOBBY_ID && !lobby) || (id === CEO_ID && !ceo)) return;
   setRotate(false);
   setFollow(false);
-  shownId = shownId === id ? null : id;
-  applyView();
+  switchView(shownId === id ? null : id);
 }
 
 function showAll() {
@@ -3701,9 +3931,12 @@ function armRotate() {
 
 function rotateStep() {
   rotateTimer = 0;
-  shownId = nextFloor(viewOrder(viewIds, lobby !== null), shownId);
-  if (shownId === null) return setRotate(false);
-  applyView();
+  const next = nextFloor(viewOrder(viewIds, lobby !== null), shownId);
+  if (next === null) {
+    shownId = null;
+    return setRotate(false);
+  }
+  switchView(next);
   armRotate();
 }
 
@@ -3785,10 +4018,8 @@ function followCheck() {
   const now = Date.now();
   followLast = now;
   const pick = chooseFollow({ ids: viewIds, scores: followScores(now), current: shownId, now, shownSince }, ui.ui.follow);
-  if (pick.id !== null && pick.id !== shownId) {
-    shownId = pick.id;
-    applyView();
-  } else if (pick.waitMs > 0) armFollow(pick.waitMs);
+  if (pick.id !== null && pick.id !== shownId) switchView(pick.id);
+  else if (pick.waitMs > 0) armFollow(pick.waitMs);
 }
 
 /** Activity arrived: check now, or at most once per throttleMs; nothing new is armed while a check is already pending. */
@@ -3816,7 +4047,7 @@ function setFollow(on) {
   setAttr(followBtn, 'aria-pressed', String(following));
   if (following) {
     setRotate(false);
-    const here = shownId === LOBBY_ID ? null : shownId; // follow never stays in the lobby
+    const here = shownId === LOBBY_ID || shownId === CEO_ID ? null : shownId; // follow never stays in the lobby or the CEO room
     shownId = busiestFloor(viewIds, followScores(Date.now()), here, ui.ui.follow.minScore) ?? here ?? viewIds[0];
     followLast = Date.now();
     applyView();
@@ -3895,7 +4126,7 @@ function applyTheme() {
   if (pipWin) paintTheme(pipWin.document);
   setAttr(themeBtn, 'aria-pressed', String(isDark()));
   setLight(currentLight(new Date()));
-  for (const f of floorRecs.values()) syncDecor(f);
+  for (const f of ceo ? [...floorRecs.values(), ceo] : floorRecs.values()) syncDecor(f);
 }
 
 themeBtn.addEventListener('click', () => {
@@ -3954,6 +4185,7 @@ async function openPip() {
   armLobby(); // and the lobby's one timer
   if (followTimer) armFollow(Math.max(0, followDue - Date.now())); // and the pending follow check
   fitFloors();
+  bv?.relayout(); // the live floors are the ones in the small window's view
 }
 
 /** Brings the floors back to this page (the small window closed, or the person asked). Safe to call twice. */
@@ -3975,6 +4207,7 @@ function pipClosed() {
   holdEl.before(floorsEl);
   holdEl.hidden = true;
   floorsEl.style.zoom = '';
+  bv?.relayout();
   if (document.hidden) pause(); // pausing was skipped while the small window showed the office
   else {
     for (const f of floorRecs.values()) f.clock.kick(); // its timer died with the small window

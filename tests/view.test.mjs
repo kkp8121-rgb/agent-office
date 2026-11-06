@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { orderFloors, nextFloor, fallbackFloor, fitBox, pruneEvents, activityScore, busiestFloor, chooseFollow } from '../web/view.mjs';
+import { orderFloors, nextFloor, fallbackFloor, fitBox, pruneEvents, activityScore, busiestFloor, chooseFollow, viewOrder, CEO_ID, LOBBY_ID } from '../web/view.mjs';
 
 test('view: orderFloors sorts by floor number', () => {
   const views = [{ sessionId: 'c', floorNo: 3 }, { sessionId: 'a', floorNo: 1 }, { sessionId: 'b', floorNo: 2 }];
@@ -121,4 +121,23 @@ test('follow: a shown floor that is gone gives way at once, to the busiest (the 
   assert.deepEqual(gone({ a: 3, c: 20 }), { id: 'c', waitMs: 0 });
   assert.deepEqual(gone({ a: 0, c: 0 }), { id: 'a', waitMs: 0 });
   assert.deepEqual(chooseFollow({ ids: [], scores: new Map(), current: 'b', now, shownSince: now }, F), { id: null, waitMs: 0 });
+});
+
+test('view: the CEO room is a fixed button, never in the rotation', () => {
+  assert.notEqual(CEO_ID, LOBBY_ID);
+  assert.deepEqual(viewOrder(['a', 'b'], true), [LOBBY_ID, 'a', 'b']);
+  assert.ok(!viewOrder(['a', 'b'], true).includes(CEO_ID));
+  assert.ok(!viewOrder(['a', 'b'], false).includes(CEO_ID));
+});
+
+test('view: following never picks the CEO room', () => {
+  const cfg = { minScore: 1, switchMargin: 1, switchRatio: 1, minDwellSeconds: 0 };
+  const scores = new Map([['a', 5], ['b', 1]]);
+  assert.equal(busiestFloor(['a', 'b'], scores, CEO_ID, 1), 'a');
+  assert.equal(chooseFollow({ ids: ['a', 'b'], scores, current: CEO_ID, now: 10, shownSince: 0 }, cfg).id, 'a');
+});
+
+test('view: fallbackFloor keeps the CEO room whatever floors come and go', () => {
+  assert.equal(fallbackFloor(['a', 'b'], CEO_ID, ['a']), CEO_ID);
+  assert.equal(fallbackFloor(['a'], CEO_ID, []), CEO_ID);
 });
