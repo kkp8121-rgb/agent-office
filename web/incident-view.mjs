@@ -23,6 +23,17 @@ export function restSignText(cfg, rest) {
   return `${cfg.signText} · ${fill(cfg.untilText, { hh: two(at.getHours()), mm: two(at.getMinutes()) })}`;
 }
 
+/**
+ * The lobby news line of a floor going on its lunch break (cfg = ui.rest): the sentence with the floor's name and, when the server knows when the limit ends,
+ * the return time. Without a return time the sentence ends before its first 「 · 」.
+ */
+export function restNewsText(cfg, rest, floorName) {
+  if (!rest) return '';
+  if (!Number.isFinite(rest.until)) return fill(cfg.news.split(' · ')[0], { floor: floorName });
+  const at = new Date(rest.until);
+  return fill(cfg.news, { floor: floorName, hh: two(at.getHours()), mm: two(at.getMinutes()) });
+}
+
 /** What a faint signal does to one character: 'skip' (nothing at all), 'say' (only the line) or 'full' (fall, notepad and line).
  *  A floor on its lunch break and a character that fainted a moment ago stay silent. Without the effects there is the line only. */
 export function faintPlan({ fxOn, rest, lastAt, now, cooldownMs }) {

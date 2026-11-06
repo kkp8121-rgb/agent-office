@@ -1,6 +1,8 @@
 // Effects area "bell-floor": the meeting bell on every floor and the bell meeting it starts. Classes: mb-*, looks in web/bell-floor.css, rules in web/bellmeeting.mjs.
+//   The bell hangs on a cord from the ceiling of the room (ui.bellMeeting.at[design] = [cord x, bell top y, ceiling y]; the picture sizes are ui.bellMeeting.art).
 //   A press on the bell gathers the floor at its meeting spots (the one meeting machine, ctx.meeting); the lead chairs from the boss spot, every speaker says what
-//   their bubble shows (or the idle line), the lead closes, everybody walks back. A refused press (a phase meeting runs, the floor is at lunch) only shows a sign.
+//   their bubble shows (or the idle line), the lead closes, everybody walks back, and the bell shows its ringing picture meanwhile. A refused press (a phase meeting
+//   runs, the floor is at lunch, the lead is alone) only shows a sign.
 // Information (the button, the sign) is drawn with the effects off too. Every timer is the office's, with the floor id.
 import { ringDecision, nearestSpot, planBell } from './bellmeeting.mjs';
 import { LOBBY_ID } from './view.mjs';
@@ -42,6 +44,9 @@ export function init(ctx) {
 
   // ---------- the bell of each floor ----------
 
+  /** True when the lead is the only one on the floor: a bell meeting needs staff. */
+  const isAlone = (frec) => !ctx.life.members(frec).some((r) => !r.isLead);
+
   const bubbleOf = (rec) => (rec.bubTxt && !rec.bubTxt.classList.contains('empty') ? rec.bubTxt.textContent : '');
 
   function flashSign(frec, text) {
@@ -58,6 +63,8 @@ export function init(ctx) {
     const floors = sessionFloors();
     for (const f of floors) {
       const at = bm.at?.[f.design] ?? null;
+      const { art } = bm;
+      const sc = art.scale;
       let b = bells.get(f);
       if (!at) {
         if (b) {
@@ -70,13 +77,21 @@ export function init(ctx) {
         const btn = mk('button', 'mb-bell');
         btn.type = 'button';
         const img = mk('img', 'mb-bell-img');
-        img.src = `${PROPS}bell-desk.png`;
+        img.src = `${PROPS}bell-hang.png`;
         img.alt = '';
         img.draggable = false;
+        img.style.width = `${art.w * sc}px`;
+        img.style.height = `${art.h * sc}px`;
+        const cord = mk('span', 'mb-bell-cord'); // the cord tile repeats from the bell up to the ceiling
+        cord.style.left = `${(art.attachX - (art.cordW - 1) / 2) * sc}px`;
+        cord.style.width = `${art.cordW * sc}px`;
+        cord.style.height = `${at[1] - at[2]}px`;
+        cord.style.backgroundImage = `url(${PROPS}bell-hang-cord.png)`;
+        cord.style.backgroundSize = `${art.cordW * sc}px ${art.cordH * sc}px`;
         const sign = mk('div', 'mb-bell-sign');
         sign.hidden = true;
-        btn.append(img, sign);
-        btn.style.left = `${at[0]}px`;
+        btn.append(cord, img, sign);
+        btn.style.left = `${at[0] - art.attachX * sc}px`;
         btn.style.top = `${at[1]}px`;
         btn.addEventListener('click', () => onBell(f));
         f.stage.append(btn);
@@ -87,6 +102,7 @@ export function init(ctx) {
       const shown = ctx.floorActive(f) && f.status !== 'leaving';
       if (b.btn.hidden === shown) b.btn.hidden = !shown;
       b.btn.classList.toggle('mb-bell-rest', Boolean(view?.rest));
+      b.btn.classList.toggle('mb-bell-alone', isAlone(f));
       const label = `${bm.label} ${view?.floorNo ?? ''}`.trim();
       if (b.btn.getAttribute('aria-label') !== label) b.btn.setAttribute('aria-label', label);
     }
@@ -98,7 +114,7 @@ export function init(ctx) {
 
   const ringPicture = (frec, ringing) => {
     const b = bells.get(frec);
-    if (b) b.img.src = `${PROPS}${ringing ? 'bell-desk-ring' : 'bell-desk'}.png`;
+    if (b) b.img.src = `${PROPS}${ringing ? 'bell-hang-ring' : 'bell-hang'}.png`;
   };
 
   // ---------- the bell meeting ----------
@@ -106,7 +122,7 @@ export function init(ctx) {
   function onBell(frec) {
     const sid = frec.sid;
     const d = ringDecision({
-      phaseActive: ctx.meeting.active(frec) === 'phase', bellActive: ctx.meeting.active(frec) === 'bell' || flows.has(sid), lunch: Boolean(ctx.view(sid)?.rest),
+      phaseActive: ctx.meeting.active(frec) === 'phase', bellActive: ctx.meeting.active(frec) === 'bell' || flows.has(sid), lunch: Boolean(ctx.view(sid)?.rest), alone: isAlone(frec),
       offFloor: !ctx.floorActive(frec) || frec.status === 'leaving', now: ctx.now(), lastRingAt: lastRing.get(sid) ?? null,
     }, ctx.ui.bellMeeting);
     if (!d.ok) {

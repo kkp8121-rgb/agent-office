@@ -115,6 +115,13 @@ ui.bellMeeting.sayMs number
 ui.bellMeeting.gapMs number
 ui.bellMeeting.maxSpeakers number
 ui.bellMeeting.cooldownMs number
+ui.bellMeeting.aloneText string
+ui.bellMeeting.art.w number
+ui.bellMeeting.art.h number
+ui.bellMeeting.art.attachX number
+ui.bellMeeting.art.cordW number
+ui.bellMeeting.art.cordH number
+ui.bellMeeting.art.scale number
 ui.bellMeeting.at.studio2 array
 ui.bellMeeting.at.lounge array
 ui.bellMeeting.at.library array
@@ -144,13 +151,14 @@ test('removed key paths are absent', () => {
   assert.equal(at('hourglass.kinds.exec_result'), undefined);
 });
 
-test('coordinate keys are null or the right shape', () => {
+test('coordinate keys are placed: none is null, each has the right shape', () => {
   const num = (v) => typeof v === 'number' && Number.isFinite(v);
   const pair = (v) => Array.isArray(v) && v.length === 2 && v.every(num);
+  const triple = (v) => Array.isArray(v) && v.length === 3 && v.every(num) && v[2] < v[1]; // [cord x, bell top y, ceiling y]: the ceiling is above the bell
   const shapes = {
     'ui.conflict.lobbyLampAt': pair,
     'ui.pile.offset.*': pair,
-    'ui.bellMeeting.at.*': pair,
+    'ui.bellMeeting.at.*': triple,
   };
   let seen = 0;
   for (const [pattern, ok] of Object.entries(shapes)) {
@@ -160,7 +168,8 @@ test('coordinate keys are null or the right shape', () => {
     assert.ok(values.length > 0, pattern);
     for (const [name, v] of values) {
       seen++;
-      assert.ok(v === null || ok(v), `${pattern}: ${name}`); // null = not placed yet: the picture or button is simply not drawn
+      assert.notEqual(v, null, `${pattern}: ${name} is not placed`);
+      assert.ok(ok(v), `${pattern}: ${name}`);
     }
   }
   assert.equal(seen, 1 + 4 + 4);

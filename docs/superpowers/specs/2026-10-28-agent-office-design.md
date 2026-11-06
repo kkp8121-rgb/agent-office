@@ -1,9 +1,9 @@
 # 에이전트 사무실 (Agent Office) — 설계서
 
 - 작성일: 2026-10-28
-- 위치: `C:\Users\gustj\agent-office\` (새 프로젝트)
+- 위치: `<저장소>\` (새 프로젝트)
 - 참고 시안(브레인스토밍 중 사용자 확인): 픽셀아트 사무실 배경 + 픽셀 SD 캐릭터 + 세션 숨기기 + 기록 칸
-  - 배경 그림 원본: `C:\Users\gustj\AppData\Local\Temp\claude\C--Project\6106276a-a6e5-4468-8650-198bebbf83af\scratchpad\art\pixel-office.png`
+  - 배경 그림 원본: `<스크래치>\art\pixel-office.png`
   - 캐릭터 견본: 같은 폴더 `pixel-sd.png`(Codex 원본), `pixel-sd-64.png`(64px 격자 정리본)
   - 시안 HTML: 같은 scratchpad 의 `.superpowers\brainstorm\1140325-1793170347\content\office-v1.html`
   - 사용자가 보여준 참고 화면: 정면 픽셀 사무실 + 오른쪽 기록 칸(이름 · 시각 · 여러 줄 설명) + 「전체 기록 ↗」 링크
@@ -41,7 +41,7 @@
 - Windows 11, Node.js v24.18.0, Python 3.12.10(Pillow 있음) 설치 확인.
 - 외부 CDN·폰트·스크립트 사용 금지. 화면은 로컬 파일과 로컬 서버만으로 동작한다.
 - 서버는 `127.0.0.1` 에만 연다(같은 네트워크의 다른 기기에서 접근 불가).
-- `C:\Users\gustj\.claude\sessions\*.key` 같은 비밀 파일은 열지 않는다.
+- `~/.claude\sessions\*.key` 같은 비밀 파일은 열지 않는다.
 - 기획 수치(폴링 주기, 말풍선 길이, 사라지는 시간, 이름 표 등)는 코드에 박지 말고 설정 표(JSON)에 둔다.
 - 사용자에게 보이는 글은 한국어.
 - **자원 절약이 최우선 (사용자 확정 2026-10-28)**: CPU·메모리를 최대한 아끼는 쪽으로 모든 선택을 한다.
@@ -156,8 +156,8 @@
 
 | 필요한 것 | 출처 |
 |---|---|
-| 살아 있는 세션 목록 | `C:\Users\gustj\.claude\sessions\<pid>.json` — `pid`, `sessionId`, `cwd`, `status`("busy"/"shell" 확인), `name`, `startedAt`, `updatedAt`. 오늘 5개 모두 실행 중 `claude.exe` PID 와 일치 |
-| 세션 기록 | `C:\Users\gustj\.claude\projects\<프로젝트폴더>\<sessionId>.jsonl` — 한 줄 한 이벤트, 뒤에 붙는 방식. `assistant` 줄의 `message.content[]` 안 `tool_use{name,input}`, `timestamp`, `ai-title` 줄의 `aiTitle` |
+| 살아 있는 세션 목록 | `~/.claude\sessions\<pid>.json` — `pid`, `sessionId`, `cwd`, `status`("busy"/"shell" 확인), `name`, `startedAt`, `updatedAt`. 오늘 5개 모두 실행 중 `claude.exe` PID 와 일치 |
+| 세션 기록 | `~/.claude\projects\<프로젝트폴더>\<sessionId>.jsonl` — 한 줄 한 이벤트, 뒤에 붙는 방식. `assistant` 줄의 `message.content[]` 안 `tool_use{name,input}`, `timestamp`, `ai-title` 줄의 `aiTitle` |
 | 서브에이전트 | `<세션폴더>\<sessionId>\subagents\agent-<id>.jsonl` + `agent-<id>.meta.json`(`agentType`, `description`, `toolUseId`, `spawnDepth`, `requestShape`, 끝나면 `finished:true`) |
 | 워크플로 | 실행 요약 `<sessionId>\workflows\wf_<runId>.json`(`workflowName`, `phases`, `status` …, 끝날 때 기록되는 듯), 에이전트 `<sessionId>\subagents\workflows\wf_<runId>\agent-<id>.jsonl/.meta.json`(`workflowPhase`, `description`=라벨), 진행 일지 `journal.jsonl`(`launched` / `started{agentId,label,phase}` / `result`) |
 | 말풍선 문구 | 마지막 `tool_use`: Bash → `input.description`(없으면 명령의 **첫 단어만**, 예 「git 실행」), Read/Edit/Write → 파일 이름만, Grep/Glob → 「검색 중」(검색어는 내보내지 않음), Agent → 역할 이름 + `description`, Skill → 스킬 이름, 도구 없는 답 → 「생각 중」 |

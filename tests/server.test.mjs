@@ -374,3 +374,22 @@ test('server: /scenes serves scene pictures with the picture cache header and re
     assert.equal((await req(c, 'GET', p)).status, 404, p);
   }
 });
+
+test('server: a same-file conflict is announced as a `conflict` frame (ids and numbers only) and shows in the state frame', async (t) => {
+  const key = 'f00dfacefeedbeefdeadbabe'; // what the parser makes of a path; it never leaves the server
+  const edit = (ts) => ({ kind: 'tool', ts, toolUseId: `e${ts}`, name: 'Edit', text: 'Edit', fileKey: key });
+  const c = await start(t, { sessions: [S('s1'), S('s2')] });
+  const opened = sse(c, (x) => x.includes('event: conflict') && x.split('event: state').length >= 3);
+  await new Promise((r) => setTimeout(r, 50)); // the client is registered before the change goes out
+  c.office.applySessionEvents('s1', [edit(2000)], 2000);
+  c.office.applySessionEvents('s2', [edit(2100)], 2100);
+  c.office.tick(2200);
+  c.server.broadcast();
+  const r = await opened;
+  const evs = events(r.text);
+  const sigs = evs.filter(([name]) => name === 'conflict').map(([, d]) => d);
+  assert.deepEqual(sigs, [{ type: 'conflict', id: 'c1', sessionIds: ['s1', 's2'], at: 2200 }]);
+  const last = evs.filter(([name]) => name === 'state').at(-1)[1].floors;
+  assert.deepEqual(last.map((f) => f.conflicts), [[{ id: 'c1', with: ['s1'], since: 2100 }], [{ id: 'c1', with: ['s2'], since: 2100 }]], 'each floor lists the other');
+  assert.ok(!r.text.includes(key), 'the file key is not in any frame');
+});

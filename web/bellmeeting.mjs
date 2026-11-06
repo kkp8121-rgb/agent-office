@@ -3,13 +3,14 @@
 
 /**
  * May the bell on this floor start a meeting now? A refusal says why and what to show (a sign only, never a wobble).
- * `s`: {phaseActive, bellActive, lunch, offFloor, now, lastRingAt}; `bm`: ui.bellMeeting.
+ * `s`: {phaseActive, bellActive, lunch, alone, offFloor, now, lastRingAt}; `bm`: ui.bellMeeting. `alone`: the lead has no staff on the floor, so nobody to meet.
  * @returns {{ok: boolean, reason?: string, sign?: string, wobble: boolean}}
  */
 export function ringDecision(s, bm) {
   if (s.offFloor) return { ok: false, reason: 'hidden', wobble: false };
   if (s.phaseActive) return { ok: false, reason: 'phase', sign: bm.busyText, wobble: false };
   if (s.lunch) return { ok: false, reason: 'lunch', sign: bm.restText, wobble: false };
+  if (s.alone) return { ok: false, reason: 'alone', sign: bm.aloneText, wobble: false };
   if (s.bellActive) return { ok: false, reason: 'busy', wobble: false };
   if (s.lastRingAt != null && s.now - s.lastRingAt < bm.cooldownMs) return { ok: false, reason: 'cooldown', wobble: false };
   return { ok: true, wobble: false };

@@ -12,7 +12,7 @@ const load = (n) => decodePng(readFileSync(join(DIR, n)));
 const luma = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
 
 test('every prop is RGBA with transparent corners', () => {
-  assert.equal(files().length, 13);
+  assert.equal(files().length, 14);
   for (const n of files()) {
     const { w, h, rgba } = load(n);
     for (const [x, y] of [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]]) {

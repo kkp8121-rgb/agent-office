@@ -372,7 +372,9 @@
                     "offset": { "studio2": [-14, -27], "lounge": [-12, -14], "library": [-14, -24], "greenhouse": [-14, -24] } },
           "hourglass": { "tickMs": 5000, "flipMs": 2000, "text": "{m}분 {s}초", "textHour": "{h}시간 {m}분" },
           "bellMeeting": { "label": "회의 소집 종", "busyText": "회의 중", "restText": "점심시간이라 쉬는 중", "sayMs": 2600, "gapMs": 300, "maxSpeakers": 7, "cooldownMs": 20000,
-                           "at": { "studio2": [826, 204], "lounge": [575, 158], "library": [866, 222], "greenhouse": [858, 268] } } },
+                           "aloneText": "혼자라 회의할 수 없어요",
+                           "art": { "w": 25, "h": 19, "attachX": 12, "cordW": 5, "cordH": 4, "scale": 1.5 },
+                           "at": { "studio2": [830, 66, 50], "lounge": [602, 54, 30], "library": [884, 98, 90], "greenhouse": [806, 112, 70] } } },
   "leads": [
     { "key": "lead",   "name": "유나", "role": "팀장" },
     { "key": "lead-2", "name": "하나", "role": "팀장" },

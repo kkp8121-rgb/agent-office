@@ -101,25 +101,6 @@ def pile(sheets):
 for _n in range(1, 5):
     SHAPES["pile-%d" % _n] = pile(_n)
 
-SHAPES["bell-desk"] = [
-    "....rrrr....",
-    "..rrRRrrrr..",
-    ".rRRrrrrrrr.",
-    "rRrrrrrrrrrr",
-    "rrrrrrrrrrrr",
-    "dddddddddddd",
-    ".dssssssssd.",
-]
-SHAPES["bell-desk-ring"] = [
-    "R..........R",
-    ".R..rrrr..R.",
-    "..rrRRrrrr..",
-    ".rRRrrrrrrr.",
-    "rRrrrrrrrrrr",
-    "rrrrrrrrrrrr",
-    "dddddddddddd",
-    ".dssssssssd.",
-]
 SHAPES["warn-lamp-on"] = [
     "...RRrr...",
     "..RyyRrr..",
@@ -159,7 +140,7 @@ SHAPES["tug-paper"] = [
 ORDER = [
     "folder", "plane", "notepad",
     "hourglass", "pile-1", "pile-2", "pile-3", "pile-4",
-    "bell-desk", "bell-desk-ring", "warn-lamp-on", "warn-lamp-off", "tug-paper",
+    "bell-hang", "bell-hang-ring", "bell-hang-cord", "warn-lamp-on", "warn-lamp-off", "tug-paper",
 ]
 
 USE = {
@@ -171,8 +152,9 @@ USE = {
     "pile-2": "desk paper pile, stage 2",
     "pile-3": "desk paper pile, stage 3",
     "pile-4": "desk paper pile, stage 4 (about to topple)",
-    "bell-desk": "desk bell for the bell meeting",
-    "bell-desk-ring": "the same bell while it is rung",
+    "bell-hang": "the meeting bell, hanging on a cord from the ceiling (drawn by build_bell_hang.py)",
+    "bell-hang-ring": "the same bell while it is rung",
+    "bell-hang-cord": "the rope tile repeated from the ceiling down to the bell",
     "warn-lamp-on": "lobby conflict lamp, lit",
     "warn-lamp-off": "lobby conflict lamp, dark",
     "tug-paper": "the paper pulled in a file conflict (one end leaves the picture)",
@@ -252,8 +234,9 @@ def readme(images):
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    images = {name: render(SHAPES[name]) for name in ORDER}
-    for name in ORDER:
+    # the hanging bell pictures come from build_bell_hang.py (they are read back here for the table and the contact sheet)
+    images = {name: render(SHAPES[name]) if name in SHAPES else Image.open(os.path.join(OUT, name + ".png")) for name in ORDER}
+    for name in SHAPES:
         images[name].save(os.path.join(OUT, name + ".png"), compress_level=9)
     with open(os.path.join(OUT, "README.md"), "w", encoding="utf-8", newline="\n") as f:
         f.write(readme(images))

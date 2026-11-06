@@ -120,7 +120,7 @@ export function init(ctx) {
       alive.add(person.key);
       setBand(rec, person.model);
       setGlass(rec, glassPlan({ slowSince: person.slowSince, nowMs, rest: fv.rest, fxOn: on }, glassCfg));
-      const plan = pilePlan({ pile: person.pile, design: fv.design, fxOn: on }, pileCfg);
+      const plan = pilePlan({ pile: person.pile, design: fv.design, fxOn: on, meeting: rec.play?.kind === 'meeting' }, pileCfg);
       setPile(frec, person.key, plan.draw, deskOf(frec.scene.r, person.key, person.slot));
       setTitle(rec, plan.title);
     }
@@ -175,5 +175,14 @@ export function init(ctx) {
   };
   ctx.fx.onFx('floor-shown', again, { always: true });
   ctx.fx.onFx('floor-hidden', () => ticker.sync(), { always: true });
+  // a meeting takes the people from their desks (and the piles with them) and brings them back; the machine marks them just after it announces the start and the end
+  for (const name of ['meeting-start', 'meeting-end']) {
+    ctx.fx.onFx(name, ({ floor }) => {
+      ctx.timers.setTimeout(() => {
+        const fv = ctx.view(floor.sid);
+        if (fv) syncFloor(fv);
+      }, 0, floor.sid);
+    });
+  }
   ctx.fx.onFxChange(syncAll); // the effects switch: piles appear or go, the hourglass starts or stops flipping, the stage-4 words move
 }

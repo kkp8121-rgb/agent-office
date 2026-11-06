@@ -11,7 +11,7 @@ test('sanitize: bash without description exposes first word only', () => {
 test('sanitize: quoted exe path reduces to bare name', () =>
   assert.equal(describeTool('Bash', {command:'"C:/Program Files/nodejs/node.exe" x.mjs'}), 'node 실행'));
 test('sanitize: file tools show basename only', () => {
-  assert.equal(describeTool('Read', {file_path:'C:\\Users\\gustj\\secret\\PostController.cs'}), 'PostController.cs 읽는 중');
+  assert.equal(describeTool('Read', {file_path:'C:\\Users\\someone\\secret\\PostController.cs'}), 'PostController.cs 읽는 중');
   assert.equal(describeTool('Edit', {file_path:'/a/b/app.js'}), 'app.js 고치는 중');
   assert.equal(describeTool('Write', {file_path:'/a/b/new.md'}), 'new.md 쓰는 중');
 });

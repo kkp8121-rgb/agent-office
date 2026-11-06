@@ -225,6 +225,24 @@ test('lobby board: state words, with the leaving floor overriding every state', 
   assert.equal(stateLabel({ ...e, floorStatus: 'leaving' }, L), '퇴근 중');
 });
 
+test('lobby board: a floor on its lunch break says the lunch word for everyone on it, and a leaving floor still says 퇴근 중', () => {
+  const e = { state: 'working', floorStatus: 'busy', rest: true };
+  assert.equal(stateLabel(e, L, '점심시간'), '점심시간');
+  assert.equal(stateLabel({ ...e, state: 'idle' }, L, '점심시간'), '점심시간');
+  assert.equal(stateLabel(e, L), '근무 중', 'no word given: the state word');
+  assert.equal(stateLabel({ ...e, rest: false }, L, '점심시간'), '근무 중');
+  assert.equal(stateLabel({ ...e, floorStatus: 'leaving' }, L, '점심시간'), '퇴근 중');
+  const roster = lobbyRoster([floor('a', 2, [agent('a:1')], { rest: { until: null, limitKind: 'other' } }), floor('b', 3, [agent('b:1')])]);
+  assert.deepEqual(roster.map((r) => r.rest), [true, true, false, false]);
+  const rows = employeeRows(roster, 60000, L, 16, [], '점심시간');
+  assert.deepEqual(rows.map((r) => r.cells[3]), ['점심시간', '점심시간', '대기', '근무 중']);
+});
+
+test('lobby news: an office sentence is shown as it is, clipped', () => {
+  assert.equal(newsText({ ts: 0, plain: '2층 점심시간 · 07:05 복귀' }, 2, L), '2층 점심시간 · 07:05 복귀');
+  assert.ok(newsText({ ts: 0, plain: 'x'.repeat(500) }, 2, L).length <= L.newsMax + 1);
+});
+
 test('lobby board: one row per roster entry with every column; the task is the bubble clipped like the bubble', () => {
   const now = 10 * 60000 + 5000;
   const roster = lobbyRoster([floor('a', 2, [agent('a:1', { name: '서진', bubble: '아주아주 긴 말풍선 내용을 적어 봅니다 열여섯자넘음', enteredAt: 60000, wf: true, state: 'done' })], { reports: 3, startedAt: 5000 })]);

@@ -75,6 +75,13 @@ test('with the effects off no pile is drawn and only stage 4 puts its words in t
   }
 });
 
+test('a person at a meeting has no pile on the empty desk, and stage 4 speaks in the tag title instead', () => {
+  const cfg = { ...pile, offset: { studio2: [-14, -27] } };
+  assert.equal(pilePlan({ pile: 3, design: 'studio2', fxOn: true, meeting: true }, cfg).draw, null);
+  assert.notEqual(pilePlan({ pile: 3, design: 'studio2', fxOn: true, meeting: false }, cfg).draw, null);
+  assert.equal(pilePlan({ pile: 4, design: 'studio2', fxOn: true, meeting: true }, cfg).title, pile.titles[4], 'no picture shows the stage, so the words do');
+});
+
 test('only stage 4 wobbles', () => {
   const cfg = { ...pile, offset: { studio2: [-14, -27] } };
   const wobble = [1, 2, 3, 4].map((level) => pilePlan({ pile: level, design: 'studio2', fxOn: true }, cfg).draw.wobble);

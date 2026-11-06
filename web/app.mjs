@@ -8,6 +8,7 @@ import { localPlacement, planFloor, withPersonal } from './decor.mjs';
 import { fitZoom } from './pip.mjs';
 import { LOBBY_ID, orderFloors, nextFloor, fallbackFloor, fitBox, pruneEvents, activityScore, busiestFloor, chooseFollow, viewOrder } from './view.mjs';
 import { canStroll, nextStrollAt, scaleLife, strollTarget } from './lobbylife.mjs';
+import { restNewsText } from './incident-view.mjs';
 import { assignLobbySeats, backRowSeats, changeOf, clockParts, employeeRows, headline, indexRows, lobbyRoster, msToNextMinute, newsText, officeScore, pageCount, pageRows, pushSample, tableCapacity } from './lobby.mjs';
 import { dropPoint, restSpotNear, shouldLift } from './grab.mjs';
 import { daypart, nextPoke, openBox, pickLine, playPartner, throwPath, throwVelocity } from './play.mjs';
@@ -1313,7 +1314,7 @@ function notePause(on) {
  */
 function startFloorMeeting(frec, opts = {}) {
   const spots = frec.scene.raw.meeting;
-  if (!spots || frec.off || paused() || frec.status === 'leaving' || frec.meeting) return null;
+  if (!spots || frec.off || paused() || frec.status === 'leaving' || frec.lunch || frec.meeting) return null;
   const M = ui.ui.meeting;
   const crew = [...frec.agents.values()].filter(meetable);
   const chair = crew.find((a) => a.isLead) ?? null;
@@ -2276,8 +2277,9 @@ function renderFloor(fv, elm) {
   setText(rec.ff, fv.folder);
   rec.ff.hidden = fv.folder === '';
   setText(rec.prov, originText(fv));
-  setText(rec.fs, STATUS_TEXT[fv.status] ?? fv.status);
-  rec.fs.className = `fs ${fv.status}`;
+  rec.lunch = Boolean(fv.rest); // a usage limit has the floor on its lunch break: no meetings, no screen light, no thinking bubble for the lead
+  setText(rec.fs, fv.rest ? ui.ui.rest.lobbyStatus : STATUS_TEXT[fv.status] ?? fv.status);
+  rec.fs.className = `fs ${fv.rest ? 'rest' : fv.status}`;
   setText(rec.bt, fv.board.title);
   setText(rec.bl, fv.board.line);
   rec.bl.hidden = fv.board.line === '';
@@ -2302,7 +2304,7 @@ function renderFloor(fv, elm) {
     sprite: fv.lead.sprite,
     slot: { kind: 'seat', i: 0, x: lead.at[0], y: lead.at[1], approach: lead.approach, sit: lead.sitAt, face: lead.face, ring: 0 },
     state: fv.lead.state,
-    bubble: fv.lead.bubble,
+    bubble: fv.rest ? '' : fv.lead.bubble,
     since: fv.lead.bubble === (rec.leadBubble ?? null) ? rec.leadSince : lastNow,
   };
   rec.leadBubble = fv.lead.bubble;
@@ -2694,7 +2696,7 @@ function drawWall(now) {
     const clk = clockParts(now, L.days);
     put(w.date, clk.date);
     put(w.time, clk.time);
-    const rows = employeeRows(lb.roster, now, L, ui.ui.bubbleMaxChars, ui.ui.play.statusBubbles);
+    const rows = employeeRows(lb.roster, now, L, ui.ui.bubbleMaxChars, ui.ui.play.statusBubbles, ui.ui.rest.lobbyStatus);
     lb.pages = pageCount(rows.length, w.rows.length);
     lb.page %= lb.pages;
     if (lb.pages > 1 && lb.pageAt === 0) lb.pageAt = now + L.pageSeconds * 1000;
@@ -2738,6 +2740,23 @@ function drawNews() {
   if (tc) put(tc, line(a));
   if (tl) put(tl, line(b));
   if (tr) put(tr, line(c));
+}
+
+const lunchNoted = new Set(); // session ids whose lunch break the lobby news has mentioned
+
+/** The lobby news says once when a floor goes on its lunch break (ui.rest.news); the floor is noted again after it has been back at work. */
+function noteLunches(list) {
+  const now = Date.now();
+  for (const fv of list) {
+    if (!fv.rest) {
+      lunchNoted.delete(fv.sessionId);
+      continue;
+    }
+    if (lunchNoted.has(fv.sessionId)) continue;
+    lunchNoted.add(fv.sessionId);
+    lobbyNote({ id: `rest:${fv.sessionId}:${now}`, sessionId: fv.sessionId, ts: now, plain: restNewsText(ui.ui.rest, fv.rest, lobbyFill(ui.ui.lobby.floorLabel, { n: fv.floorNo })) });
+  }
+  for (const sid of [...lunchNoted]) if (!lastFloors.has(sid)) lunchNoted.delete(sid);
 }
 
 /** A log entry arrived (or was merged): keep the newest few for the strips. */
@@ -3092,6 +3111,7 @@ function render(state) {
   for (const id of [...floorRecs.keys()]) if (!ids.has(id)) removeSession(id, false);
 
   lastFloors = new Map(list.map((f) => [f.sessionId, f]));
+  noteLunches(list);
   const floorEls = [];
   const rowEls = [];
   for (const fv of list) {

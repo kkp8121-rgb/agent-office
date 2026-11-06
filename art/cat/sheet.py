@@ -1,6 +1,6 @@
-import sys
+import os, sys
 from PIL import Image
-S = sys.argv[1]; R = "C:/Users/gustj/agent-office/assets/sprites/"
+S = sys.argv[1]; R = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "assets", "sprites") + os.sep
 names = ["default", "cat-walk-1", "cat-walk-2", "cat-sit", "cat-sleep", "cat-held"]
 ims = [Image.open(R + n + ".png").convert("RGBA") for n in names]
 W = sum(i.width * 5 + 10 for i in ims) + 10

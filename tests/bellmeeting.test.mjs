@@ -11,7 +11,7 @@ const mk = (n) => [
   { id: 's1', isLead: false, spot: 1, bubble: 'a' },
   { id: 's2', isLead: false, spot: 2, bubble: '' },
 ].slice(0, n);
-const idle = { phaseActive: false, bellActive: false, lunch: false, offFloor: false, now: 100000, lastRingAt: null };
+const idle = { phaseActive: false, bellActive: false, lunch: false, alone: false, offFloor: false, now: 100000, lastRingAt: null };
 
 test('speaking order: lead first, then staff by spot number', () => {
   const { speakers } = speakingOrder(mk(4), 7);
@@ -48,6 +48,16 @@ test('phase signal during a bell meeting hands over to a phase meeting chaired b
 test('lunch floor refuses with the rest sign only', () => {
   const r = ringDecision({ ...idle, lunch: true }, BM);
   assert.deepEqual([r.ok, r.reason, r.sign, r.wobble], [false, 'lunch', BM.restText, false]);
+});
+
+test('a lead alone on the floor starts no meeting: refused with the alone sign only', () => {
+  const r = ringDecision({ ...idle, alone: true }, BM);
+  assert.deepEqual([r.ok, r.reason, r.sign, r.wobble], [false, 'alone', BM.aloneText, false]);
+  assert.ok(BM.aloneText.length > 0);
+  assert.equal(ringDecision({ ...idle, alone: true, phaseActive: true }, BM).reason, 'phase', 'a running phase meeting is named first');
+  assert.equal(ringDecision({ ...idle, alone: true, lunch: true }, BM).reason, 'lunch');
+  assert.equal(ringDecision({ ...idle, alone: true, offFloor: true }, BM).reason, 'hidden');
+  assert.equal(ringDecision({ ...idle, alone: false }, BM).ok, true, 'with staff on the floor the bell rings');
 });
 
 test('cooldown ignores a second ring inside cooldownMs', () => {

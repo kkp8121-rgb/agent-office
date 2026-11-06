@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "walk"))
 import sheet as walk
 
-S = "C:/Users/gustj/agent-office/assets/sprites/"
+S = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "assets", "sprites") + os.sep
 keys = ["worker", "lead-3", "performance-reviewer"] + [f"extra-{n:02d}" for n in range(1, 13)]
 z, BG = 4, (239, 230, 210, 255)
 cw, rh = 54 * z, (64 + 52) * z + 14

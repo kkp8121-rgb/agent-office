@@ -1,10 +1,10 @@
 """Key, split and snap the raw sheets into assets/sprites/extra-NN.png / extra-NN-sit.png.
   python art/extras/build.py stand|sit [key ...]
 Raw sheets: <work>/stand<i>.png or <work>/sit<i>.png (4 girls each, left to right)."""
-import json, os, subprocess, sys
+import json, os, subprocess, sys, tempfile
 
-ROOT = "C:/Users/gustj/agent-office"
-WORK = os.environ.get("AGENT_OFFICE_ART_WORK") or "C:/Users/gustj/AppData/Local/Temp/claude/C--Project/6106276a-a6e5-4468-8650-198bebbf83af/scratchpad/varied/extras"
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+WORK = os.environ.get("AGENT_OFFICE_ART_WORK") or os.path.join(tempfile.gettempdir(), "agent-office-art", "extras")
 KEYS = sorted(json.load(open(ROOT + "/art/prompts.json", encoding="utf-8"))["extras"])
 mode = sys.argv[1]
 only = set(sys.argv[2:])

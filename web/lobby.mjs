@@ -23,7 +23,7 @@ export function clip(text, max) {
 export function lobbyRoster(floors, leadSince = new Map()) {
   const out = [];
   for (const fv of [...floors].sort((a, b) => a.floorNo - b.floorNo)) {
-    const base = { sid: fv.sessionId, floorNo: fv.floorNo, colorIndex: fv.colorIndex, title: fv.title, floorStatus: fv.status };
+    const base = { sid: fv.sessionId, floorNo: fv.floorNo, colorIndex: fv.colorIndex, title: fv.title, floorStatus: fv.status, rest: Boolean(fv.rest) };
     out.push({
       ...base, key: `${fv.sessionId}:lead`, name: fv.lead.name, role: fv.lead.role, sprite: fv.lead.sprite, rank: 'lead',
       state: fv.lead.state, bubble: fv.lead.bubble, since: leadSince.get(fv.sessionId) ?? 0, startedAt: fv.startedAt ?? 0, reports: fv.reports,
@@ -186,17 +186,18 @@ export function fmtDuration(ms, labels) {
   return mins < 60 ? fill(labels.minutes, { m: mins }) : fill(labels.hours, { h: Math.floor(mins / 60), m: mins % 60 });
 }
 
-/** The state words of the wall: a leaving floor says 퇴근 중 for everyone. */
-export const stateLabel = (e, labels) => (e.floorStatus === 'leaving' ? labels.state.leaving : labels.state[e.state] ?? e.state);
+/** The state words of the wall: a leaving floor says 퇴근 중 for everyone, a floor on its lunch break says `restWord` (ui.rest.lobbyStatus) for everyone. */
+export const stateLabel = (e, labels, restWord = '') => (e.floorStatus === 'leaving' ? labels.state.leaving : e.rest && restWord ? restWord : labels.state[e.state] ?? e.state);
 
 /**
  * One table row per roster entry: cells in column order (이름, 층, 구분, 상태, 지금 하는 일, 근무 시간, 보고) and the full task text for the tooltip.
- * `labels` = ui.lobby, `bubbleMax` = ui.bubbleMaxChars, `now` in ms, `statusWords` = ui.play.statusBubbles (the stock phrases of a quiet 직원).
+ * `labels` = ui.lobby, `bubbleMax` = ui.bubbleMaxChars, `now` in ms, `statusWords` = ui.play.statusBubbles (the stock phrases of a quiet 직원),
+ * `restWord` = ui.rest.lobbyStatus (the state word of a floor on its lunch break).
  * No column repeats another: see taskCell.
  */
-export function employeeRows(roster, now, labels, bubbleMax, statusWords = []) {
+export function employeeRows(roster, now, labels, bubbleMax, statusWords = [], restWord = '') {
   return roster.map((e) => {
-    const state = stateLabel(e, labels);
+    const state = stateLabel(e, labels, restWord);
     const started = e.startedAt > 0 ? fmtDuration(now - e.startedAt, labels) : '-';
     const others = [e.name, fill(labels.floorLabel, { n: e.floorNo }), labels.rank[e.rank], state, started];
     const cells = [others[0], others[1], others[2], state, taskCell(e.bubble, others, statusWords, bubbleMax), started, e.reports > 0 ? String(e.reports) : '-'];
@@ -260,8 +261,9 @@ export const officeScore = (scores) => [...scores.values()].reduce((s, v) => s +
 
 // ---- 업무 일지 line and clock ----
 
-/** `HH:MM 2층 이름 · text` (the floor part is left out when the floor is gone). `e` is a log entry {ts, name, head?, text}. */
+/** `HH:MM 2층 이름 · text` (the floor part is left out when the floor is gone). `e` is a log entry {ts, name, head?, text}, or a sentence of the office itself {plain}. */
 export function newsText(e, floorNo, labels) {
+  if (e.plain) return clip(e.plain, labels.newsMax);
   const d = new Date(e.ts);
   const where = floorNo ? `${fill(labels.floorLabel, { n: floorNo })} ` : '';
   const body = e.head ? `${e.head} · ${e.text}` : e.text;

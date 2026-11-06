@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { restDim, restSignText, faintPlan, faintTotalMs, FAINT_LIE_SHARE } from '../web/incident-view.mjs';
+import { restDim, restSignText, restNewsText, faintPlan, faintTotalMs, FAINT_LIE_SHARE } from '../web/incident-view.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ui = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8')).ui;
@@ -34,6 +34,14 @@ test('a second faint of the same character inside the cooldown stays silent', ()
   assert.equal(faintPlan({ fxOn: false, rest: false, lastAt: 1000, now: 1000 + cooldownMs - 1, cooldownMs }), 'skip');
   assert.equal(faintPlan({ fxOn: true, rest: false, lastAt: 1000, now: 1000 + cooldownMs, cooldownMs }), 'full');
   assert.ok(Math.abs(faintTotalMs(ui.faint.downMs) * FAINT_LIE_SHARE - ui.faint.downMs) <= 1, 'the lying part of the fall is the configured time');
+});
+
+test('the lobby news of a lunch break names the floor and the return time, and drops the time when there is no end', () => {
+  const at = new Date(2026, 10, 6, 7, 5).getTime();
+  assert.equal(restNewsText(ui.rest, null, '2층'), '');
+  assert.equal(restNewsText(ui.rest, { until: at, limitKind: 'five_hour' }, '2층'), '2층 점심시간 · 07:05 복귀');
+  assert.equal(restNewsText(ui.rest, { until: null, limitKind: 'other' }, '2층'), '2층 점심시간');
+  assert.equal(ui.rest.lobbyStatus, '점심시간');
 });
 
 test('the lunch sign shows the return time only when there is an end', () => {

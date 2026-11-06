@@ -23,7 +23,7 @@ class Node {
 
 const BM = { ...cfg.ui.bellMeeting, sayMs: 100, gapMs: 10, maxSpeakers: 7, cooldownMs: 1000 };
 
-function setup({ rest = null, meeting = null } = {}) {
+function setup({ rest = null, meeting = null, withStaff = true } = {}) {
   globalThis.document = { createElement: (tag) => new Node(tag) };
   let now = 1000;
   let nextTimer = 1;
@@ -32,11 +32,11 @@ function setup({ rest = null, meeting = null } = {}) {
   const calls = { start: [], end: [] };
   const lead = { isLead: true, x: 0, y: 0, bubTxt: null };
   const staff = { isLead: false, x: 10, y: 0, bubTxt: { classList: { contains: () => false }, textContent: 'working on it' } };
-  const frec = { sid: 's1', design: 'studio2', stage: new Node('div'), status: 'busy', off: false, agents: new Map([['lead', lead], ['a1', staff]]), scene: { raw: { meeting: { spots: [{ at: [0, 0] }, { at: [10, 0] }] } } } };
+  const frec = { sid: 's1', design: 'studio2', stage: new Node('div'), status: 'busy', off: false, agents: new Map(withStaff ? [['lead', lead], ['a1', staff]] : [['lead', lead]]), scene: { raw: { meeting: { spots: [{ at: [0, 0] }, { at: [10, 0] }] } } } };
   const hooks = { fx: {}, state: [] };
   let running = meeting;
   const ctx = {
-    ui: { ...cfg.ui, bellMeeting: { ...BM, at: { studio2: [100, 50] } } },
+    ui: { ...cfg.ui, bellMeeting: { ...BM, at: { studio2: [100, 50, 20] } } },
     fx: { onFx: (name, fn) => { hooks.fx[name] = fn; }, onFxChange: () => {} },
     timers: { setTimeout: (fn, ms) => { const t = nextTimer++; timers.set(t, { fn, at: now + ms }); return t; }, clearTimeout: (t) => timers.delete(t) },
     floors: () => [frec],
@@ -47,6 +47,7 @@ function setup({ rest = null, meeting = null } = {}) {
     line: (key) => key.toUpperCase(),
     sayFor: (rec, text) => said.push([rec === lead ? 'lead' : 'a1', text]),
     onState: (fn) => hooks.state.push(fn),
+    life: { members: () => (withStaff ? [lead, staff] : [lead]) },
     meeting: {
       active: () => running,
       start: (f, opts) => { calls.start.push(opts); running = 'bell'; return { members: new Set([lead, staff]), opts }; },
@@ -70,13 +71,18 @@ function setup({ rest = null, meeting = null } = {}) {
   return { ctx, frec, btn, said, calls, run, opts, hooks, lead, staff };
 }
 
-test('every floor with a bell place gets a button there, named after the floor, with the desk bell picture', () => {
+test('every floor with a bell place gets a button there, named after the floor, with the hanging bell picture on its cord', () => {
   const { btn } = setup();
+  const { art } = BM;
   assert.equal(btn.className, 'mb-bell');
-  assert.deepEqual([btn.style.left, btn.style.top], ['100px', '50px']);
+  assert.deepEqual([btn.style.left, btn.style.top], [`${100 - art.attachX * art.scale}px`, '50px'], 'the cord x is the bell attach column');
   assert.equal(btn.getAttribute('aria-label'), `${BM.label} 3`);
   assert.equal(btn.hidden, false);
-  assert.equal(btn.firstChild.src, '/assets/props/bell-desk.png');
+  const [cord, img] = btn.children;
+  assert.equal(img.src, '/assets/props/bell-hang.png');
+  assert.equal(cord.className, 'mb-bell-cord');
+  assert.equal(cord.style.height, '30px', 'the cord runs from the bell top (50) up to the ceiling (20)');
+  assert.match(cord.style.backgroundImage, /bell-hang-cord\.png/);
 });
 
 test('a press starts a bell meeting on the shared machine and the bell rings', () => {
@@ -85,7 +91,7 @@ test('a press starts a bell meeting on the shared machine and the bell rings', (
   assert.equal(calls.start.length, 1);
   assert.equal(opts().kind, 'bell');
   assert.equal('chair' in opts(), false, 'no boss comes down: the machine puts the lead in the chair itself');
-  assert.equal(btn.firstChild.src, '/assets/props/bell-desk-ring.png');
+  assert.equal(btn.children[1].src, '/assets/props/bell-hang-ring.png');
 });
 
 test('onHold plans one line per speaker (the lead first, an empty bubble says the idle line) and the lead closes', () => {
@@ -95,7 +101,7 @@ test('onHold plans one line per speaker (the lead first, an empty bubble says th
   run(BM.sayMs * 5);
   assert.deepEqual(said, [['lead', 'BELLMEETINGIDLE'], ['a1', 'working on it'], ['lead', 'BELLMEETINGCLOSE']]);
   assert.equal(calls.end.length, 1, 'the area ends the meeting when the plan is over');
-  assert.equal(btn.firstChild.src, '/assets/props/bell-desk.png');
+  assert.equal(btn.children[1].src, '/assets/props/bell-hang.png');
 });
 
 test('a press while the floor is at lunch only shows the rest sign', () => {
@@ -106,6 +112,19 @@ test('a press while the floor is at lunch only shows the rest sign', () => {
   assert.equal(btn.lastChild.textContent, BM.restText);
   run(BM.sayMs + 1);
   assert.equal(btn.lastChild.hidden, true, 'the sign goes by itself');
+});
+
+test('a lead alone on the floor: the press starts nothing, shows the alone sign, and the bell is dimmed', () => {
+  const { btn, calls, run } = setup({ withStaff: false });
+  assert.equal(btn.classList.contains('mb-bell-alone'), true);
+  btn.listeners.click();
+  assert.equal(calls.start.length, 0);
+  assert.equal(btn.children.at(-1).hidden, false);
+  assert.equal(btn.children.at(-1).textContent, BM.aloneText);
+  run(BM.sayMs + 1);
+  assert.equal(btn.children.at(-1).hidden, true, 'the sign goes by itself');
+  const withStaff = setup();
+  assert.equal(withStaff.btn.classList.contains('mb-bell-alone'), false);
 });
 
 test('a press during a workflow phase meeting shows the busy sign, and a second press inside the cooldown is ignored', () => {
@@ -130,7 +149,7 @@ test('a workflow phase taking the meeting over, or the floor going away, drops t
   calls.start[0].onSwitch();
   run(BM.sayMs * 5);
   assert.deepEqual(said, [], 'nothing is said after the takeover');
-  assert.equal(btn.firstChild.src, '/assets/props/bell-desk.png');
+  assert.equal(btn.children[1].src, '/assets/props/bell-hang.png');
   hooks.fx['floor-hidden']({ floor: frec, removed: true });
   assert.equal(btn.removed, true);
 });

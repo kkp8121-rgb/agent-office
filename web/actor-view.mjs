@@ -39,16 +39,16 @@ export function bandOf(badge, model, dark) {
 export const pileOffset = (cfg, design) => cfg.offset[design] ?? null;
 
 /**
- * What one person's pile shows. `pile` = 0..top (the view's stage).
+ * What one person's pile shows. `pile` = 0..top (the view's stage). `meeting`: the person is away from the desk at a meeting (the desk is empty, so no pile).
  * @returns {{draw: {level: number, offset: number[], wobble: boolean}|null, title: string}}
  *   draw: the picture, only while the effects are on, a stage above 0 and the design has an offset.
  *   title: the last stage's words for the name tag when no picture shows it (effects off).
  */
-export function pilePlan({ pile, design, fxOn }, cfg) {
+export function pilePlan({ pile, design, fxOn, meeting = false }, cfg) {
   const top = cfg.titles.length - 1;
   const level = Math.min(Math.max(Math.trunc(pile) || 0, 0), top);
   const offset = pileOffset(cfg, design);
-  if (fxOn && level > 0 && offset) return { draw: { level, offset, wobble: level === top }, title: '' };
+  if (fxOn && level > 0 && offset && !meeting) return { draw: { level, offset, wobble: level === top }, title: '' };
   return { draw: null, title: level === top ? cfg.titles[top] : '' };
 }
 

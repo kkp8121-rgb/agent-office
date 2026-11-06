@@ -140,6 +140,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .sign .fs.busy { background: var(--busy-bg); }
 .sign .fs.waiting { background: var(--wait-bg); }
 .sign .fs.leaving { background: var(--leave-bg); color: var(--muted); }
+.sign .fs.rest { background: var(--leave-bg); color: var(--muted); }
 .sign input { font: inherit; width: 150px; }
 .board {
   position: absolute; padding: 6px 10px; overflow: hidden; z-index: 9000;
@@ -681,7 +682,7 @@ body.paused .wx-a, body.paused .wx-b, body.paused .wx-f { animation-play-state: 
 .led-hd .tm { font-style: normal; font-weight: 700; font-size: 10px; }
 .led-hd .dt { font-style: normal; }
 .led .lr, .led .lf { display: grid; align-items: center; height: 10px; column-gap: 3px; cursor: pointer; }
-.led .lr { grid-template-columns: 30px 24px 56px 32px minmax(0, 1fr) 50px 18px; }
+.led .lr { grid-template-columns: 30px 24px 56px 38px minmax(0, 1fr) 50px 18px; }
 .led .lr span, .led .lf span { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .led .lr.lh { color: var(--led-flat); font-size: 8px; cursor: default; border-bottom: 1px solid rgba(127, 211, 255, .25); }
 .led .lr.lh .c-name { color: var(--led-flat); }

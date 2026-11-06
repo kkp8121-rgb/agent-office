@@ -14,8 +14,9 @@ A test reads this table: the sizes below must match the PNG files.
 | pile-2.png | 16x6 | desk paper pile, stage 2 |
 | pile-3.png | 16x8 | desk paper pile, stage 3 |
 | pile-4.png | 16x10 | desk paper pile, stage 4 (about to topple) |
-| bell-desk.png | 14x9 | desk bell for the bell meeting |
-| bell-desk-ring.png | 14x10 | the same bell while it is rung |
+| bell-hang.png | 25x19 | the meeting bell, hanging on a cord from the ceiling (drawn by build_bell_hang.py) |
+| bell-hang-ring.png | 25x19 | the same bell while it is rung |
+| bell-hang-cord.png | 5x4 | the rope tile repeated from the ceiling down to the bell |
 | warn-lamp-on.png | 12x12 | lobby conflict lamp, lit |
 | warn-lamp-off.png | 12x12 | lobby conflict lamp, dark |
 | tug-paper.png | 16x10 | the paper pulled in a file conflict (one end leaves the picture) |
