@@ -9,7 +9,7 @@ import { checkScene } from '../server/scene-check.mjs';
 import { readPngSize } from '../server/scenes.mjs';
 import {
   assignLobbySeats, backRowSeats, changeOf, changeText, clip, clockParts, employeeRows, fmtDuration, headline, indexRows, lobbyRoster, msToNextMinute,
-  newsText, officeScore, pageCount, pageRows, pushSample, stateLabel, tableCapacity, costPageRows, costPageStep, floorFigure,
+  newsText, officeScore, pageCount, pageRows, pushSample, stateLabel, tableCapacity, costPageRows, costPageStep, floorFigure, initCost, live,
 } from '../web/lobby.mjs';
 import { costView } from '../web/cost-view.mjs';
 import { quadFrame } from '../web/board.mjs';
@@ -647,4 +647,75 @@ test('lobby cost: the cost page comes after the last page of the table, which is
     shown = step.show;
   }
   assert.deepEqual(seen, [0, 1, 2, 'cost', 0, 1, 2, 'cost']);
+});
+
+// ---- initCost on a stand-in page (review nits: the table's title row, no ic- class, a hidden tab paints nothing) ----
+
+class Node {
+  constructor(doc, tag) { Object.assign(this, { tag, ownerDocument: doc, children: [], dataset: {}, style: {}, hidden: false, className: '', textContent: '' }); }
+  get classList() { return { contains: (c) => this.className.split(' ').includes(c) }; }
+  append(...kids) { this.children.push(...kids); }
+  setAttribute() {}
+}
+const standIn = () => {
+  const doc = { createElement: (tag) => new Node(doc, tag) };
+  const el = new Node(doc, 'div');
+  const title = new Node(doc, 'div');
+  title.className = 'led-hd';
+  const cols = new Node(doc, 'div');
+  el.append(title, cols);
+  const lb = { sid: 'lobby', page: 0, pages: 1, pageAt: 0, wall: { boxes: new Map([['center', { el }]]), rows: [new Node(doc, 'div'), new Node(doc, 'div')], idxRows: [], tickers: [] } };
+  const hooks = { state: [], server: {}, fx: {}, timers: [] };
+  const ctx = {
+    ui: cfg.ui, lobby: () => lb, floorActive: () => true, now: () => 0,
+    timers: { setTimeout: (fn) => hooks.timers.push(fn), clearTimeout: () => {} },
+    onServer: (name, fn) => { hooks.server[name] = fn; },
+    onState: (fn) => hooks.state.push(fn),
+    onPauseChange: () => {},
+    fx: { onFx: (name, fn) => { hooks.fx[name] = fn; } },
+  };
+  return { ctx, lb, el, title, cols, hooks };
+};
+
+test('lobby cost page: its box is marked by a data attribute, and the whole table (title row too) steps aside while it shows', () => {
+  const was = globalThis.MutationObserver;
+  globalThis.MutationObserver = class { observe() {} };
+  try {
+    const { ctx, el, title, cols, hooks } = standIn();
+    initCost(ctx);
+    const box = el.children.at(-1);
+    assert.equal(box.className, '', 'no class of another package');
+    assert.ok('costPage' in box.dataset);
+    assert.equal(box.hidden, true);
+    hooks.timers.shift()(); // the rotation's first look: a one-page table alternates to the cost page
+    assert.equal(box.hidden, false);
+    assert.equal(title.style.display, 'none');
+    assert.equal(cols.style.display, 'none');
+    hooks.timers.shift()(); // and back
+    assert.equal(box.hidden, true);
+    assert.equal(title.style.display, '');
+  } finally {
+    globalThis.MutationObserver = was;
+  }
+});
+
+test('lobby cost page: a state frame of a hidden tab does not paint the wall, a visible one does', () => {
+  const was = globalThis.MutationObserver;
+  globalThis.MutationObserver = class { observe() {} };
+  try {
+    const { ctx, el, hooks } = standIn();
+    initCost(ctx);
+    const box = el.children.at(-1);
+    hooks.server.cost(costFrame());
+    hooks.timers.shift()(); // the cost page is on the wall
+    const firstRow = () => box.children[1];
+    assert.equal(firstRow().children[1].textContent, '', 'no floors known yet: no floor number');
+    hooks.state[0]([floor('s1', 3)], { hidden: true });
+    assert.equal(live.floors.length, 1, 'the data is kept current');
+    assert.equal(firstRow().children[1].textContent, '', 'but nothing is drawn');
+    hooks.state[0]([floor('s1', 3)], { hidden: false });
+    assert.equal(firstRow().children[1].textContent, '3층');
+  } finally {
+    globalThis.MutationObserver = was;
+  }
 });

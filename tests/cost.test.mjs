@@ -34,7 +34,7 @@ test('cost: lead, agent and workflow agent usage go to their owners', () => {
   l.add(use(ts, 'm3', 40, { agentKey: 'w1' })); // subagents/workflows/<run>/agent-w1.jsonl
   l.add(use(ts, 'm4', 80, { sessionId: 's2', provider: 'codex' }));
   const t = l.today(at('2026-11-06', 10));
-  assert.deepEqual(t.floors, [{ sessionId: 's1', tokens: 70 }, { sessionId: 's2', tokens: 80 }]);
+  assert.deepEqual(t.floors, [{ sessionId: 's1', tokens: 70, cacheRead: 0 }, { sessionId: 's2', tokens: 80, cacheRead: 0 }]);
   assert.deepEqual(t.top, [
     { sessionId: 's2', agentKey: null, tokens: 80 },
     { sessionId: 's1', agentKey: 'w1', tokens: 40 },
@@ -121,6 +121,7 @@ test('cost: cache reads never enter tokens', () => {
   assert.equal(t.cacheRead, 12000);
   assert.equal(t.byHour.reduce((a, b) => a + b, 0), 10);
   assert.equal(t.floors[0].tokens, 10);
+  assert.equal(t.floors[0].cacheRead, 12000, 'the floor keeps its own cache reads, apart from its tokens');
   assert.equal(t.top[0].tokens, 10);
   assert.equal(l.toJSON(at('2026-11-06', 12)).days['2026-11-06'].tokens, 10);
 });
@@ -223,7 +224,7 @@ test('cost: a restart on the same day keeps the floors and the top equal to befo
   const is = after.today(now);
   assert.deepEqual(is.floors, was.floors);
   assert.deepEqual(is.top, was.top);
-  assert.deepEqual(is.floors, [{ sessionId: 's1', tokens: 1400 }, { sessionId: 's2', tokens: 100 }]);
+  assert.deepEqual(is.floors, [{ sessionId: 's1', tokens: 1400, cacheRead: 0 }, { sessionId: 's2', tokens: 100, cacheRead: 0 }]);
   assert.equal(is.tokens, 1500);
   assert.equal(is.floors.reduce((a, f) => a + f.tokens, 0), is.tokens, 'the floors add up to the day');
   assert.equal(after.add(use(at(DAY, 11, 5), 'm6', 9, { agentKey: 'a1' })), true, 'a new line after the restart adds on top');
@@ -241,7 +242,7 @@ test('cost: a session id of __proto__ survives a restart without touching Object
   assert.equal(({}).zz, undefined);
   assert.equal(Object.prototype.hasOwnProperty('zz'), false);
   const is = CostLedger.fromJSON(json, opts, now).today(now);
-  assert.deepEqual(is.floors, [{ sessionId: '__proto__', tokens: 25 }]);
+  assert.deepEqual(is.floors, [{ sessionId: '__proto__', tokens: 25, cacheRead: 0 }]);
   assert.equal(is.top.find((p) => p.sessionId === '__proto__' && p.agentKey === 'zz').tokens, 25);
 });
 
@@ -285,5 +286,27 @@ test('cost: the saved file holds only numbers, booleans, day keys and the ids al
   const known = new Set(['version', 'seenUntil', 'scannedDays', 'days', 'detail', 'day', 'floors', 'people', 'tokens', 'cacheRead', 'byHour', 'partial', DAY, '', ...ids]);
   assert.deepEqual([...keys].filter((k) => !known.has(k)), [], 'no key besides the field names, the day and the ids');
   assert.deepEqual(json.detail.people, { 'floor-one': { '': 10, 'agent-x': 20 }, 'floor-two': { 'agent-y': 30 } });
-  assert.deepEqual(json.detail.floors, { 'floor-one': 30, 'floor-two': 30 });
+  assert.deepEqual(json.detail.floors, { 'floor-one': { tokens: 30, cacheRead: 0 }, 'floor-two': { tokens: 30, cacheRead: 0 } });
+});
+
+test('cost: a floor keeps its cache reads across a restart and the saved form is numbers only', () => {
+  const before = ledger();
+  before.add(use(at(DAY, 9), 'c1', 100, { cacheRead: 5000 }));
+  before.add(use(at(DAY, 9, 1), 'c2', 0, { cacheRead: 700, agentKey: 'a1' })); // an agent's cache reads belong to its floor
+  before.add(use(at(DAY, 10), 'c3', 40, { sessionId: 's2', cacheRead: 90 }));
+  const now = at(DAY, 11);
+  const json = saved(before, now);
+  assert.deepEqual(json.detail.floors, { s1: { tokens: 100, cacheRead: 5700 }, s2: { tokens: 40, cacheRead: 90 } });
+  const is = CostLedger.fromJSON(json, opts, now).today(now);
+  assert.deepEqual(is.floors, [{ sessionId: 's1', tokens: 100, cacheRead: 5700 }, { sessionId: 's2', tokens: 40, cacheRead: 90 }]);
+  assert.equal(is.cacheRead, 5790, 'the floors add up to the day');
+});
+
+test('cost: a file saved with a plain number per floor still loads, with no cache reads for the floor', () => {
+  const old = { version: 1, seenUntil: at(DAY, 9), scannedDays: [], days: { [DAY]: { tokens: 75, cacheRead: 900, byHour: new Array(24).fill(0), partial: false } }, detail: { day: DAY, floors: { s1: 50, s3: 25 }, people: {} } };
+  const now = at(DAY, 11);
+  const is = CostLedger.fromJSON(JSON.parse(JSON.stringify(old)), opts, now).today(now);
+  assert.deepEqual(is.floors, [{ sessionId: 's1', tokens: 50, cacheRead: 0 }, { sessionId: 's3', tokens: 25, cacheRead: 0 }]);
+  assert.deepEqual(CostLedger.fromJSON({ ...old, detail: { day: DAY, floors: { s1: { tokens: 'x', cacheRead: -4 }, s2: null }, people: {} } }, opts, now).today(now).floors,
+    [{ sessionId: 's1', tokens: 0, cacheRead: 0 }, { sessionId: 's2', tokens: 0, cacheRead: 0 }], 'a damaged entry is read leniently');
 });

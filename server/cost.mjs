@@ -43,7 +43,7 @@ export class CostLedger {
   #dedupeCap;
   #topCount;
   #days = new Map(); // day key -> {tokens, cacheRead, byHour[24], partial}
-  #detail = new Map(); // day key -> {floors: Map(sessionId -> tokens), people: Map(sessionId + NUL + agentKey -> {sessionId, agentKey, tokens})}
+  #detail = new Map(); // day key -> {floors: Map(sessionId -> {tokens, cacheRead}), people: Map(sessionId + NUL + agentKey -> {sessionId, agentKey, tokens})}
   #seen = new Map(); // file key -> Map(msgId -> day key): the recent message ids of one transcript, oldest first
   #scanned = new Set(); // day keys that a start-up scan has counted
   #scanning = false;
@@ -152,7 +152,10 @@ export class CostLedger {
     rec.cacheRead += c;
     rec.byHour[this.#clock.hourOf(ts)] += t;
     const detail = this.#detailRec(day);
-    detail.floors.set(sessionId, (detail.floors.get(sessionId) ?? 0) + t);
+    const floor = detail.floors.get(sessionId) ?? { tokens: 0, cacheRead: 0 };
+    floor.tokens += t;
+    floor.cacheRead += c;
+    detail.floors.set(sessionId, floor);
     const personKey = `${sessionId}\0${agentKey ?? ''}`;
     const person = detail.people.get(personKey) ?? { sessionId, agentKey, tokens: 0 };
     person.tokens += t;
@@ -190,7 +193,7 @@ export class CostLedger {
       lastWeek: week
         ? { day: shiftDay(day, -7), tokensSameHour: week.byHour.slice(0, hour + 1).reduce((a, b) => a + b, 0), partial: week.partial }
         : null,
-      floors: detail ? [...detail.floors].map(([sessionId, tokens]) => ({ sessionId, tokens })) : [],
+      floors: detail ? [...detail.floors].map(([sessionId, f]) => ({ sessionId, tokens: f.tokens, cacheRead: f.cacheRead })) : [],
       top: people.slice(0, this.#topCount).map((p) => ({ sessionId: p.sessionId, agentKey: p.agentKey, tokens: p.tokens })),
     };
   }
@@ -229,7 +232,7 @@ export class CostLedger {
       }
       out.detail = {
         day: ref,
-        floors: Object.fromEntries(detail.floors),
+        floors: Object.fromEntries([...detail.floors].map(([sessionId, f]) => [sessionId, { tokens: f.tokens, cacheRead: f.cacheRead }])),
         people: Object.fromEntries(Object.entries(people).map(([k, v]) => [k, { ...v }])),
       };
     }
@@ -257,7 +260,10 @@ export class CostLedger {
     const saved = json.detail;
     if (saved && typeof saved === 'object' && DAY_KEY.test(saved.day) && ledger.#days.has(saved.day) && (!isNum(nowTs) || opts.clock.dayKey(nowTs) === saved.day)) {
       const rec = ledger.#detailRec(saved.day);
-      for (const [sessionId, tokens] of Object.entries(saved.floors && typeof saved.floors === 'object' ? saved.floors : {})) rec.floors.set(sessionId, count(tokens));
+      for (const [sessionId, f] of Object.entries(saved.floors && typeof saved.floors === 'object' ? saved.floors : {})) {
+        // the earlier saved form held a plain number per floor (tokens only)
+        rec.floors.set(sessionId, f && typeof f === 'object' ? { tokens: count(f.tokens), cacheRead: count(f.cacheRead) } : { tokens: count(f), cacheRead: 0 });
+      }
       for (const [sessionId, agents] of Object.entries(saved.people && typeof saved.people === 'object' ? saved.people : {})) {
         for (const [key, tokens] of Object.entries(agents && typeof agents === 'object' ? agents : {})) {
           const agentKey = key === '' ? null : key;

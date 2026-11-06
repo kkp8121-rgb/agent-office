@@ -64,7 +64,7 @@ test('cost-frame: cost is sent once on connect', async (t) => {
   assert.equal(f.tokens, 1450);
   assert.equal(f.cacheRead, 300);
   assert.deepEqual(f.lastWeek, { day: '2026-10-30', tokensSameHour: 300, partial: false });
-  assert.deepEqual(f.floors, [{ sessionId: 's1', tokens: 1400 }], 'only the floors on screen');
+  assert.deepEqual(f.floors, [{ sessionId: 's1', tokens: 1400, cacheRead: 200 }], 'only the floors on screen, each with its own cache reads');
   assert.deepEqual(f.top, [
     { sessionId: 's1', agentKey: null, name: lead.lead.name, floorName: lead.title, tokens: 1000 },
     { sessionId: 's1', agentKey: 'a1', name: c.cfg.ui.cost.goneName, floorName: lead.title, tokens: 400 },

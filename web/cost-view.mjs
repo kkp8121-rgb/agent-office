@@ -1,10 +1,10 @@
 // Labour cost view (pure: no DOM, no clock, no I/O): the numbers of the `cost` frame turned into what the screens write.
 // Used by the lobby wall, the floor detail window and the character card (this package), and by the boss-room chalkboard (package O).
 //
-// Totals are NEW tokens only (input + cache writes + output). Cache reads come as `cacheRead`, a separate figure that only the detail window shows (owner decision D4).
+// Totals are NEW tokens only (input + cache writes + output). Cache reads come as `cacheRead` (the office's, and one per floor in `floors`), a separate figure that only the detail window shows (owner decision D4).
 // The frame can say the figures are not final: `scanning` (the first read of the old logs is still running) and `partial` (the read stopped at its size limit).
 // A figure is never a wrong number: no frame yet -> ui.cost.empty, scanning -> ui.cost.scanning, partial -> the number with ui.cost.partial next to it.
-// `cfg` = ui.cost everywhere below. The frame is {day, tokens, cacheRead, lastWeek: {day, tokensSameHour, partial}|null, floors: [{sessionId, tokens}],
+// `cfg` = ui.cost everywhere below. The frame is {day, tokens, cacheRead, lastWeek: {day, tokensSameHour, partial}|null, floors: [{sessionId, tokens, cacheRead}],
 // top: [{sessionId, agentKey, name, floorName, tokens}], scanning, partial}.
 
 const fill = (template, vars) => template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
@@ -75,6 +75,11 @@ export function floorTokens(frame, sessionId) {
   return frame?.floors.find((f) => f.sessionId === sessionId)?.tokens ?? null;
 }
 
+/** Today's cache reads of one floor: a number, or null when the frame has no entry for it. Never part of a total (D4). */
+export function floorCacheRead(frame, sessionId) {
+  return frame?.floors.find((f) => f.sessionId === sessionId)?.cacheRead ?? null;
+}
+
 /** Today's tokens of one person (`agentKey` null = the 팀장) when the frame's top list names them, else null. The frame lists only the office's top people. */
 export function personTokens(frame, sessionId, agentKey) {
   return frame?.top.find((p) => p.sessionId === sessionId && p.agentKey === agentKey)?.tokens ?? null;
@@ -100,16 +105,17 @@ export function personOf(floors, who) {
 /**
  * The 「오늘 인건비」 block of a floor's detail window: {title, total, people, cache}, each a {label, text}.
  * `labels` = {floor, cacheRead}: the words of the first and last row (the caller owns the wording). `max` people of that floor, taken from the frame's top list.
- * The frame carries the cache reads of the whole office only (D4: they are never added to a total), so `cache` is that office figure.
+ * `cache` is that floor's own cache reads (D4: never added to a total); the office-wide figure is not shown here.
  */
 export function floorCost(frame, cfg, sessionId, labels, max) {
   const v = costView(frame, cfg);
   const n = floorTokens(frame, sessionId);
+  const c = floorCacheRead(frame, sessionId);
   return {
     title: cfg.title,
     total: { label: labels.floor, text: v.state === 'ready' && n === null ? cfg.empty : v.tagged(n ?? 0) },
     people: floorTop(frame, sessionId, max).map((p) => ({ label: p.name || cfg.goneName, text: v.text(p.tokens) })),
-    cache: { label: labels.cacheRead, text: v.cacheRead },
+    cache: { label: labels.cacheRead, text: v.state === 'ready' && c === null ? cfg.empty : v.tagged(c ?? 0) },
   };
 }
 
