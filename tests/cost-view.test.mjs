@@ -2,14 +2,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadConfig } from '../server/config.mjs';
-import { costView, diffPercent, diffText, floorCost, floorTokens, floorTop, fmtTokens, personCostLine, personOf, personTokens } from '../web/cost-view.mjs';
+import { costView, diffPercent, diffText, floorCacheRead, floorCost, floorTokens, floorTop, fmtTokens, personCostLine, personOf, personTokens } from '../web/cost-view.mjs';
 
 const C = loadConfig().ui.cost;
 
 const person = (sessionId, agentKey, name, tokens, floorName = 'F') => ({ sessionId, agentKey, name, floorName, tokens });
 const frame = (o = {}) => ({
   day: '2026-11-06', tokens: 12_300_000, cacheRead: 4_200_000_000, lastWeek: { day: '2026-10-30', tokensSameHour: 10_000_000, partial: false },
-  floors: [{ sessionId: 's1', tokens: 9_000_000 }, { sessionId: 's2', tokens: 3_300_000 }],
+  floors: [{ sessionId: 's1', tokens: 9_000_000, cacheRead: 800_000_000 }, { sessionId: 's2', tokens: 3_300_000, cacheRead: 3_400_000_000 }],
   top: [person('s1', null, '하나', 6_000_000), person('s1', 'a1', '둘', 3_000_000), person('s2', null, '셋', 2_000_000), person('s2', 'a2', '', 900_000), person('s1', 'a3', '다섯', 400_000), person('s2', 'a4', '여섯', 300_000)],
   scanning: false, partial: false, ...o,
 });
@@ -104,15 +104,22 @@ test('cost-view: the top list is cut at topN and a person who has left is named 
 });
 
 test('cost-view: a floor window shows the floor total, its top people, and the cache reads apart', () => {
-  const f = floorCost(frame(), C, 's2', { floor: '3층', cacheRead: '사무실 캐시 읽기' }, 3);
+  const f = floorCost(frame(), C, 's2', { floor: '3층', cacheRead: '3층 캐시 읽기' }, 3);
   assert.deepEqual(f.total, { label: '3층', text: '3.3M' });
   assert.deepEqual(f.people, [{ label: '셋', text: '2.0M' }, { label: C.goneName, text: '900.0k' }, { label: '여섯', text: '300.0k' }]);
-  assert.deepEqual(f.cache, { label: '사무실 캐시 읽기', text: '4.2B' });
+  assert.deepEqual(f.cache, { label: '3층 캐시 읽기', text: '3.4B' }, "the floor's own cache reads, not the office's 4.2B");
+  assert.equal(floorCost(frame(), C, 's1', { floor: 'x', cacheRead: 'y' }, 3).cache.text, '800.0M');
+  assert.equal(floorCost(frame(), C, 'gone', { floor: 'x', cacheRead: 'y' }, 3).cache.text, C.empty, 'a floor the frame does not list has no figure');
+  assert.equal(floorCost(frame({ partial: true }), C, 's1', { floor: 'x', cacheRead: 'y' }, 3).cache.text, `800.0M (${C.partial})`);
+  assert.equal(floorCost(frame({ scanning: true }), C, 's1', { floor: 'x', cacheRead: 'y' }, 3).cache.text, C.scanning);
   assert.equal(floorCost(frame(), C, 's1', { floor: 'x', cacheRead: 'y' }, 2).people.length, 2, 'at most `max` people');
   assert.equal(floorCost(frame(), C, 'gone', { floor: 'x', cacheRead: 'y' }, 3).total.text, C.empty, 'a floor the frame does not list has no figure');
   assert.equal(floorCost(frame({ scanning: true }), C, 's1', { floor: 'x', cacheRead: 'y' }, 3).total.text, C.scanning);
   assert.equal(floorTokens(frame(), 's1'), 9_000_000);
   assert.equal(floorTokens(null, 's1'), null);
+  assert.equal(floorCacheRead(frame(), 's2'), 3_400_000_000);
+  assert.equal(floorCacheRead(frame(), 'gone'), null);
+  assert.equal(floorCacheRead(null, 's1'), null);
   assert.equal(floorTop(frame(), 's1', 9).length, 3);
 });
 

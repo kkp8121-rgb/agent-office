@@ -359,7 +359,8 @@ export function initCost(ctx) {
     const center = lb.wall.boxes?.get('center');
     if (!center || !lb.wall.rows) return { box: null };
     const doc = center.el.ownerDocument;
-    const box = mkNode(doc, 'div', 'ic-page');
+    const box = mkNode(doc, 'div');
+    box.dataset.costPage = '';
     box.hidden = true;
     const hd = mkNode(doc, 'div', 'led-hd');
     const total = mkNode(doc, 'span', 'pg num');
@@ -374,7 +375,7 @@ export function initCost(ctx) {
       return row;
     });
     box.append(hd, ...rows, empty);
-    const hide = [...center.el.children].filter((n) => !n.classList.contains('led-hd'));
+    const hide = [...center.el.children]; // all of the table, its title row too: the cost page has its own
     center.el.append(box);
     return { box, total, rows, empty, hide };
   }
@@ -398,7 +399,6 @@ export function initCost(ctx) {
     if (!att.box || att.shown === on) return;
     att.shown = on;
     for (const n of att.hide) n.style.display = on ? 'none' : '';
-    att.lb.wall.page.style.visibility = on ? 'hidden' : ''; // the table's 「1/3」 would name the wrong page
     att.box.hidden = !on;
     if (on) paintPage(view());
   }
@@ -463,9 +463,9 @@ export function initCost(ctx) {
     setLive({ cost: frame });
     paintWall();
   });
-  ctx.onState((list) => {
+  ctx.onState((list, { hidden }) => {
     setLive({ floors: list });
-    paintWall();
+    if (!hidden) paintWall(); // a hidden tab draws nothing; the next visible frame paints
   });
   for (const name of ['floor-shown', 'floor-hidden']) {
     ctx.fx.onFx(name, ({ floor }) => {

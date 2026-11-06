@@ -47,21 +47,17 @@ export function panelModel(fv, now, L, board, lobby, cost = null) {
     doing: a.bubble || '',
     since: a.since > 0 ? fmtDuration(Math.max(0, now - a.since), lobby) : '',
   }));
+  const floorName = fill(lobby.floorLabel, { n: fv.floorNo });
   return {
     title: fv.title,
     folder: fv.folder,
     lead: { name: fv.lead.name, role: fv.lead.role, state: stateWord(fv.lead.state), doing: fv.lead.bubble || '' },
     runFor: fv.startedAt > 0 ? fmtDuration(Math.max(0, now - fv.startedAt), lobby) : '',
-    cost: cost && floorCost(cost.frame, cost.cfg, fv.sessionId, { floor: fill(lobby.floorLabel, { n: fv.floorNo }), cacheRead: costCacheLabel(lobby, cost.cfg) }, COST_PEOPLE),
+    cost: cost && floorCost(cost.frame, cost.cfg, fv.sessionId, { floor: floorName, cacheRead: `${floorName} ${cost.cfg.cacheReadLabel}` }, COST_PEOPLE),
     todos,
     phases,
     staff,
   };
-}
-
-/** The label of the cache-read row: the frame holds the whole office's cache reads, so the row says so with the first word of 「사무실 지수」 (no word of its own in the config). */
-function costCacheLabel(lobby, cfg) {
-  return `${lobby.officeIndex.split(' ')[0]} ${cfg.cacheReadLabel}`;
 }
 
 // ---------- DOM ----------
