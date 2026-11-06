@@ -404,7 +404,7 @@
           "empty": { "variant": "a", "text": "터미널이나 데스크톱 앱에서 Claude Code·Codex를 켜면 첫 직원이 출근합니다",
                      "signA": "오늘은 아직 아무도 출근하지 않았어요", "cardTitle": "출근 준비 완료",
                      "cardSteps": ["터미널에서 claude 또는 codex 실행", "데스크톱 앱에서 새 대화 시작", "첫 직원이 엘리베이터로 출근"],
-                     "readyDesign": "studio2", "catAt": null, "dimA": 0.6 } },
+                     "readyDesign": "studio2", "catAt": [190, 375], "dimA": 0.6 } },
   "leads": [
     { "key": "lead",   "name": "유나", "role": "팀장" },
     { "key": "lead-2", "name": "하나", "role": "팀장" },

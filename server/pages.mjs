@@ -25,6 +25,7 @@ export const INDEX_HTML = String.raw`<!doctype html>
 <link rel="stylesheet" href="/web/commute.css">
 <link rel="stylesheet" href="/web/building.css">
 <link rel="stylesheet" href="/web/ceo.css">
+<link rel="stylesheet" href="/web/empty.css">
 </head>
 <body>
 <header id="topbar">

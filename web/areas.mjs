@@ -13,6 +13,7 @@ import { init as initFxConflict } from './fx-conflict.mjs';
 import { init as initFxActor } from './fx-actor.mjs';
 import { init as initFxCommute } from './fx-commute.mjs';
 import { init as initCeo } from './ceo-floor.mjs';
+import { init as initFxEmpty } from './fx-empty.mjs';
 
 export const AREAS = [
   { name: 'fx-weather', init: initFxWeather },
@@ -28,6 +29,7 @@ export const AREAS = [
   { name: 'fx-actor', init: initFxActor },
   { name: 'fx-commute', init: initFxCommute },
   { name: 'ceo', init: initCeo },
+  { name: 'fx-empty', init: initFxEmpty },
 ];
 
 /** SSE event names, besides state/log/phase/fail/weather/sysload, that connect() relays to ctx.onServer. */
