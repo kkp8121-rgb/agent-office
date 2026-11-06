@@ -17,6 +17,7 @@ export const INDEX_HTML = String.raw`<!doctype html>
 <link rel="stylesheet" href="/web/fx-led.css">
 <link rel="stylesheet" href="/web/fx-hit.css">
 <link rel="stylesheet" href="/web/officelife.css">
+<link rel="stylesheet" href="/web/handoff.css">
 <link rel="stylesheet" href="/web/decor.css">
 <link rel="stylesheet" href="/web/card.css">
 </head>
