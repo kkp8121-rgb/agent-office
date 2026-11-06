@@ -87,12 +87,19 @@ export function planCar(car, requests, cfg) {
 }
 
 /**
- * Where a door cover sits: its bottom middle on `at` + (dx, dy), its size the picture's size times `scale`.
- * @returns {{left: number, top: number, w: number, h: number, foot: [number, number]}} the box in scene px and the bottom-middle point
+ * Where a door cover sits. Its bottom middle is on `at` + (dx, dy); its size is the picture's size times `scale` across and `scaleY` (default `scale`) up;
+ * `skew` (degrees, default 0) tilts it along the wall the door is drawn in (a point to the right of the foot moves down by tan(skew) per px), because the doors of
+ * the isometric rooms are parallelograms. `box` is the untilted rectangle (`top` and `foot` are those of the middle line, which the panel hangs on), `corners` the tilted
+ * cover, clockwise from the top left.
+ * @returns {{left: number, top: number, w: number, h: number, foot: [number, number], corners: [number, number][]}}
  */
 export function doorBox(at, pic, d) {
   const w = pic.w * d.scale;
-  const h = pic.h * d.scale;
+  const h = pic.h * (d.scaleY ?? d.scale);
   const foot = [at[0] + d.dx, at[1] + d.dy];
-  return { left: foot[0] - w / 2, top: foot[1] - h, w, h, foot };
+  const tilt = Math.tan(((d.skew ?? 0) * Math.PI) / 180);
+  const [l, r] = [foot[0] - w / 2, foot[0] + w / 2];
+  const lift = (x) => (x - foot[0]) * tilt;
+  const corners = [[l, foot[1] - h + lift(l)], [r, foot[1] - h + lift(r)], [r, foot[1] + lift(r)], [l, foot[1] + lift(l)]];
+  return { left: l, top: foot[1] - h, w, h, foot, corners };
 }

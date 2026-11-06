@@ -2,8 +2,8 @@
    Every class starts with cm-. The veil is an information sign (drawn with the effects off too); the door cover and the panel exist only while the effects are on.
    Animated: opacity only (the veil fade, the panel blink). prefers-reduced-motion turns the repeating blink into a still panel. */
 
-/* the door cover: bottom middle on its foot point (left/top), size = the picture times --cm-s; the picture is a pixel drawing */
-.cm-door { position: absolute; pointer-events: none; image-rendering: pixelated; transform-origin: 50% 100%; transform: translate(-50%, -100%) scale(var(--cm-s, 1)); }
+/* the door cover: bottom middle on its foot point (left/top), size = the picture times --cm-sx across and --cm-sy up, tilted by --cm-k (the doors of the isometric rooms are parallelograms); the picture is a pixel drawing */
+.cm-door { position: absolute; pointer-events: none; image-rendering: pixelated; transform-origin: 50% 100%; transform: translate(-50%, -100%) skewY(var(--cm-k, 0deg)) scale(var(--cm-sx, 1), var(--cm-sy, 1)); }
 
 /* the panel over the door: floor number and an arrow, lit in the LED colours so it reads in dark mode too (same layer as the LED, z 7600) */
 .cm-panel {

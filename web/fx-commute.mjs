@@ -29,6 +29,8 @@ export function init(ctx) {
     return p;
   };
   const doorCfg = (frec) => cfg.door?.[frec.design] ?? null;
+  /** Where people appear and vanish at the door: the scene's `door.at`, or the design's own `at` when the drawn door is not on the floor the staff walk on. */
+  const doorAt = (frec) => doorCfg(frec)?.at ?? frec.scene.r.door.at;
   const isNight = () => Number.parseFloat(globalThis.getComputedStyle(doc.documentElement).getPropertyValue('--room-dim')) > 0;
   const tagged = (rec, cls, on) => {
     for (const n of [rec.el, rec.tagRoot]) n.classList.toggle(cls, on);
@@ -46,7 +48,7 @@ export function init(ctx) {
       return;
     }
     if (p.door) return;
-    const { at } = frec.scene.r.door;
+    const at = frec.scene.r.door.at;
     const img = doc.createElement('img');
     img.className = 'cm-door';
     img.alt = '';
@@ -54,8 +56,10 @@ export function init(ctx) {
     img.src = `${PROP_URL}closed.png`;
     img.style.left = `${at[0] + d.dx}px`;
     img.style.top = `${at[1] + d.dy}px`;
-    img.style.setProperty('--cm-s', String(d.scale));
-    img.style.zIndex = String(charZ(at[1], ctx.server.depth) - 1); // an object nearer than the door's foot stays in front of it, a figure at the door is in front of the cover
+    img.style.setProperty('--cm-sx', String(d.scale));
+    img.style.setProperty('--cm-sy', String(d.scaleY ?? d.scale));
+    img.style.setProperty('--cm-k', `${d.skew ?? 0}deg`);
+    img.style.zIndex = String(charZ(doorAt(frec)[1] - ctx.server.spriteHeight, ctx.server.depth) - 1); // an object nearer than the door's foot stays in front of it, and a figure that comes out of the door is in front of the cover for as long as it overlaps it
     frec.stage.append(img);
     p.door = img;
   }
@@ -70,12 +74,21 @@ export function init(ctx) {
     const d = doorCfg(frec);
     if (!p.door || !d) return;
     p.panel?.remove();
-    const box = doorBox(frec.scene.r.door.at, { w: p.door.naturalWidth, h: p.door.naturalHeight }, d);
+    const img = p.door;
     const panel = doc.createElement('div');
     panel.className = 'cm-panel';
     panel.textContent = `${cfg.panelText.replace('{n}', String(ctx.view(frec.sid)?.floorNo ?? ''))} ${up ? ARROW_UP : ARROW_DOWN}`;
-    panel.style.left = `${box.foot[0]}px`;
-    panel.style.top = `${box.top}px`;
+    const place = () => { // the panel hangs on the top of the cover, which needs the picture's size: a cover that has just been made may not have it yet
+      const box = doorBox(frec.scene.r.door.at, { w: img.naturalWidth, h: img.naturalHeight }, d);
+      panel.style.left = `${box.foot[0]}px`;
+      panel.style.top = `${box.top}px`;
+      panel.hidden = false;
+    };
+    if (img.naturalHeight) place();
+    else {
+      panel.hidden = true;
+      img.decode().then(place, () => {});
+    }
     frec.stage.append(panel);
     p.panel = panel;
   }
@@ -154,7 +167,7 @@ export function init(ctx) {
       run.tokens.delete(token);
     };
     ctx.freeze(lead);
-    ctx.placeAt(lead, door.at);
+    ctx.placeAt(lead, doorAt(frec));
     lead.seat = null;
     ctx.setPose(lead, false, false);
     ctx.setFacing(lead, door.face);
@@ -190,7 +203,8 @@ export function init(ctx) {
     if (!people.length) return;
     const run = startRun(frec);
     const { door } = frec.scene.r;
-    const toDoor = { x: door.at[0], y: door.at[1], face: door.face, seated: false, seat: null };
+    const at = doorAt(frec);
+    const toDoor = { x: at[0], y: at[1], face: door.face, seated: false, seat: null };
     let closeTimer = 0;
     const opened = () => { // the door is open while somebody goes through, and closes a moment after the last one
       setDoor(frec, true);
