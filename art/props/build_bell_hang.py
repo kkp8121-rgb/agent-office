@@ -2,7 +2,7 @@
 
   python art/props/build_bell_hang.py
 Three pictures, same pixel language as art/props/build.py (it reuses that file's palette and render(): 1px dark outline, no anti-aliasing):
-  bell-hang.png       still: a brass bell on a short rope, the rope's top edge is the picture's top edge
+  bell-hang.png       still: a brass bell on a short rope, the rope's dark cap is the picture's top row
   bell-hang-ring.png  same canvas, the bell swung to the right with a leaning clapper and small motion marks
   bell-hang-cord.png  a 5x4 rope tile to repeat vertically from the ceiling line down to the top of the bell picture
 Both bell pictures share one canvas and one rope column, so the swap on ring never moves the rope.
@@ -92,8 +92,7 @@ def cord_tile():
 
 
 def bell_image(rows):
-    im = B.render(rows)
-    return im.crop((0, 1, im.width, im.height))  # drop the top margin row: the rope's top outline is the picture's top edge
+    return B.render(rows)  # row 0 is the rope's dark cap (a knot above the rope), so the picture's top edge is dark and the tile above joins it
 
 
 def contact(imgs):
