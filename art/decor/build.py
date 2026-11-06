@@ -57,8 +57,13 @@ DESKS = {
         "desk-b": dict(surface=[[27, 22], [33, 19], [36, 23], [70, 23], [70, 19]], monitorTop=[[57, 0]],
                        bezel=[[46, 17], [46, 9], [67, 17], [67, 9]], monitorEdge=[[41, 13], [73, 11]]),
     },
+    # the CEO's one desk (the painted desk already carries a lamp, pen holder, papers and a name plate; the free spots are left of the monitor and on the front edge)
+    "ceo": {
+        "ceo-desk": dict(surface=[[30, 38], [46, 40], [90, 40], [112, 40]], monitorTop=[[60, 6]],
+                         bezel=[[48, 26], [48, 14], [72, 26], [72, 14]], monitorEdge=[[43, 20], [79, 18]]),
+    },
 }
-ORDER = ["studio2", "lounge", "library", "greenhouse", "lobby"]
+ORDER = ["studio2", "lounge", "library", "greenhouse", "lobby", "ceo"]
 
 
 # ---------------------------------------------------------------------------------------------------------------

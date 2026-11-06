@@ -1,0 +1,81 @@
+{
+  "refPrompt": "Use your image generation tool to create ONE pixel-art picture of the boss's office (CEO room) on the top floor of an office building, in EXACTLY the same pixel-art style, palette feel, dark outlines, pixel size, isometric camera angle, room shape (the same six-sided floor outline: wide back edge, slanted left and right wing walls, short front edge), same 2:1 aspect ratio (1024x512 look) and the same flat dark green background outside the room as the attached studio2.png. Do not draw any people. Do not use real brand names or readable text.\nThe room is a luxurious but cosy executive office: dark walnut floor boards, a big dark-red patterned rug in the middle, warm cream walls with dark wood wainscoting. The back wall and the left wall have tall large windows showing a HIGH-FLOOR city view (we are very high up: rooftops and skyscrapers far below, blue sky). On the RIGHT wall there is a big wooden-framed black chalkboard (dark green-black slate surface with a thick light-oak frame, empty, no writing, facing the room), and the door (dark wood, with a door frame) is also on the RIGHT wall near the front end, like the door in studio2.png.\nFurniture: in the middle of the room, toward the back, one very big dark wooden executive desk in the same diagonal-free straight orientation as the lead desk of studio2 (long side parallel to the back wall) with a computer monitor on it seen from the BACK (the monitor back faces the viewer, absolutely no screen picture visible), a desk lamp, a few papers, and behind the desk (far side) a BIG tall-backed brown leather executive chair. In front of the desk (viewer side) lots of free floor for visitors. A cream-leather guest sofa with a low coffee table on the left side, a tall wooden bookcase full of books flush against the back wall, a trophy display cabinet with glass doors and golden trophies against the left wall, a big leafy plant in a pot near the right wall, and a wooden coat stand next to the door. Wall-mounted lamps and a couple of framed pictures on the walls.\nRender crisp pixel art, no anti-aliasing blur, no text, no watermark. Save the result as ceo.png in the current directory.",
+  "refEditPrompt": "Use your image generation tool to edit the attached image ceo-ref.png: output the SAME room (same pixel-art style, same isometric camera angle, same six-sided room outline, same windows with the high-floor city view on the back wall and left wall, same 2:1 aspect ratio, same flat green background outside the room, same door on the right wall) with these changes only: 1) Make the floor DARK walnut wood boards (deep brown, clearly darker than now) and make the walls warm cream with a dark wood wainscoting band along the bottom; keep the existing soft light patches. 2) On the RIGHT wall replace the big framed picture by a big black-green chalkboard (empty dark slate surface, absolutely no writing or drawing on it) with a thick light-oak wooden frame and a small chalk ledge, hung flat on the right wall like the picture was, same size and position. 3) Remove the dining table with its four green chairs and the green rug under it. 4) Remove the two armchairs and the small round table in front of the desk, so the big floor area in front of the desk is free; keep the big rug under the desk but make it dark red with a thin gold border. 5) Make the executive desk darker walnut and keep the monitor seen from its BACK only (no screen picture), the tall brown leather executive chair behind the desk. Keep the cream sofa with the coffee table on the left, the sideboards, the bookcases, the potted plants, floor lamps and the door. Remove the two plants standing at the very front and the small rug at the front. No people, no text, no brand names. Save the result as ceo.png in the current directory.",
+  "shellPrompt": "Use your image generation tool to edit the attached image ceo-ref2.png: output the SAME room (same pixel-art style, same isometric camera angle, same six-sided room outline, same dark walnut floor boards, same wainscoting and cream walls, same windows with the high-floor city view on the back wall and left wall, same wall chalkboard on the right wall with its oak frame, same door with door frame on the right wall, same wall lamps, same framed pictures on the walls, same 2:1 aspect ratio, same flat green background outside the room) but with EVERY free-standing floor object removed: no desk, no desk chair, no monitor, no desk lamp, no table lamps, no floor lamps, no sofa, no coffee table, no sideboards or cabinets standing against the back wall, no potted plants (neither floor plants nor plants on top of furniture), no hanging plant, no books or papers lying around. Keep every rug exactly where it is (the big dark red rug with the gold border in the middle, the green rug at the left, the small door mat at the right front). Keep the two bookcases that stand flush against the right wall (the tall one and the small one next to the door), drawn as part of the wall. Where objects stood, show the plain floor boards, the wainscoting and the wall continuing behind them. Only the empty room shell with floor, rugs, walls, windows, wall chalkboard, door and wall-mounted items remains. Save the result as shell.png in the current directory.",
+  "shell": {
+    "ref": "art/floors/ceo.png",
+    "size": [
+      1024,
+      512
+    ]
+  },
+  "sheets": [
+    {
+      "id": "s1",
+      "rows": 2,
+      "ref": "art/floors/ceo.png",
+      "pieces": [
+        "ceo-desk",
+        "ceo-chair",
+        "sofa",
+        "coffee-table",
+        "bookcase",
+        "trophy",
+        "plant-big",
+        "coat-stand"
+      ],
+      "prompt": "Use your image generation tool to create a sprite sheet of 8 separate furniture objects in EXACTLY the same pixel-art style, palette, dark outlines, pixel size and same isometric camera angle as the objects in the attached ceo-ref2.png (the boss's office). Layout: TWO rows of 4 objects with wide empty gaps between all objects, each object alone and fully separated, on a flat solid #FF00FF magenta background (no shadow on the floor, no floor, no glow). Objects, row 1 left to right: 1) a very big dark walnut executive desk, straight orientation (its long side runs left-right parallel to the viewer, we see its carved front panel and the two side pedestals with drawers), with a computer monitor on it seen from the BACK (the back of the monitor faces the viewer, absolutely no screen picture, no webcam), a small brass desk lamp at the left end, a pen holder, a few papers and a small name plate, no chair; 2) a big tall-backed brown leather executive chair with armrests and a high headrest, seen from the front (the seat faces the viewer), nobody sitting in it; 3) a cream leather three-seat sofa with two green cushions, seen in the same diagonal isometric angle as the sofa in ceo-ref2.png, its front facing the lower right; 4) a low rectangular dark wooden coffee table with a few books on it. Row 2 left to right: 5) a tall dark wooden bookcase full of colourful books, seen from the front; 6) a trophy display cabinet with glass doors and shelves holding several golden trophies and a medal, seen from the front; 7) a big leafy tall indoor plant in a large round white-and-brown pot (about 2.5 times as tall as wide); 8) a tall wooden coat stand with a dark overcoat and a hat hanging on it. Do not use magenta anywhere inside the objects. Canvas 2:1 wide. Save as sheet.png in the current directory."
+    }
+  ],
+  "views": {
+    "box": {
+      "origin": [
+        64,
+        32
+      ],
+      "size": [
+        624,
+        224
+      ],
+      "horizon": 96
+    },
+    "dayPrompt": "Wide panorama of a sunny big city seen from the TOP FLOOR of a very tall skyscraper (we are higher than almost everything): pale blue sky with a few small white clouds in the upper part, a hazy skyline of distant small blue-grey towers sitting on the horizon (haze fades them toward the sky colour), and below the horizon the view looks DOWN over the city: many mid-height beige, pink and blue-grey building roofs with tiny roof details, thin streets with tiny cars as dots, a pale river curving through, and a few green park patches. Strong scale difference: far towers very small, nearer roofs medium, the nearest roofs along the bottom edge larger. Only one or two taller towers rise to a similar height as the viewer. Pixel art, 16-bit era, same rendering style, palette and pixel size as the attached style reference (it is a crop of the old window view of this room: match colours and brush, ignore its composition). Flat 2-3 tone shading, about 48 colours, soft low contrast for far things. One single continuous wide landscape, NOT several separate pictures. No window frame, no glass, no reflection, no text, no people, no characters, no border, no vignette. Output exactly the aspect ratio of the attached guide image; the horizon is the thin red line of the guide image (do not draw the red line), keep the horizon on that line across the whole width. The attached images in order: style reference, aspect/horizon guide. Save the final image as view-day.png in the current directory.",
+    "nightPrompt": "Edit the attached day image into a night version of EXACTLY the same picture: every building, street, river, bridge, park and the skyline stay in exactly the same pixel positions and shapes, the horizon stays on the same row, nothing moves, nothing is added or removed in the landscape. Only recolour it for night: deep navy sky with a crescent moon and a few small stars, dark blue-violet buildings with many small warm-yellow lit windows (about a third of the windows lit), streets with tiny pale street-lamp dots and tiny car headlight dots, the river dark navy with a pale moon streak, parks dark teal. No glow, no bloom, flat pixel lights only, painted brighter than realistic so the city is clearly readable. Pixel art, 16-bit era, same rendering style and pixel size as the day image. No text, no people, no border. Keep exactly the same image size and aspect ratio as the day image. Save the final image as view-night.png in the current directory.",
+    "note": "day: python art/view.py ceo day <raw> 0.28 ; night: python art/view.py ceo night <raw> 0.28 (same composition as the day picture, horizon fraction measured equal)."
+  },
+  "kinds": {
+    "ceo-desk": {
+      "piece": "s1/piece-0",
+      "width": 150
+    },
+    "ceo-chair": {
+      "piece": "s1/piece-1",
+      "height": 66
+    },
+    "sofa": {
+      "piece": "s1/piece-2",
+      "width": 112
+    },
+    "coffee-table": {
+      "piece": "s1/piece-3",
+      "width": 70
+    },
+    "bookcase": {
+      "piece": "s1/piece-4",
+      "height": 62
+    },
+    "trophy": {
+      "piece": "s1/piece-5",
+      "height": 60
+    },
+    "plant-big": {
+      "piece": "s1/piece-6",
+      "height": 78
+    },
+    "coat-stand": {
+      "piece": "s1/piece-7",
+      "height": 66
+    }
+  },
+  "note": "reference art/floors/ceo.png = ceo-ref2 (second Codex call: edit of the first reference) resized to 1024x512. Raw Codex output, sheets and pieces live outside the repo (AGENT_OFFICE_ART_WORK/ceo). The raw 8-pane window quads were measured from the shell (glass.json ceo). scene.json is the source of truth for footprints, seats and points. Pieces: piece-0 (desk) had its monitor and stand repainted to a neutral dark grey (saturation <= 0.25, nightmap monitorRule) before atlas.py. Sky masks: art/skymask.py has no ceo row; the same script run with ROOMS['ceo'] = dict(dist=12, hole=8000, bright=None) wrote sky-day.png and sky-night.png (night boundary step x3.17). Outline: art/backdrop.py simplification with --eps=2.5 (12 points), written into scene.json by hand because the regex of backdrop.py only matches a one-line outline. art/scene_sheet.py indexes seats[5] and stops on a room without seats, so the check sheet was made with a copy that uses the lead desk."
+}
