@@ -1,0 +1,46 @@
+/* Area "actor": the model band under a name tag, the paper pile on a desk, the hourglass over a slow command (web/fx-actor.mjs).
+   Every class starts with ac-. The band and the hourglass are information marks: they draw with the effects off too (nothing animates then).
+   The pile is a decoration: fx-actor.mjs builds it only while the effects are on. Animated: transform / rotate only. */
+
+/* ---- model band: a strip right under the tag's outer edge (colours: ui.badge.colors, set per band as --ac-band-l / --ac-band-d) ---- */
+.ac-band {
+  position: absolute; left: -1.5px; right: -1.5px; top: calc(100% + 1.5px);
+  display: block; background: var(--ac-band-l); pointer-events: auto;
+}
+:root[data-theme="dark"] .ac-band { background: var(--ac-band-d); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .ac-band { background: var(--ac-band-d); }
+}
+
+/* ---- paper pile: bottom centre on the desk point (left / top are set in px), one level above its desk ---- */
+.ac-pile {
+  position: absolute; translate: -50% -100%; image-rendering: pixelated; pointer-events: none; user-select: none;
+}
+html.fx-on .ac-pile.ac-wobble { animation: ac-wobble var(--ac-wobble) ease-in-out infinite; }
+@keyframes ac-wobble {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+/* ---- hourglass: right of the head, above the name tag and under the speech bubble, in the tag layer (above every desk and monitor) ---- */
+.ac-glass {
+  position: absolute; left: calc(50% + 18px); bottom: 41px; display: flex; align-items: flex-end; gap: 2px;
+  white-space: nowrap; pointer-events: none;
+}
+.ac-glass-img { width: 16px; height: 16px; image-rendering: pixelated; }
+.ac-glass-t {
+  font-size: 9px; font-weight: 700; line-height: 1.2; padding: 0 3px; background: var(--paper); border: 1px solid var(--ink);
+}
+html.fx-on .ac-glass.ac-spin .ac-glass-img { animation: ac-flip calc(var(--ac-flip) * 2) ease-in-out infinite; }
+/* one turn per ui.hourglass.flipMs: turns over, rests, turns over again */
+@keyframes ac-flip {
+  0% { rotate: 0deg; }
+  20%, 50% { rotate: 180deg; }
+  70%, 100% { rotate: 360deg; }
+}
+.agt.held .ac-glass { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  html.fx-on .ac-pile.ac-wobble, html.fx-on .ac-glass.ac-spin .ac-glass-img { animation: none; }
+}

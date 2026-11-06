@@ -114,10 +114,10 @@ ui.badge.colors.codex.dark string
 ui.badge.minLumaGap number
 ui.pile.wobbleMs number
 ui.pile.titles array
-ui.pile.offset.studio2 null
-ui.pile.offset.lounge null
-ui.pile.offset.library null
-ui.pile.offset.greenhouse null
+ui.pile.offset.studio2 array
+ui.pile.offset.lounge array
+ui.pile.offset.library array
+ui.pile.offset.greenhouse array
 ui.hourglass.tickMs number
 ui.hourglass.flipMs number
 ui.hourglass.text string
