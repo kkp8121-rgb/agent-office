@@ -1,15 +1,55 @@
 // Turns one transcript JSONL line into privacy-safe events. Transcript lines are untrusted:
 // this never throws and never copies prompts, answers, thinking or tool results.
+import { randomBytes } from 'node:crypto';
 import { describeTool, clip, cleanLine, cleanTodos, TODO_TEXT_MAX, MAX_LEN } from './sanitize.mjs';
+import { fileKey } from './filekey.mjs';
 import config from '../config.json' with { type: 'json' };
 
 const NAME_MAX = config.parse.nameMaxChars; // title, run id, workflow name
 const PATH_MAX = config.parse.pathMaxChars; // scriptPath is only read from, never shown: a longer one is dropped, not clipped
 
 const TITLE_RANK_CUSTOM = 2; // ai-title and the folder fallback rank 1 (the default)
+const SEND_TO_MAX = 16; // SendMessage recipient, same length as a bubble line
+const EPOCH_MS_MIN = 1e12; // a reset time below this is in seconds
+
+const { conflict: CONFLICT, model: MODEL } = config;
+const EDIT_TOOLS = new Set(CONFLICT.editTools);
+const IGNORED_MODELS = new Set(MODEL.ignore.map((m) => m.toLowerCase()));
+
+// Salt of the same-file keys: made here when the module is loaded, never stored. A restart changes every key, so a key
+// kept anywhere cannot be matched back to a path. Tests set their own through setFileKeySalt.
+let fileKeySalt = randomBytes(CONFLICT.saltBytes);
+export function setFileKeySalt(buf) {
+  fileKeySalt = buf;
+}
 
 const isObj = (v) => typeof v === 'object' && v !== null;
 const str = (v, n) => (typeof v === 'string' ? clip(v, n) : '');
+const num = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0); // anything else counts as 0
+const timeOf = (o) => (typeof o.timestamp === 'string' ? Date.parse(o.timestamp) || 0 : 0);
+
+/** Model family from the model id: the first `model.claude` entry whose text the lower-cased id contains, else 'other'. */
+function foldModel(raw) {
+  const id = typeof raw === 'string' ? raw.toLowerCase() : '';
+  for (const [needle, family] of MODEL.claude) if (id.includes(needle)) return family;
+  return 'other';
+}
+
+const modelIgnored = (message) => typeof message.model === 'string' && IGNORED_MODELS.has(message.model.toLowerCase());
+
+/**
+ * Token numbers of one assistant line: {ts, msgId, tokens, cacheRead}, or null when the line carries none (no usage, no message id,
+ * or a model listed in `model.ignore`). `tokens` is new input + cache writes + output; cache reads are counted apart.
+ * The same `msgId` repeats on every line a message is written on: the caller counts it once.
+ */
+export function claudeUsage(o) {
+  const m = isObj(o) && o.type === 'assistant' && isObj(o.message) ? o.message : null;
+  if (!m || !isObj(m.usage) || modelIgnored(m)) return null;
+  const msgId = str(m.id, config.parse.nameMaxChars);
+  if (!msgId) return null;
+  const u = m.usage;
+  return { ts: timeOf(o), msgId, tokens: num(u.input_tokens) + num(u.cache_creation_input_tokens) + num(u.output_tokens), cacheRead: num(u.cache_read_input_tokens) };
+}
 
 function toolEvent(block, ts) {
   const input = isObj(block.input) ? block.input : {};
@@ -21,6 +61,14 @@ function toolEvent(block, ts) {
     name,
     text: describeTool(name, input),
   };
+  if (CONFLICT.enabled && EDIT_TOOLS.has(name)) {
+    const key = fileKey(name === 'NotebookEdit' ? input.notebook_path : input.file_path, fileKeySalt, { maxChars: CONFLICT.maxPathChars, hashChars: CONFLICT.hashChars });
+    if (key) ev.fileKey = key; // server-side only: the path itself is not kept
+  }
+  if (name === 'SendMessage') {
+    const to = cleanLine(input.to, SEND_TO_MAX);
+    if (to) ev.sendTo = to; // server-side only
+  }
   if (name === 'Agent') {
     if (typeof input.subagent_type === 'string') ev.agentType = clip(input.subagent_type, MAX_LEN);
     if (typeof input.description === 'string') ev.description = clip(input.description, MAX_LEN);
@@ -38,8 +86,20 @@ function toolEvent(block, ts) {
   return ev;
 }
 
+/** A rate-limit error line -> limit event; null for any other error line (server_error and the like). */
+function limitEvent(o, ts) {
+  if (o.isApiErrorMessage !== true) return null;
+  const quota = isObj(o.quotaLimits) ? o.quotaLimits : {};
+  if (o.error !== 'rate_limit' && quota.status !== 'rejected') return null;
+  const info = isObj(o.apiErrorParams) && isObj(o.apiErrorParams.rate_limit_info) ? o.apiErrorParams.rate_limit_info : {};
+  const resetsAt = typeof quota.resetsAt === 'number' ? quota.resetsAt : info.resetsAt;
+  const until = typeof resetsAt === 'number' && Number.isFinite(resetsAt) && resetsAt > 0 ? (resetsAt < EPOCH_MS_MIN ? resetsAt * 1000 : resetsAt) : null;
+  const type = quota.rateLimitType ?? info.rateLimitType;
+  return { kind: 'limit', ts, until, limitKind: type === 'five_hour' || type === 'seven_day' ? type : 'other' };
+}
+
 function parseObject(o) {
-  const ts = typeof o.timestamp === 'string' ? Date.parse(o.timestamp) || 0 : 0;
+  const ts = timeOf(o);
   const content = isObj(o.message) && Array.isArray(o.message.content) ? o.message.content : [];
   const evs = [];
 
@@ -60,7 +120,24 @@ function parseObject(o) {
       else if (b.type === 'thinking' || b.type === 'text') evs.push({ kind: 'think', ts });
     }
     if (o.message?.stop_reason === 'end_turn') evs.push({ kind: 'end', ts });
+    const limit = limitEvent(o, ts);
+    if (limit) evs.push(limit);
+    const usage = claudeUsage(o);
+    if (usage) {
+      evs.push({ kind: 'usage', ts, msgId: usage.msgId, tokens: usage.tokens, cacheRead: usage.cacheRead });
+      const u = o.message.usage;
+      // the size of the prompt of this call = how long the conversation is now
+      evs.push({ kind: 'ctx', ts, ctxTokens: num(u.input_tokens) + num(u.cache_creation_input_tokens) + num(u.cache_read_input_tokens), window: null, model: foldModel(o.message.model) });
+    }
     return evs;
+  }
+
+  // Only the trigger and the duration of a context compaction are read; the summary text is not.
+  if (o.type === 'system' && o.subtype === 'compact_boundary') {
+    const meta = isObj(o.compactMetadata) ? o.compactMetadata : {};
+    const trigger = meta.trigger === 'auto' || meta.trigger === 'manual' ? meta.trigger : 'other';
+    const durationMs = typeof meta.durationMs === 'number' && Number.isFinite(meta.durationMs) && meta.durationMs >= 0 ? meta.durationMs : null;
+    return [{ kind: 'compact', ts, trigger, durationMs }];
   }
 
   if (o.type === 'user') {

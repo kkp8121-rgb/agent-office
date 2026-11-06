@@ -3,10 +3,11 @@ import { readdir, readFile as fsReadFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
 /** @typedef {{agentId:string, agentType:string, description:string, finished:boolean, transcriptPath:string, mtimeMs:number,
- *             workflow: null | {runId:string, phase:string, label:string}}} AgentMeta */
+ *             toolUseId:string, workflow: null | {runId:string, phase:string, label:string}}} AgentMeta */
 
 const str = (v) => (typeof v === 'string' ? v : '');
 const META_RE = /^agent-(.+)\.meta\.json$/;
+const TOOL_USE_ID = /^[\w-]{1,100}$/; // id of the Agent tool_use that started the agent: server-internal, never sent out
 
 /**
  * Names in `dir` that pass `keep`. The listing is remembered in `cache` under the directory path and reused while the
@@ -60,6 +61,7 @@ async function readMeta(dir, name, runId, cache, readFile) {
     finished: j.finished === true,
     transcriptPath: join(dir, name.replace(/\.meta\.json$/, '.jsonl')),
     mtimeMs,
+    toolUseId: typeof j.toolUseId === 'string' && TOOL_USE_ID.test(j.toolUseId) ? j.toolUseId : '',
     workflow: runId ? { runId, phase: str(j.workflowPhase), label: str(j.description) } : null,
   };
   cache.set(file, { mtimeMs, value, settled: value.finished });

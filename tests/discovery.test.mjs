@@ -25,7 +25,7 @@ test('sessions: live session is listed', async (t) => {
   const r = await listLiveSessions(h.dir);
   assert.equal(r.length, 1);
   assert.deepEqual(r[0], {
-    provider: 'claude', pid: process.pid, sessionId: 's1', cwd: 'C:\\Project', status: 'busy', name: 'x', startedAt: 1793170000000,
+    provider: 'claude', pid: process.pid, sessionId: 's1', cwd: 'C:\\Project', status: 'busy', waitingPermission: false, name: 'x', startedAt: 1793170000000,
   });
   assert.equal(isPidAlive(process.pid), true);
 });
