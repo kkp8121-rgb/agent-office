@@ -93,7 +93,7 @@ ui.conflict.tugMs number
 ui.conflict.tugEveryMs number
 ui.conflict.blinkMs number
 ui.conflict.tagText string
-ui.conflict.lobbyLampAt null
+ui.conflict.lobbyLampAt array
 ui.conflict.lobbyLampSize array
 ui.badge.bandPx number
 ui.badge.labels.opus string
