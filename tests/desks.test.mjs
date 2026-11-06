@@ -1,5 +1,5 @@
 // Tests of the seated pose at desks: the lower legs of seated figures under open tables (scripts/make-leg-sprites.mjs, scene seat.legs, style.css "desks"),
-// the lobby desks (monitor and laptop backs in the middle, the figure sits behind), and the chair base of the open table's chair.
+// the lobby desks (the monitor back and the laptop lid at one side, the figure sits behind), and the chair base of the open table's chair.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { decodePng, encodePng, SPRITES } from '../scripts/make-lit-sprites.mjs';
 import { LEGS_DIR, LEGS_ROWS, legSources, legsFile, legsOf } from '../scripts/make-leg-sprites.mjs';
 import { checkSceneFormat, resolveScene } from '../web/scene.mjs';
+import { atlasOf, loadData as loadNight, monitorMask } from '../scripts/make-nightmap.mjs';
 import { FORMAT_OPTS, fixtureRaw } from './helpers/fixture.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -152,40 +153,53 @@ test('lounge art: the monitor back stands in front of the seat (between the view
 
 // ---- the lobby desks ----
 
-test('lobby art: the monitor back and the laptop lid stand in the middle of their desks, nothing stays at the old places', () => {
-  const im = atlas('lobby');
+// panel rows of a monitor back (the rows at least 70% as wide as the widest) and its columns, measured on the same pixels the night map uses
+function panelOf(design, kind) {
+  const night = loadNight();
+  const raw = scene(design);
+  const at = atlasOf(design, raw);
+  const [rx, ry] = raw.kinds[kind].rect;
+  const mask = monitorMask(at, raw.kinds[kind].rect, night.monitors[design][kind], night.monitorRule);
+  const rows = new Map();
+  for (const i of mask) {
+    const x = (i % at.w) - rx;
+    const y = Math.floor(i / at.w) - ry;
+    const r = rows.get(y) ?? { n: 0, x0: 1e9, x1: -1 };
+    rows.set(y, { n: r.n + 1, x0: Math.min(r.x0, x), x1: Math.max(r.x1, x) });
+  }
+  const wide = Math.max(...[...rows.values()].map((r) => r.n));
+  const panel = [...rows].filter(([, r]) => r.n >= 0.7 * wide);
+  return { h: panel.length, top: Math.min(...rows.keys()), x0: Math.min(...panel.map(([, r]) => r.x0)), x1: Math.max(...panel.map(([, r]) => r.x1)), mask, at, rx, ry };
+}
+
+test('lobby art: the monitor back stands on one side of its desk, beside the centred figure, and is as big next to the figure as on the floors', () => {
+  const cfgSit = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8')).sitHeight;
+  const floors = [['library', 'desk'], ['library', 'lead-desk'], ['studio2', 'desk'], ['studio2', 'lead-desk'], ['greenhouse', 'desk'], ['greenhouse', 'lead-desk']].map(([d, k]) => panelOf(d, k).h / cfgSit);
+  const mean = floors.reduce((a, b) => a + b, 0) / floors.length;
   const raw = scene('lobby');
-  const darkBox = (x0, y0, w, h) => {
-    let a = w;
-    let b = -1;
-    for (let y = 0; y < h; y++) {
-      for (let x = 20; x < 58; x++) { // between the things lying on the desk top (the notebook on the left, the mug on the right)
-        const i = ((y0 + y) * im.w + x0 + x) * 4;
-        if (im.rgba[i + 3] > 40 && im.rgba[i] < 100 && im.rgba[i + 1] < 100) { a = Math.min(a, x); b = Math.max(b, x); }
-      }
-    }
-    return [a, b];
-  };
-  const [bx, by, bw, bh] = raw.kinds['desk-b'].rect;
-  const [b0, b1] = darkBox(bx, by, bw, 5);
-  assert.ok(Math.abs((b0 + b1) / 2 - bw / 2) <= 2, `desk-b monitor centre ${(b0 + b1) / 2} of ${bw}`);
-  for (let y = 0; y < 7; y++) for (let x = 54; x <= 72; x++) assert.equal(alphaAt(im, bx + x, by + y), 0, `desk-b: nothing floats above the desk top at the old monitor place (${x},${y})`);
-  const [dx, dy, dw] = raw.kinds.desk.rect;
-  const [l0, l1] = darkBox(dx, dy, dw, 7);
-  assert.ok(Math.abs((l0 + l1) / 2 - dw / 2) <= 2, `desk lid centre ${(l0 + l1) / 2} of ${dw}`);
-  assert.deepEqual(raw.kinds.desk.rect.slice(2), [76, 31]);
-  assert.equal(raw.kinds.desk.anchor[1], 30, 'the sprite grew 4 rows upward, its front edge stays where it was');
-  // the lid and the monitor wear no screen: no bright or blue pixel on them
-  for (const [x0, y0] of [[dx + 29, dy + 2], [bx + 29, by]]) {
-    for (let y = 0; y < 9; y++) {
-      for (let x = 0; x < 18; x++) {
-        const i = ((y0 + y) * im.w + x0 + x) * 4;
-        if (im.rgba[i + 3] < 40) continue;
-        const [r, g, b] = [im.rgba[i], im.rgba[i + 1], im.rgba[i + 2]];
-        assert.ok(!(b > 120 && b > r + 30) && Math.min(r, g, b) <= 200, `a screen-coloured pixel at ${x0 + x},${y0 + y}`);
-      }
+  for (const kind of ['desk-b', 'desk']) {
+    const k = raw.kinds[kind];
+    const m = panelOf('lobby', kind);
+    const ratio = m.h / cfgSit;
+    assert.ok(Math.abs(ratio / mean - 1) <= 0.15, `${kind}: panel ${m.h} rows / figure ${cfgSit} = ${ratio.toFixed(3)}, the floors' ${mean.toFixed(3)}`);
+    const seatX = k.anchor[0] + k.seat.sitAt[0]; // the figure's column inside the desk picture
+    if (kind === 'desk-b') assert.ok(m.x0 >= seatX && m.x1 <= k.rect[2] - 1, `desk-b monitor columns ${m.x0}..${m.x1} lie right of the seat column ${seatX}`);
+    else assert.ok(m.x1 < seatX && m.x0 >= 0, `laptop lid columns ${m.x0}..${m.x1} lie left of the seat column ${seatX}`);
+    // the head stays free: the monitor starts below the face band (config depth.faceTopPx) of the seated picture
+    const face = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8')).depth.faceTopPx;
+    const figureTop = k.anchor[1] + k.seat.sitAt[1] - cfgSit;
+    assert.ok(m.top > figureTop + face, `${kind}: monitor top row ${m.top} below the face band (${figureTop}..${figureTop + face})`);
+    // the sprite's top row is the monitor's top (as on the floors): the seat check wants the figure's top 28 rows above it
+    assert.equal(m.top, 0, `${kind}: the sprite starts at the monitor top`);
+    // no screen: nothing bright or blue on the back
+    for (const i of m.mask) {
+      const [r, g, b] = [m.at.rgba[i * 4], m.at.rgba[i * 4 + 1], m.at.rgba[i * 4 + 2]];
+      assert.ok(!(b > 120 && b > r + 30) && Math.min(r, g, b) <= 200, `${kind}: a screen-coloured pixel at ${i}`);
     }
   }
+  assert.deepEqual(raw.kinds['desk-b'].rect.slice(2), [76, 42]);
+  assert.deepEqual(raw.kinds.desk.rect.slice(2), [76, 40]);
+  for (const kind of ['desk-b', 'desk']) assert.equal(raw.kinds[kind].anchor[1], raw.kinds[kind].rect[3] - 1, `${kind}: the anchor is the sprite's last row, so the front edge stays where it was`);
 });
 
 test('lobby: the chair stands behind the seated figure (front of its footprint above the seat), every desk of both kinds', () => {

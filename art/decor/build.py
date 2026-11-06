@@ -52,10 +52,10 @@ DESKS = {
                           bezel=[[41, 18], [41, 9], [63, 18], [63, 9]], monitorEdge=[[35, 14], [69, 12]]),
     },
     "lobby": {
-        "desk": dict(surface=[[8, 8], [15, 6], [46, 8], [54, 5], [70, 7]], monitorTop=[[30, 3]],
-                     bezel=[[28, 8], [33, 8]], monitorEdge=[[22, 6], [38, 6]]),
-        "desk-b": dict(surface=[[30, 13], [38, 10], [45, 13], [51, 9], [28, 9]], monitorTop=[[62, 0]],
-                       bezel=[[57, 8], [66, 8]], monitorEdge=[[54, 6], [69, 5]]),
+        "desk": dict(surface=[[43, 21], [49, 18], [55, 21], [61, 18], [70, 21]], monitorTop=[[20, 0]],
+                     bezel=[[12, 15], [12, 8], [28, 15], [28, 8]], monitorEdge=[[5, 10], [34, 8]]),
+        "desk-b": dict(surface=[[27, 22], [33, 19], [36, 23], [70, 23], [70, 19]], monitorTop=[[57, 0]],
+                       bezel=[[46, 17], [46, 9], [67, 17], [67, 9]], monitorEdge=[[41, 13], [73, 11]]),
     },
 }
 ORDER = ["studio2", "lounge", "library", "greenhouse", "lobby"]
