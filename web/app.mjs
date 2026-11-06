@@ -6,7 +6,7 @@ import { createNav } from './nav.mjs';
 import { charZ, objectNodes, splitWalk } from './depth.mjs';
 import { localPlacement, planFloor, withPersonal } from './decor.mjs';
 import { fitZoom } from './pip.mjs';
-import { LOBBY_ID, orderFloors, nextFloor, fallbackFloor, fitBox, pruneEvents, activityScore, busiestFloor, chooseFollow, viewOrder } from './view.mjs';
+import { LOBBY_ID, orderFloors, nextFloor, fallbackFloor, fitBox, fitColumns, pruneEvents, activityScore, busiestFloor, chooseFollow, viewOrder } from './view.mjs';
 import { canStroll, nextStrollAt, scaleLife, strollTarget } from './lobbylife.mjs';
 import { restNewsText } from './incident-view.mjs';
 import { assignLobbySeats, backRowSeats, changeOf, clockParts, employeeRows, headline, indexRows, lobbyRoster, msToNextMinute, newsText, officeScore, pageCount, pageRows, pushSample, tableCapacity } from './lobby.mjs';
@@ -43,6 +43,7 @@ const DONE_STALE_MS = 4000; // a done agent older than this is not walked to the
 const HELD_Z = 7900; // a held character draws above every object and character of its floor (the name tags sit at 8000)
 const HELD_FOLLOW_MS = 80; // a held character trails the pointer by this much, which also softens the lift
 const SINGLE_MAX_ZOOM = 3; // a single floor (or the stack with the panel hidden) is scaled up to fit, at most this much
+const FULLSCREEN_SLACK_PX = 2; // the page counts as full screen (browser F11) when the window is this close to the screen size or closer
 const PANEL_KEY = 'agent-office.panelOff'; // localStorage: the session panel was hidden by the person
 const THEME_KEY = 'agent-office.theme'; // localStorage: 'dark' or 'light' when the person chose; absent = follow the OS
 const LIFT_PX = 28; // the held character's height above its shadow (--lift in style.css)
@@ -107,12 +108,26 @@ const recOf = new WeakMap(); // character element -> rec
 
 // ---------- small helpers ----------
 
-/** Scales the floors (CSS zoom) to the room: the widest one down to fit beside the panel (or above it in a narrow window); the single floor shown, or the stack once the panel is hidden, up or down (in fullscreen the whole stack fits the screen height too). */
+/** Full screen: the page's own button (body.fs), or the browser's (F11), which the Fullscreen API does not report: display-mode media query, else a window as big as the screen. */
+function isFullscreen() {
+  return document.body.classList.contains('fs')
+    || window.matchMedia('(display-mode: fullscreen)').matches
+    || (Math.abs(window.innerWidth - screen.width) <= FULLSCREEN_SLACK_PX && Math.abs(window.innerHeight - screen.height) <= FULLSCREEN_SLACK_PX);
+}
+
+/** Lays the stacked floors out in `cols` columns (1 = the plain column; more only in full screen, see fitFloors). */
+function setFloorCols(cols) {
+  floorsEl.classList.toggle('floors-grid', cols > 1);
+  floorsEl.style.setProperty('--floor-cols', String(cols));
+}
+
+/** Scales the floors (CSS zoom) to the room: the widest one down to fit beside the panel (or above it in a narrow window); the single floor shown, or the stack once the panel is hidden, up or down (in full screen the whole stack fits the screen too, in as many columns as scale it the most). */
 function fitFloors() {
   const doc = floorsEl.ownerDocument; // the small window's document while the floors are there
   const mini = doc.body.classList.contains('pip-mini');
   let availW;
   let availH;
+  let sideBySide = false;
   if (mini) {
     // mini layout: floors only, the whole window minus the body padding
     const cs = doc.defaultView.getComputedStyle(doc.body);
@@ -120,21 +135,30 @@ function fitFloors() {
     availH = doc.documentElement.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   } else {
     const cs = getComputedStyle(appEl);
-    const sideBySide = cs.flexDirection === 'row';
+    sideBySide = cs.flexDirection === 'row';
     availW = appEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
       - (sideBySide && panelEl.offsetWidth ? panelEl.offsetWidth + parseFloat(cs.columnGap) : 0);
     availH = window.innerHeight - topbarEl.offsetHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   }
   const shown = shownId === null ? null : shownId === LOBBY_ID ? lobby : floorRecs.get(shownId);
   if (shown) {
+    setFloorCols(1);
     floorsEl.style.zoom = String(fitBox(availW, availH, ...shown.scene.r.size, SINGLE_MAX_ZOOM));
     return;
   }
   const widest = Math.max(0, ...[...floorRecs.values()].map((r) => r.scene.r.size[0]));
-  // fullscreen (or one floor alone): the whole stack has to fit the height too (scaled by width alone it is taller than the screen and the page scrolls); a taller stack in a window scrolls by design
   const stack = [...floorRecs.values()].filter((r) => !r.off);
-  const stackH = !mini && (doc.body.classList.contains('fs') || stack.length === 1) ? stack.reduce((sum, r) => sum + r.scene.r.size[1], 0) + Math.max(0, stack.length - 1) * parseFloat(getComputedStyle(floorsEl).rowGap) : 0;
-  floorsEl.style.zoom = !mini && widest > 0 && !panelEl.offsetWidth ? String(fitBox(availW, stackH > 0 ? availH : Infinity, widest, stackH, SINGLE_MAX_ZOOM)) : fitZoom(availW, widest);
+  // full screen (or one floor alone): the whole stack has to fit the height too (scaled by width alone it is taller than the screen and the page scrolls), in the columns that give the biggest floors; a taller stack in a window scrolls by design.
+  // Under a panel that sits below the floors (narrow window) the height is not the floors' own, so only a hidden panel or a side-by-side one counts.
+  const fit = !mini && widest > 0 && stack.length > 0 && (!panelEl.offsetWidth || (sideBySide && isFullscreen()));
+  if (fit && (stack.length === 1 || isFullscreen())) {
+    const { cols, scale } = fitColumns(stack.map((r) => r.scene.r.size), availW, availH, parseFloat(getComputedStyle(floorsEl).rowGap), SINGLE_MAX_ZOOM);
+    setFloorCols(cols);
+    floorsEl.style.zoom = String(scale);
+    return;
+  }
+  setFloorCols(1);
+  floorsEl.style.zoom = !mini && widest > 0 && !panelEl.offsetWidth ? String(fitBox(availW, Infinity, widest, 0, SINGLE_MAX_ZOOM)) : fitZoom(availW, widest);
 }
 
 function showConn(text) {

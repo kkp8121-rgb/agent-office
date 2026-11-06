@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { orderFloors, nextFloor, fallbackFloor, fitBox, pruneEvents, activityScore, busiestFloor, chooseFollow } from '../web/view.mjs';
+import { orderFloors, nextFloor, fallbackFloor, fitBox, fitColumns, pruneEvents, activityScore, busiestFloor, chooseFollow } from '../web/view.mjs';
 
 test('view: orderFloors sorts by floor number', () => {
   const views = [{ sessionId: 'c', floorNo: 3 }, { sessionId: 'a', floorNo: 1 }, { sessionId: 'b', floorNo: 2 }];
@@ -33,6 +33,58 @@ test('view: fitBox takes the tighter of width and height and caps the zoom', () 
   assert.equal(fitBox(4000, 4000, 1024, 512, 3), 3);
   assert.equal(fitBox(2048, Infinity, 1024, 0, 3), 2);
   assert.equal(fitBox(-5, 100, 1024, 512, 3), 0);
+});
+
+const FLOOR = [1024, 576];
+const floors = (n) => Array.from({ length: n }, () => FLOOR);
+
+test('view: fitColumns keeps one column for one floor, and for an empty stack', () => {
+  assert.deepEqual(fitColumns(floors(1), 1800, 1000, 12, 3), { cols: 1, scale: fitBox(1800, 1000, 1024, 576, 3) });
+  assert.equal(fitColumns([], 1800, 1000, 12, 3).cols, 1);
+});
+
+test('view: fitColumns puts two floors side by side on a wide screen', () => {
+  const r = fitColumns(floors(2), 1800, 900, 12, 3);
+  assert.equal(r.cols, 2);
+  assert.equal(r.scale, fitBox(1800, 900, 2 * 1024 + 12, 576, 3));
+  assert.ok(r.scale > fitBox(1800, 900, 1024, 2 * 576 + 12, 3)); // better than the one column
+});
+
+test('view: fitColumns takes two columns for four floors on 16:9', () => {
+  const r = fitColumns(floors(4), 1888, 1000, 12, 3);
+  assert.deepEqual(r, { cols: 2, scale: Math.min(1888 / (2 * 1024 + 12), 1000 / (2 * 576 + 12)) });
+  assert.ok(r.scale > fitBox(1888, 1000, 1024, 4 * 576 + 3 * 12, 3));
+});
+
+test('view: fitColumns for eight floors fills a 2x4 or 3x3 grid, whichever scales more', () => {
+  const r = fitColumns(floors(8), 1888, 1000, 12, 3);
+  const by = (c) => fitBox(1888, 1000, c * 1024 + (c - 1) * 12, Math.ceil(8 / c) * 576 + (Math.ceil(8 / c) - 1) * 12, 3);
+  const best = Math.max(...[1, 2, 3, 4, 5, 6, 7, 8].map(by));
+  assert.equal(r.scale, best);
+  assert.equal(by(r.cols), best);
+  assert.ok(r.cols >= 3);
+});
+
+test('view: fitColumns keeps one column on a tall narrow screen', () => {
+  assert.equal(fitColumns(floors(4), 600, 2400, 12, 3).cols, 1);
+  assert.equal(fitColumns(floors(2), 700, 1800, 12, 3).cols, 1);
+});
+
+test('view: fitColumns breaks a tie toward fewer columns (the cap, an empty last row)', () => {
+  assert.equal(fitColumns(floors(2), 100000, 100000, 12, 3).cols, 1); // all capped at 3
+  // 3 floors on a very wide, short screen: 3 columns (one row) beat 2 columns (two rows)
+  assert.equal(fitColumns(floors(3), 3300, 300, 12, 3).cols, 3);
+  // 5 floors: 3 and 4 columns both make two rows and both are tall-limited (same scale), 5 columns are too wide: the 3 wins
+  const r = fitColumns(floors(5), 4000, 1000, 12, 3);
+  assert.equal(r.cols, 3);
+  assert.equal(r.scale, fitBox(4000, 1000, 4 * 1024 + 3 * 12, 2 * 576 + 12, 3));
+});
+
+test('view: fitColumns sizes a column by its widest floor and a row by its tallest', () => {
+  const sizes = [[1024, 576], [1024, 512], [1024, 576], [1024, 512]];
+  const r = fitColumns(sizes, 2060, 1200, 12, 3);
+  assert.equal(r.cols, 2);
+  assert.equal(r.scale, Math.min(2060 / (2 * 1024 + 12), 1200 / (576 + 576 + 12), 3));
 });
 
 test('view: config.json gives the rotation a positive number of seconds', () => {

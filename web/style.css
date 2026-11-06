@@ -109,6 +109,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 #app { display: flex; gap: 16px; padding: 16px; align-items: flex-start; justify-content: safe center; }
 #floors { flex: none; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+#floors.floors-grid { display: grid; grid-template-columns: repeat(var(--floor-cols), auto); justify-items: center; } /* full screen: the stack in columns, row by row (fitFloors in app.mjs) */
 
 /* ---- floor ---- */
 .floor { position: relative; flex: none; transition: opacity .6s; }

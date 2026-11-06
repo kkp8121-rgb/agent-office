@@ -38,6 +38,28 @@ export function fitBox(availW, availH, w, h, maxScale) {
   return Math.max(0, Math.min(rw, rh, maxScale));
 }
 
+/**
+ * Column count that lets the stacked floors be scaled the most. `sizes` = [[w, h], ...] in display order; the floors fill the grid row by row,
+ * a column is as wide as its widest floor and a row as tall as its tallest, `gap` lies between columns and between rows.
+ * Returns {cols, scale} (scale as fitBox, capped at `maxScale`); a tie goes to the fewer columns, so one column is what the plain stack gives.
+ */
+export function fitColumns(sizes, availW, availH, gap, maxScale) {
+  if (!sizes.length) return { cols: 1, scale: maxScale };
+  let best = null;
+  for (let cols = 1; cols <= sizes.length; cols++) {
+    const colW = new Array(cols).fill(0);
+    const rowH = new Array(Math.ceil(sizes.length / cols)).fill(0);
+    sizes.forEach(([w, h], i) => {
+      colW[i % cols] = Math.max(colW[i % cols], w);
+      rowH[Math.floor(i / cols)] = Math.max(rowH[Math.floor(i / cols)], h);
+    });
+    const sum = (xs) => xs.reduce((a, b) => a + b, 0);
+    const scale = fitBox(availW, availH, sum(colW) + (cols - 1) * gap, sum(rowH) + (rowH.length - 1) * gap, maxScale);
+    if (best === null || scale > best.scale) best = { cols, scale };
+  }
+  return best;
+}
+
 // ---- follow the busiest floor (pure) ----
 // Activity of a floor = events inside the last `windowSeconds` (each with its weight) + `workingWeight` per character that is working or thinking now.
 
