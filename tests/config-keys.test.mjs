@@ -173,10 +173,10 @@ ui.bellMeeting.sayMs number
 ui.bellMeeting.gapMs number
 ui.bellMeeting.maxSpeakers number
 ui.bellMeeting.cooldownMs number
-ui.bellMeeting.at.studio2 null
-ui.bellMeeting.at.lounge null
-ui.bellMeeting.at.library null
-ui.bellMeeting.at.greenhouse null
+ui.bellMeeting.at.studio2 array
+ui.bellMeeting.at.lounge array
+ui.bellMeeting.at.library array
+ui.bellMeeting.at.greenhouse array
 ui.ceo.tab string
 ui.ceo.name string
 ui.ceo.role string

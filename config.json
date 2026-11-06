@@ -398,7 +398,7 @@
                         "entryAt": { "studio2": [925, 338], "lounge": [828, 455], "library": [925, 440], "greenhouse": [852, 380], "ceo": [925, 338] },
                         "basement": { "racks": 8, "blinkSlowMs": 1600, "blinkFastMs": 300, "none": "—" } },
           "bellMeeting": { "label": "회의 소집 종", "busyText": "회의 중", "restText": "점심시간이라 쉬는 중", "sayMs": 2600, "gapMs": 300, "maxSpeakers": 7, "cooldownMs": 20000,
-                           "at": { "studio2": null, "lounge": null, "library": null, "greenhouse": null } },
+                           "at": { "studio2": [826, 204], "lounge": [575, 158], "library": [866, 222], "greenhouse": [858, 268] } },
           "ceo": { "tab": "사장실", "name": "사장님", "role": "사장", "sprite": "ceo", "awayText": "사장실에 보고하러 감", "roofText": "옥상에서 쉬는 중",
                    "meetingAway": "{n}층 회의 중", "queueText": "대기 {n}", "board": { "title": "오늘 인건비", "rows": 3 } },
           "empty": { "variant": "a", "text": "터미널이나 데스크톱 앱에서 Claude Code·Codex를 켜면 첫 직원이 출근합니다",
