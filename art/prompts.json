@@ -37,6 +37,10 @@
     "extra-11": "white twin-tails with blue tips, purple witch hat with a star, star-patterned navy cape over a dress, holding a star-topped magic wand, little witch",
     "extra-12": "brown hair in one long side braid under a wide straw sun hat, bright yellow raincoat and red rubber boots, holding a green watering can, gardener"
   },
+  "ceo": {
+    "look": "middle-aged company boss, neat short hair, dark navy suit, white shirt, tie, holding a coffee mug",
+    "outfit": "dark navy suit, tie"
+  },
   "views": {
     "style": "Pixel art, 16-bit era, same rendering style, palette and pixel size as the attached style reference (it is a crop of the old window view of this room: match colours and brush, ignore its composition). Flat 2-3 tone shading, about 48 colours, soft low contrast for far things. One single continuous wide landscape, NOT several separate pictures. No window frame, no glass, no reflection, no text, no people, no characters, no border, no vignette. Output exactly the aspect ratio of the attached guide image; the horizon is the thin red line of the guide image (do not draw the red line), keep the horizon on that line across the whole width.",
     "prompts": {
