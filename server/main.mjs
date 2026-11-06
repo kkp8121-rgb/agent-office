@@ -25,7 +25,7 @@ const costClock = localClock(cfg.cost.dayStartHour);
 const costFile = path.join(dataDir, cfg.cost.file);
 const ledger = CostLedger.fromJSON(loadCostFile(costFile), {
   clock: costClock, keepDays: cfg.cost.keepDays, dedupePerFile: cfg.cost.dedupePerFile, topCount: cfg.ui.cost.topCount,
-});
+}, Date.now());
 const poller = new Poller(cfg, office, ledger);
 // The only outbound connection (see README: Weather). AGENT_OFFICE_WEATHER_URL points it at a local fake server for checks.
 const weather = createWeather(cfg.weather, { baseUrl: process.env.AGENT_OFFICE_WEATHER_URL || undefined });

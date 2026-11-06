@@ -99,6 +99,7 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
   let costVersion = -1; // ledger version of the last cost frame sent to everyone
   let costJson = null; // that frame
   let costSentAt = 0;
+  let costSlot = ''; // day and hour of the last cost frame: "the same hour last week" moves with the clock, not only with new usage
 
   const server = http.createServer((req, res) => {
     for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
@@ -148,6 +149,7 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
         costVersion = cost.version;
         costJson = json;
         costSentAt = at;
+        costSlot = cost.slot(at);
       }
     }
     onSseConnect?.();
@@ -170,11 +172,12 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
       if (entries.length) res.write(frame('log', entries));
       for (const sig of signals) res.write(frame(sig.type, sig));
     }
-    // The cost frame follows the ledger: only after it changed, and not more often than cost.sendMinMs (a change inside that time waits for a later round).
-    if (cost && cost.version !== costVersion && now() - costSentAt >= cfg.cost.sendMinMs) {
+    // The cost frame follows the ledger (or the hour changing): only after that, and not more often than cost.sendMinMs (a change inside that time waits for a later round).
+    if (cost && (cost.version !== costVersion || cost.slot(now()) !== costSlot) && now() - costSentAt >= cfg.cost.sendMinMs) {
       const at = now();
       const json = JSON.stringify(costFrame(cost.today(at), snap.floors, cfg.ui.cost.goneName));
       costVersion = cost.version;
+      costSlot = cost.slot(at);
       if (json !== costJson) {
         costJson = json;
         costSentAt = at;

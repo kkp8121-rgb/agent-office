@@ -117,3 +117,30 @@ test('cost-frame: a change inside sendMinMs is held', async (t) => {
   assert.equal(frames[0].tokens, 1000);
   assert.equal(frames[1].tokens, 1500, 'the held change arrives whole');
 });
+
+test('cost-frame: a new hour resends the frame without new usage, an unchanged hour does not', async (t) => {
+  const lastWeekAt = (h) => T0 - 7 * 24 * HOUR - 10 * HOUR + h * HOUR; // last week's same weekday at hour h (T0 is 10:00)
+  const c = await start(t);
+  c.ledger.add(use(lastWeekAt(9), 'w9', 300));
+  c.ledger.add(use(lastWeekAt(11), 'w11', 700)); // only counts once the clock reaches 11:00
+  c.ledger.add(use(T0 - HOUR, 'm1', 1000));
+  let text = '';
+  const got = sse(c, (x) => { text = x; return pings(x) >= 6; });
+  await sleep(10);
+  assert.equal(costFrames(text).length, 1);
+  assert.equal(costFrames(text)[0].lastWeek.tokensSameHour, 300);
+  c.time.now = T0 + 50 * 60 * 1000; // 10:50, still the 10 o'clock hour, long after sendMinMs
+  c.server.broadcast();
+  await sleep(10);
+  assert.equal(costFrames(text).length, 1, 'same hour, no new usage: nothing is sent');
+  c.time.now = T0 + HOUR; // 11:00
+  c.server.broadcast();
+  await sleep(10);
+  assert.equal(costFrames(text).length, 2, 'the hour changed: sent again with no new usage');
+  assert.equal(costFrames(text)[1].lastWeek.tokensSameHour, 1000);
+  assert.equal(costFrames(text)[1].tokens, 1000, 'nothing else changed');
+  c.time.now += 10 * 60 * 1000;
+  c.server.broadcast();
+  const frames = costFrames(await got);
+  assert.equal(frames.length, 2, 'and quiet again inside the new hour');
+});
