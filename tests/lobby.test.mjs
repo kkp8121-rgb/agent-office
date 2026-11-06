@@ -419,8 +419,8 @@ test('lobby server: the snapshot adds no text field (privacy list unchanged)', (
   o.syncAgents('s1', [M('a1')], 100000);
   const f = floorOf(o, 's1');
   // 'phases' carries the same cleaned phase names the board's sheet already sends (the detail panel shows them next to the to-do list)
-  assert.deepEqual(Object.keys(f).sort(), ['agents', 'autoTitle', 'board', 'colorIndex', 'design', 'failAt', 'floorNo', 'folder', 'lead', 'origin', 'phases', 'provider', 'reports', 'sessionId', 'sheet', 'startedAt', 'status', 'title', 'todos', 'workflows']);
-  assert.deepEqual(Object.keys(f.agents[0]).sort(), ['agentId', 'bubble', 'enteredAt', 'key', 'name', 'role', 'since', 'slot', 'sprite', 'state', 'wf']);
+  assert.deepEqual(Object.keys(f).sort(), ['agents', 'autoTitle', 'board', 'call', 'callSince', 'colorIndex', 'conflicts', 'design', 'failAt', 'floorNo', 'folder', 'lead', 'origin', 'phases', 'provider', 'reports', 'rest', 'sessionId', 'sheet', 'startedAt', 'status', 'title', 'todos', 'workflows']);
+  assert.deepEqual(Object.keys(f.agents[0]).sort(), ['agentId', 'bubble', 'conflict', 'enteredAt', 'key', 'model', 'name', 'phase', 'pile', 'role', 'since', 'slot', 'slowKind', 'slowSince', 'sprite', 'state', 'wf']);
 });
 
 // ---- scene ----
