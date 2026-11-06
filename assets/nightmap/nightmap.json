@@ -4,8 +4,8 @@
   "monitorRule": { "maxSat": 0.25, "minAlpha": 128 },
   "monitors": {
     "lobby": {
-      "desk": { "box": [26, 0, 50, 14], "seed": [37, 6], "screen": [29, 2, 46, 10] },
-      "desk-b": { "box": [26, 0, 50, 14], "seed": [37, 5], "screen": [29, 0, 46, 10] }
+      "desk": { "box": [2, 0, 38, 23], "seed": [20, 9], "screen": [5, 0, 35, 18] },
+      "desk-b": { "box": [38, 0, 76, 26], "seed": [48, 10], "screen": [40, 0, 74, 19] }
     },
     "library": {
       "desk": { "box": [23, 0, 53, 25], "seed": [35, 5], "screen": [24, 0, 50, 15] },
