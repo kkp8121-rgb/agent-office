@@ -10,6 +10,8 @@ import { FIXTURE_DIR, FIXTURE_SCENES, ROOT, atlasSize, cfg, fixtureRaw } from '.
 
 const check = (raw, size = atlasSize) => checkScene(raw, { atlasSize: size, cfg });
 const SHIPPED = join(ROOT, 'assets', 'scenes');
+/** May this shipped scene set minSeats? Only the CEO room (cfg.ceo.design) has no staff seats, and it may only lower the minimum to 0. */
+const minSeatsAllowed = (design, minSeats) => minSeats === undefined || (design === cfg.ceo.design && minSeats === 0);
 
 test('scenes: fixture passes stages 1-9', () => {
   const res = check(fixtureRaw());
@@ -21,13 +23,22 @@ test('scenes: every shipped scene passes', (t) => {
   const designs = existsSync(SHIPPED) ? readdirSync(SHIPPED, { withFileTypes: true }).filter((d) => d.isDirectory() && existsSync(join(SHIPPED, d.name, 'scene.json'))) : [];
   for (const d of designs) {
     const raw = JSON.parse(readFileSync(join(SHIPPED, d.name, 'scene.json'), 'utf8'));
-    assert.equal(raw.minSeats, undefined, `${d.name}: a shipped scene must not lower the seat minimum`);
+    assert.ok(minSeatsAllowed(d.name, raw.minSeats), `${d.name}: a shipped scene must not lower the seat minimum`);
     assert.equal(raw.design, d.name);
     const res = check(raw, readPngSize(join(SHIPPED, d.name, raw.atlas)));
     assert.deepEqual(res.errors, [], d.name);
     for (const w of res.warnings) t.diagnostic(`${d.name}: ${w}`);
   }
   t.diagnostic(`${designs.length} shipped scene(s) checked`);
+});
+
+test('scenes: only the ceo design may set minSeats, and only to 0', () => {
+  assert.equal(minSeatsAllowed('lobby', undefined), true);
+  assert.equal(minSeatsAllowed('lobby', 0), false);
+  assert.equal(minSeatsAllowed('studio2', 0), false);
+  assert.equal(minSeatsAllowed('ceo', 1), false);
+  assert.equal(minSeatsAllowed('ceo', 0), true);
+  assert.equal(cfg.ceo.design, 'ceo');
 });
 
 test('scenes: validator catches an unreachable seat', () => {
