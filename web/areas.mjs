@@ -6,6 +6,7 @@ import { init as initFxEvents } from './fx-events.mjs';
 import { init as initFxLed } from './fx-led.mjs';
 import { init as initFxHit } from './fx-hit.mjs';
 import { init as initOfficeLife } from './officelife.mjs';
+import { initCost } from './lobby.mjs';
 
 export const AREAS = [
   { name: 'fx-weather', init: initFxWeather },
@@ -14,6 +15,7 @@ export const AREAS = [
   { name: 'fx-led', init: initFxLed },
   { name: 'fx-hit', init: initFxHit },
   { name: 'officelife', init: initOfficeLife },
+  { name: 'cost', init: initCost },
 ];
 
 /** SSE event names, besides state/log/phase/fail/weather/sysload, that connect() relays to ctx.onServer. */

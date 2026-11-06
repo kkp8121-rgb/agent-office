@@ -5,7 +5,8 @@
 // for Esc / Tab / resize on its own document and removes them again on close. The live fields refresh when the office calls refreshCard()
 // after a state update (no timers). Opening and closing animate transform and opacity only (Web Animations), and only while the
 // effects switch is on and the viewer does not ask for reduced motion; otherwise the card appears and disappears at once.
-import { fmtDuration, stateLabel } from './lobby.mjs';
+import { fmtDuration, live as office, onLive, stateLabel } from './lobby.mjs';
+import { personCostLine, personOf } from './cost-view.mjs';
 
 const fill = (template, vars) => template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
 
@@ -109,9 +110,10 @@ export function fitScale(vw, vh, layout) {
  * who   = {sprite, name, role, rank ('lead'|'staff'|'project'|'cat'), state, floorStatus, floorNo, lobby, startedAt}: what the office shows of it right now
  * entry = the cards.json card of its sprite key (or undefined: the fields show the placeholder)
  * cfg   = ui.card, lobbyLabels = ui.lobby (floor label, rank and state words, duration words), now in ms, type = the persona type or ''
+ * extra = more memo lines (cardExtraLines: model, paper pile, today's cost), after the office's own words
  * 사는 곳 and 메모 are live: only the office's own words (role, rank, state, how long, which team a lobby figure belongs to), never anything from the logs.
  */
-export function cardFields(who, entry, cfg, lobbyLabels, now, type = '') {
+export function cardFields(who, entry, cfg, lobbyLabels, now, type = '', extra = []) {
   const L = cfg.labels;
   const e = entry ?? {};
   const val = (v) => (typeof v === 'string' && v !== '' ? v : L.empty);
@@ -125,6 +127,7 @@ export function cardFields(who, entry, cfg, lobbyLabels, now, type = '') {
     memo.push(who.startedAt > 0 ? fill(L.memoState, { state, dur: fmtDuration(now - who.startedAt, lobbyLabels) }) : state);
   }
   if (who.lobby && who.floorNo > 0) memo.push(fill(L.memoFloor, { floor }));
+  memo.push(...extra);
   return {
     name: `${who.name} · ${role}`,
     age: val(e.age),
@@ -139,6 +142,21 @@ export function cardFields(who, entry, cfg, lobbyLabels, now, type = '') {
     memo,
     stamp: cfg.typeLabels[type] ?? '',
   };
+}
+
+/**
+ * The memo lines the 1.1 signals add: the model (「Opus」), the paper pile (「서류 많음」; level 0 has an empty title: no row) and today's new tokens (「오늘 인건비 12.3M」).
+ * `person` = personOf() of the card's character (null when the floors do not list it: no lines), `frame` = the cost frame or null,
+ * `ui` = the config ui ({badge, pile, cost}; `cost` may be missing: no cost line). A model the config has no label for gets no line.
+ */
+export function cardExtraLines(person, frame, ui) {
+  if (!person) return [];
+  const { model, pile } = person.view;
+  const lines = [];
+  if (ui.badge.labels[model]) lines.push(ui.badge.labels[model]);
+  if (ui.pile.titles[pile]) lines.push(ui.pile.titles[pile]);
+  if (ui.cost) lines.push(personCostLine(frame, ui.cost, person.sessionId, person.agentKey));
+  return lines;
 }
 
 // ---------- the tag ----------
@@ -282,7 +300,8 @@ export function createCard(deps) {
   function paint(w) {
     const { refs } = live;
     const { entry, type } = lookup(w);
-    const f = cardFields(w, entry, cfg, lobbyLabels, deps.now(), type);
+    const extra = server.ui ? cardExtraLines(personOf(office.floors, w), office.cost, server.ui) : [];
+    const f = cardFields(w, entry, cfg, lobbyLabels, deps.now(), type, extra);
     for (const k of ['name', 'age', 'birthplace', 'residence', 'hair', 'eye', 'height', 'weight', 'bio']) setText(refs[k], f[k]);
     for (const [key, items] of [['skills', f.skills], ['memo', f.memo]]) {
       const ul = refs[key];
@@ -379,12 +398,15 @@ export function createCard(deps) {
       if (!cd.contains(e.target)) close();
     });
     closeBtn.addEventListener('click', close);
+    const offLive = onLive(() => refresh()); // a new cost frame or floor list repaints the open card
     const stop = () => {
       doc.removeEventListener('keydown', onKey, true);
       win.removeEventListener('resize', onResize);
+      offLive();
     };
     live = { rec, who, tag, doc, back, fit: fitEl, cd, refs, closeBtn, stop, last: null, gone: false };
     paint(who(rec));
+    sheet.style.gridTemplateRows = getComputedStyle(sheet).gridTemplateRows.replace(/\S+$/, 'auto'); // the memo, the last row, grows with its lines (the model, pile and cost rows come after the office's own words)
     fit();
     return live;
   }
