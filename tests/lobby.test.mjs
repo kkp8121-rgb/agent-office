@@ -9,8 +9,9 @@ import { checkScene } from '../server/scene-check.mjs';
 import { readPngSize } from '../server/scenes.mjs';
 import {
   assignLobbySeats, backRowSeats, changeOf, changeText, clip, clockParts, employeeRows, fmtDuration, headline, indexRows, lobbyRoster, msToNextMinute,
-  newsText, officeScore, pageCount, pageRows, pushSample, stateLabel, tableCapacity,
+  newsText, officeScore, pageCount, pageRows, pushSample, stateLabel, tableCapacity, costPageRows, costPageStep, floorFigure,
 } from '../web/lobby.mjs';
+import { costView } from '../web/cost-view.mjs';
 import { quadFrame } from '../web/board.mjs';
 import { LOBBY_ID, busiestFloor, chooseFollow, fallbackFloor, nextFloor, viewOrder } from '../web/view.mjs';
 import { ROOT, cfg as rawCfg } from './helpers/fixture.mjs';
@@ -594,4 +595,56 @@ test('lobby bubbles: only the back row (smallest y) of the shipped scene keeps a
   assert.equal(ys.size, 1);
   assert.equal([...ys][0], Math.min(...seats.map((s) => s.at[1])));
   assert.deepEqual([...backRowSeats([{ at: [1, 50] }, { at: [2, 30] }, { at: [3, 33] }, { at: [4, 90] }])].sort(), [1, 2]);
+});
+
+// ---- labour cost on the wall ----
+
+const costFrame = (o = {}) => ({
+  day: '2026-11-06', tokens: 5_000_000, cacheRead: 9_000_000, lastWeek: null, floors: [{ sessionId: 's1', tokens: 4_000_000 }],
+  top: [
+    { sessionId: 's1', agentKey: null, name: '하나', floorName: '제목 하나', tokens: 3_000_000 },
+    { sessionId: 'gone', agentKey: 'x', name: '', floorName: '', tokens: 2_000_000 },
+  ],
+  scanning: false, partial: false, ...o,
+});
+
+test('lobby cost: the cost page lists the top people with their floor, and a person whose floor left has none and no click target', () => {
+  const rows = costPageRows(costView(costFrame(), cfg.ui.cost), [floor('s1', 3)], L, 5);
+  assert.deepEqual(rows.map((r) => r.cells), [['하나', '3층', '제목 하나', '', '', '3.0M', ''], [cfg.ui.cost.goneName, '', '', '', '', '2.0M', '']]);
+  assert.deepEqual(rows.map((r) => r.sid), ['s1', '']);
+  assert.equal(costPageRows(costView(costFrame(), cfg.ui.cost), [floor('s1', 3)], L, 1).length, 1, 'at most as many rows as the table has');
+  assert.deepEqual(costPageRows(costView(costFrame({ scanning: true }), cfg.ui.cost), [floor('s1', 3)], L, 5), [], 'counting: no half-counted rows');
+  assert.deepEqual(costPageRows(costView(null, cfg.ui.cost), [], L, 5), []);
+});
+
+test('lobby cost: a floor line of the index panel starts with its tokens, an unlisted floor with the empty mark, counting with the scanning word', () => {
+  const C = cfg.ui.cost;
+  const v = costView(costFrame(), C);
+  assert.equal(floorFigure(v, costFrame(), 's1', C), '4.0M');
+  assert.equal(floorFigure(v, costFrame(), 's9', C), C.empty);
+  assert.equal(floorFigure(costView(costFrame({ scanning: true }), C), costFrame({ scanning: true }), 's1', C), C.scanning);
+  assert.equal(floorFigure(costView(null, C), null, 's1', C), C.empty);
+});
+
+test('lobby cost: the cost page comes after the last page of the table, which is held back one flip; a one-page table alternates', () => {
+  // three pages: it comes up when the table has wrapped to page 0 and puts the table back to its last page
+  assert.deepEqual(costPageStep(false, 3, 1), { show: false, rewind: null });
+  assert.deepEqual(costPageStep(false, 3, 2), { show: false, rewind: null });
+  assert.deepEqual(costPageStep(false, 3, 0), { show: true, rewind: 2 });
+  assert.deepEqual(costPageStep(true, 3, 0), { show: false, rewind: null }, 'the next tick hands the wall back to the table');
+  assert.deepEqual(costPageStep(false, 1, 0), { show: true, rewind: null });
+  assert.deepEqual(costPageStep(true, 1, 0), { show: false, rewind: null });
+  // walk a whole round: every table page is on the wall once, the cost page once, in order
+  let page = 0;
+  let shown = false;
+  const pages = 3;
+  const seen = [];
+  for (let flip = 0; flip < 8; flip++) {
+    seen.push(shown ? 'cost' : page);
+    page = (page + 1) % pages; // the table flips by itself
+    const step = costPageStep(shown, pages, page);
+    if (step.rewind !== null) page = step.rewind;
+    shown = step.show;
+  }
+  assert.deepEqual(seen, [0, 1, 2, 'cost', 0, 1, 2, 'cost']);
 });

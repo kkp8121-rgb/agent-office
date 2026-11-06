@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cleanCard, loadCards } from '../server/cards.mjs';
-import { cardFields, createCardState, fitScale, signature, tagRoute } from '../web/card.mjs';
+import { cardExtraLines, cardFields, createCardState, fitScale, signature, tagRoute } from '../web/card.mjs';
 import { INDEX_HTML } from '../server/pages.mjs';
 import { loadConfig } from '../server/config.mjs';
 
@@ -262,4 +262,29 @@ test('card.css only styles card classes: a bare .c-name would also restyle the l
   assert.equal(/(^|[\s,}])\.c-[a-z]/.test(css), false);
   const js = readFileSync(join(ROOT, 'web', 'card.mjs'), 'utf8');
   assert.equal(/cell\(doc, 'c-/.test(js), false);
+});
+
+// ---- model, paper pile and today's cost on the card (1.1) ----
+
+const NEW_UI = { badge: cfg.ui.badge, pile: cfg.ui.pile, cost: cfg.ui.cost };
+const person = (view, o = {}) => ({ sessionId: 's1', agentKey: null, view, ...o });
+const costFrame = { top: [{ sessionId: 's1', agentKey: null, name: 'x', floorName: '', tokens: 12_300_000 }], scanning: false, partial: false, tokens: 0, cacheRead: 0, lastWeek: null, floors: [] };
+
+test('card: the memo gets a model row, a paper-pile row and the cost row of today after the own words of the office', () => {
+  const lines = cardExtraLines(person({ model: 'opus', pile: 3 }), costFrame, NEW_UI);
+  assert.deepEqual(lines, [NEW_UI.badge.labels.opus, NEW_UI.pile.titles[3], `${NEW_UI.cost.title} 12.3M`]);
+  assert.equal(NEW_UI.badge.labels.codex, 'Codex');
+  assert.deepEqual(cardExtraLines(person({ model: 'codex', pile: 4 }), costFrame, NEW_UI).slice(0, 2), ['Codex', '곧 넘침']);
+  const who = { sprite: 'worker', name: '하나', role: '개발', rank: 'staff', state: 'working', floorStatus: 'busy', floorNo: 2, lobby: false, startedAt: 0 };
+  const f = cardFields(who, undefined, C, cfg.ui.lobby, 1000, '', lines);
+  assert.deepEqual(f.memo.slice(-3), lines, 'the three rows close the memo');
+  assert.equal(f.memo[0], `개발 · ${cfg.ui.lobby.rank.staff}`, 'the own words of the office stay first');
+  assert.deepEqual(cardFields(who, undefined, C, cfg.ui.lobby, 1000).memo, f.memo.slice(0, -3), 'no extra lines: the memo is what it was');
+});
+
+test('card: a person with no model and an empty pile gets no such rows, and an unknown person gets none at all', () => {
+  assert.deepEqual(cardExtraLines(person({ model: null, pile: 0 }), costFrame, NEW_UI), [`${NEW_UI.cost.title} 12.3M`]);
+  assert.deepEqual(cardExtraLines(person({ model: 'other', pile: 1 }), null, NEW_UI), ['기타 모델', '서류 조금', `${NEW_UI.cost.title} ${NEW_UI.cost.empty}`], 'no frame yet: the empty mark');
+  assert.deepEqual(cardExtraLines(null, costFrame, NEW_UI), []);
+  assert.deepEqual(cardExtraLines(person({ model: 'opus', pile: 2 }), costFrame, { badge: NEW_UI.badge, pile: NEW_UI.pile }), ['Opus', '서류 보통'], 'no cost config: no cost row');
 });

@@ -1,5 +1,7 @@
 // Lobby (1F) helpers (pure): who stands in the lobby, where they sit, and every number and line the status wall shows.
 // Everything here works on the snapshot the page already has (floors and their agents) plus the clock; nothing is drawn.
+// The last section (labour cost) also holds the one effects area of this package, initCost(ctx): the only code here that touches the page.
+import { costView, floorTokens } from './cost-view.mjs';
 
 const BUSY = new Set(['working', 'thinking']);
 const WAITING = new Set(['idle', 'enter', 'stale']);
@@ -274,3 +276,207 @@ export function clockParts(now, days) {
 
 /** Milliseconds to the next full minute (at least 1 s, so a tick right on the boundary does not fire twice). */
 export const msToNextMinute = (now) => Math.max(1000, 60000 - (now % 60000));
+
+// ---- 인건비 (labour cost): what the wall, the floor detail window and the card share ----
+
+/** The latest `cost` frame, floor views and ui.cost (null before initCost) the page has. The detail window and the card read it while open (onLive); initCost keeps it current. */
+export const live = { cost: null, floors: [], cfg: null };
+const liveSubs = new Set();
+
+/** Calls `fn(live)` whenever the cost frame or the floors change; returns the way to stop. */
+export function onLive(fn) {
+  liveSubs.add(fn);
+  return () => liveSubs.delete(fn);
+}
+
+function setLive(patch) {
+  Object.assign(live, patch);
+  for (const fn of [...liveSubs]) fn(live);
+}
+
+/** The figure at the start of a floor's line of the index panel: its new tokens today, 「—」 when the frame does not list the floor, the scanning word while counting. */
+export function floorFigure(view, frame, sessionId, cfg) {
+  const n = floorTokens(frame, sessionId);
+  return view.state === 'ready' && n === null ? cfg.empty : view.text(n ?? 0);
+}
+
+/**
+ * The rows of the cost page of the wall: up to `max` people of the frame's top list as cells in the columns of the employee table
+ * (이름, 층, 구분 = the floor's name, 상태, 지금 하는 일, 근무 시간 = the tokens, 보고). A person whose floor has left has no floor number and no click target.
+ * `view` = costView(), `floors` = the floor views, `L` = ui.lobby. Nothing while the figures are not final (scanning) or absent.
+ */
+export function costPageRows(view, floors, L, max) {
+  if (view.state !== 'ready') return [];
+  const floorNo = new Map(floors.map((f) => [f.sessionId, f.floorNo]));
+  return view.top.slice(0, max).map((p) => {
+    const n = floorNo.get(p.sessionId);
+    const cells = [p.name, n ? fill(L.floorLabel, { n }) : '', p.floorName, '', '', p.text, ''];
+    return { sid: n ? p.sessionId : '', cells, text: cells.join('|') };
+  });
+}
+
+/**
+ * One tick of the cost page's rotation, run just after the table flips its page. `shown`: the cost page is on the wall now; `pages`, `page`: the table's paging
+ * after the flip. The cost page is the page after the table's last: it comes up when the table wraps to its first page (that page is held back by
+ * rewinding the table to its last one, so the next flip shows it) and goes away on the next tick. A table of one page just alternates.
+ * Returns {show, rewind}: whether the cost page is shown from now on, and the page the table must be put back to (or null).
+ */
+export function costPageStep(shown, pages, page) {
+  if (shown) return { show: false, rewind: null };
+  if (pages <= 1) return { show: true, rewind: null };
+  return page === 0 ? { show: true, rewind: pages - 1 } : { show: false, rewind: null };
+}
+
+const SETTLE_MS = 100; // the look at the paging comes this long after the table's own flip
+const mkNode = (doc, tag, cls, text) => {
+  const n = doc.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+};
+const setText = (node, text) => {
+  if (node.textContent !== text) node.textContent = text;
+};
+
+/**
+ * Effects area (registered in areas.mjs, but nothing here is an effect: the numbers draw with the effects switch off too). It keeps `live` current and lays the
+ * labour cost onto the wall that app.mjs builds, using only nodes the wall already has and classes style.css already styles:
+ *   - centre screen: a cost page after the last page of the employee table (title and the day's total, then the top people),
+ *   - right screen: each floor line starts with that floor's new tokens today (the app rewrites the line's title; a MutationObserver puts the figure back),
+ *   - the third ticker: the one-line sentence (total, same hour last week, difference).
+ * The table keeps its own timer (the app's); the rotation here follows it with one timer of its own, only while the lobby is shown.
+ */
+export function initCost(ctx) {
+  const cfg = ctx.ui.cost;
+  const L = ctx.ui.lobby;
+  if (!cfg || !L) return;
+  live.cfg = cfg;
+  let att = null; // {lb, w, box, total, rows, empty, hide, news, obs, last, base, shown, timer}
+  const view = () => costView(live.cost, cfg);
+  const active = () => !!att && ctx.floorActive(att.lb);
+
+  function build(lb) {
+    const center = lb.wall.boxes?.get('center');
+    if (!center || !lb.wall.rows) return { box: null };
+    const doc = center.el.ownerDocument;
+    const box = mkNode(doc, 'div', 'ic-page');
+    box.hidden = true;
+    const hd = mkNode(doc, 'div', 'led-hd');
+    const total = mkNode(doc, 'span', 'pg num');
+    hd.append(mkNode(doc, 'b', '', cfg.title), total);
+    const empty = mkNode(doc, 'div', 'led-empty');
+    const rows = lb.wall.rows.map(() => {
+      const row = mkNode(doc, 'div', 'lr');
+      for (const c of ['c-name', 'c-floor', 'c-rank', 'c-state', 'c-task', 'c-time c-num', 'c-rep']) row.append(mkNode(doc, 'span', c));
+      row.tabIndex = 0;
+      row.setAttribute('role', 'button');
+      row.hidden = true;
+      return row;
+    });
+    box.append(hd, ...rows, empty);
+    const hide = [...center.el.children].filter((n) => !n.classList.contains('led-hd'));
+    center.el.append(box);
+    return { box, total, rows, empty, hide };
+  }
+
+  function paintPage(v) {
+    if (!att.box) return;
+    const rows = costPageRows(v, live.floors, L, att.rows.length);
+    setText(att.total, v.total);
+    att.empty.hidden = rows.length > 0;
+    setText(att.empty, v.state === 'scanning' ? cfg.scanning : cfg.empty);
+    att.rows.forEach((row, i) => {
+      row.hidden = i >= rows.length;
+      if (i >= rows.length) return;
+      rows[i].cells.forEach((c, j) => setText(row.children[j], c));
+      if (rows[i].sid) row.dataset.sid = rows[i].sid;
+      else delete row.dataset.sid;
+    });
+  }
+
+  function setShown(on) {
+    if (!att.box || att.shown === on) return;
+    att.shown = on;
+    for (const n of att.hide) n.style.display = on ? 'none' : '';
+    att.lb.wall.page.style.visibility = on ? 'hidden' : ''; // the table's 「1/3」 would name the wrong page
+    att.box.hidden = !on;
+    if (on) paintPage(view());
+  }
+
+  /** A floor line of the index panel: the figure, then the title the app wrote. */
+  function fixFloor(ft, v) {
+    const row = ft.parentElement;
+    if (!row?.dataset.sid || row.hidden) return;
+    const base = ft.textContent === att.last.get(ft) ? att.base.get(ft) : ft.textContent; // the text is mine, or the app wrote a new title
+    const next = `${floorFigure(v, live.cost, row.dataset.sid, cfg)} ${base}`;
+    att.base.set(ft, base);
+    att.last.set(ft, next);
+    setText(ft, next);
+  }
+
+  function paintWall() {
+    if (!att) return;
+    const v = view();
+    for (const row of att.lb.wall.idxRows ?? []) fixFloor(row.children[2], v);
+    if (att.news) setText(att.news, v.news);
+    if (att.shown) paintPage(v);
+  }
+
+  function onMutations(records) {
+    if (!att) return;
+    const v = view();
+    for (const t of new Set(records.map((m) => m.target))) {
+      if (t === att.news) setText(t, v.news);
+      else fixFloor(t, v);
+    }
+  }
+
+  function attach() {
+    const lb = ctx.lobby();
+    if (!lb?.wall || att?.lb === lb) return;
+    att = { lb, ...build(lb), news: lb.wall.tickers?.[2] ?? null, last: new WeakMap(), base: new WeakMap(), shown: false, timer: 0 };
+    att.obs = new MutationObserver(onMutations);
+    for (const row of lb.wall.idxRows ?? []) att.obs.observe(row.children[2], { childList: true, characterData: true });
+    if (att.news) att.obs.observe(att.news, { childList: true, characterData: true });
+    paintWall();
+  }
+
+  /** The next look at the table's paging: just after its next flip (it has none while it is one page long). */
+  function schedule() {
+    if (att?.timer) ctx.timers.clearTimeout(att.timer);
+    if (att) att.timer = 0;
+    if (!active() || !att.box) return;
+    const wait = att.lb.pageAt > ctx.now() ? att.lb.pageAt - ctx.now() + SETTLE_MS : L.pageSeconds * 1000;
+    att.timer = ctx.timers.setTimeout(tick, wait, att.lb.sid);
+  }
+
+  function tick() {
+    att.timer = 0;
+    if (!active()) return;
+    const step = costPageStep(att.shown, att.lb.pages, att.lb.page);
+    if (step.rewind !== null) att.lb.page = step.rewind;
+    setShown(step.show);
+    schedule();
+  }
+
+  ctx.onServer('cost', (frame) => {
+    setLive({ cost: frame });
+    paintWall();
+  });
+  ctx.onState((list) => {
+    setLive({ floors: list });
+    paintWall();
+  });
+  for (const name of ['floor-shown', 'floor-hidden']) {
+    ctx.fx.onFx(name, ({ floor }) => {
+      attach();
+      if (!att || floor !== att.lb) return;
+      setShown(false);
+      paintWall();
+      schedule();
+    }, { always: true }); // the numbers are information: they draw with the effects switch off too
+  }
+  ctx.onPauseChange(() => schedule());
+  attach();
+  schedule(); // the lobby may already be on show
+}
