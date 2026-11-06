@@ -23,6 +23,7 @@ export const INDEX_HTML = String.raw`<!doctype html>
 <link rel="stylesheet" href="/web/conflict.css">
 <link rel="stylesheet" href="/web/actor.css">
 <link rel="stylesheet" href="/web/commute.css">
+<link rel="stylesheet" href="/web/building.css">
 </head>
 <body>
 <header id="topbar">
@@ -30,6 +31,7 @@ export const INDEX_HTML = String.raw`<!doctype html>
     <button id="tab-lobby" class="tab lobby" type="button" aria-pressed="false" hidden></button>
     <span id="tab-list"></span>
     <button id="view-all" type="button" aria-pressed="true" title="모든 층을 쌓아서 보기">전체</button>
+    <button id="tab-ceo" class="tab ceo" type="button" aria-pressed="false" hidden></button>
   </nav>
   <div class="tb-right">
     <div id="snacks" role="group" aria-label="간식 주기">

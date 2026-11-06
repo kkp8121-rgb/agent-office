@@ -395,7 +395,7 @@
           "building": { "enabled": true, "mode": "grow", "allTitle": "건물 단면", "innerW": 1024, "facadePx": 40, "shaftPx": 72, "slabPx": 10, "roofPx": 150, "basementPx": 170,
                         "minZoom": 0.32, "maxZoom": 1, "maxLiveFloors": 8, "liveMarginPx": 200, "slideMs": 600, "craneMs": 1800, "collapseMs": 600,
                         "carPxPerSec": 900, "carMinMs": 400, "carMaxMs": 2500, "lobbyFigures": false, "idleNightDim": 0.25, "roofSpots": 4,
-                        "entryAt": { "studio2": null, "lounge": null, "library": null, "greenhouse": null, "ceo": null },
+                        "entryAt": { "studio2": [925, 338], "lounge": [828, 455], "library": [925, 440], "greenhouse": [852, 380], "ceo": [925, 338] },
                         "basement": { "racks": 8, "blinkSlowMs": 1600, "blinkFastMs": 300, "none": "—" } },
           "bellMeeting": { "label": "회의 소집 종", "busyText": "회의 중", "restText": "점심시간이라 쉬는 중", "sayMs": 2600, "gapMs": 300, "maxSpeakers": 7, "cooldownMs": 20000,
                            "at": { "studio2": null, "lounge": null, "library": null, "greenhouse": null } },

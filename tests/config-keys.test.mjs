@@ -157,11 +157,11 @@ ui.building.carMaxMs number
 ui.building.lobbyFigures boolean
 ui.building.idleNightDim number
 ui.building.roofSpots number
-ui.building.entryAt.studio2 null
-ui.building.entryAt.lounge null
-ui.building.entryAt.library null
-ui.building.entryAt.greenhouse null
-ui.building.entryAt.ceo null
+ui.building.entryAt.studio2 array
+ui.building.entryAt.lounge array
+ui.building.entryAt.library array
+ui.building.entryAt.greenhouse array
+ui.building.entryAt.ceo array
 ui.building.basement.racks number
 ui.building.basement.blinkSlowMs number
 ui.building.basement.blinkFastMs number

@@ -1,0 +1,97 @@
+/* The building cross-section (web/building-view.mjs). Every class here starts with b-.
+   The floors stay children of #floors in every view; the pieces of the building (class b-piece: roof, shaft, car, facade windows, slabs, basement) are
+   children of #floors too and are not drawn at all until the whole building is shown (#floors.b-on), so the single-floor view lays out as it always did. */
+#floors > .b-piece { display: none; }
+
+#floors.b-on { display: block; position: relative; overflow: hidden; }
+#floors.b-on.b-scroll { overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+#floors.b-on { --b-move: 0ms; }
+/* a floor of the building: absolute, scaled to the inner width (the lobby is wider), in its own stacking context so the dimming lies over everything in it */
+#floors.b-on > .floor {
+  position: absolute; left: var(--b-facade); isolation: isolate; z-index: 1; transform: scale(var(--b-s, 1)); transform-origin: 0 0;
+  transition: top var(--b-move) ease-in-out, clip-path var(--b-move) ease-in-out, opacity .6s;
+}
+#floors.b-on > .floor.b-drop { z-index: 0; }
+#floors.b-on > .floor.b-fold { clip-path: inset(0 0 100% 0); }
+#floors.b-on > .floor::after { content: ""; position: absolute; inset: 0; z-index: 99990; pointer-events: none; background: rgb(6, 9, 28); opacity: var(--b-dim, 0); }
+/* a floor that stands still keeps its picture but nothing moves in it (and the browser may skip painting it while it is off screen) */
+#floors.b-on > .floor.still *, #floors.b-on > .floor.still *::before, #floors.b-on > .floor.still *::after { animation-play-state: paused !important; transition: none !important; }
+#floors.b-on > .floor.still { content-visibility: auto; }
+
+#floors.b-on > .b-roof { display: block; position: absolute; left: 0; top: 0; width: var(--b-w); z-index: 5; pointer-events: none; }
+.b-roof-img { position: absolute; left: var(--b-facade); top: 0; image-rendering: pixelated; }
+.b-crane-arm, .b-cable { display: none; }
+.fx-on .b-crane-arm { display: block; position: absolute; left: calc(var(--b-facade) + 783px); top: 3px; image-rendering: pixelated; }
+.fx-on .b-cable { display: block; position: absolute; left: calc(var(--b-facade) + 797px); top: 52px; width: 2px; height: 0; background: #2b2b2b; }
+.b-hook { position: absolute; left: -6px; bottom: -62px; image-rendering: pixelated; }
+.b-cable.run { animation: b-cable var(--b-crane-ms, 1800ms) ease-in-out; }
+@keyframes b-cable { 0% { height: 0; } 55% { height: var(--b-drop, 200px); } 100% { height: 0; } }
+
+#floors.b-on > .b-win {
+  display: block; position: absolute; left: 0; width: var(--b-facade); z-index: 2; overflow: hidden; background-color: #b9ad94;
+  background-repeat: no-repeat; background-position: center; background-size: 40px 140px; image-rendering: pixelated;
+  transition: top var(--b-move) ease-in-out, height var(--b-move) ease-in-out;
+}
+.b-win-day { background-image: url(/assets/building/facade-window-day.png); }
+.b-win-night-on { background-image: url(/assets/building/facade-window-night-on.png); background-color: #6f6553; }
+.b-win-night-off { background-image: url(/assets/building/facade-window-night-off.png); background-color: #6f6553; }
+#floors.b-on > .b-slab {
+  display: block; position: absolute; left: 0; width: var(--b-w); height: var(--b-slab); z-index: 2; background: #4a4036;
+  transition: top var(--b-move) ease-in-out, opacity var(--b-move) ease-in-out;
+}
+
+#floors.b-on > .b-shaft {
+  display: block; position: absolute; left: calc(var(--b-facade) + var(--b-inner)); width: var(--b-shaftw); z-index: 1;
+  background: repeating-linear-gradient(to bottom, #2c3340 0 14px, #262c37 14px 16px); box-shadow: inset 2px 0 0 #1b1f27;
+}
+#floors.b-on > .b-sdoor {
+  display: block; position: absolute; left: calc(var(--b-facade) + var(--b-inner) + (var(--b-shaftw) - 64px) / 2); z-index: 3; image-rendering: pixelated;
+  transition: top var(--b-move) ease-in-out, opacity .3s;
+}
+#floors.b-on > .b-sdoor.open { opacity: .15; }
+#floors.b-on > .b-car {
+  display: block; position: absolute; left: calc(var(--b-facade) + var(--b-inner) + (var(--b-shaftw) - 64px) / 2); z-index: 4; image-rendering: pixelated;
+  transition: top var(--b-move) ease-in-out;
+}
+
+#floors.b-on > .b-base { display: block; position: absolute; left: 0; width: var(--b-w); z-index: 2; background: #365172; overflow: hidden; --b-blink: 1600ms; }
+.b-base-img { position: absolute; left: var(--b-facade); top: 0; image-rendering: pixelated; }
+.b-rack { position: absolute; width: 56px; height: 96px; image-rendering: pixelated; }
+.b-rack img { position: absolute; left: 0; top: 0; image-rendering: pixelated; }
+.b-rack .b-rack-on { display: none; }
+.b-rack.on .b-rack-on { display: block; }
+.b-rack.on .b-rack-off { display: none; }
+/* the LEDs of a lit rack blink in steps; with the effects off the lit picture just stays */
+.fx-on .b-rack.on .b-rack-off { display: block; animation: b-blink var(--b-blink) steps(1, end) infinite; }
+@keyframes b-blink { 0% { opacity: 0; } 50% { opacity: 1; } }
+.b-base.still *, .b-roof.still * { animation-play-state: paused !important; }
+.b-sys {
+  position: absolute; left: calc(var(--b-facade) + 12px); top: 8px; z-index: 3; display: flex; align-items: center; gap: 10px; padding: 3px 10px;
+  background: rgba(10, 16, 28, .82); border: 2px solid #8793a6; color: #e8efff; font: 700 18px/1.2 system-ui, "Malgun Gothic", sans-serif;
+}
+.b-sys-bar { width: 120px; height: 10px; background: #1a2230; border: 1px solid #8793a6; }
+.b-sys-fill { height: 100%; width: 0; background: #5fd38c; }
+
+.b-wait { visibility: hidden; }
+/* the door cover and its panel of the single-floor view are not drawn in the building: the shaft is the door */
+#floors.b-on .cm-door, #floors.b-on .cm-panel { display: none; }
+
+/* the whole building slides to the chosen floor before the single view shows it (translate, so the floors' own transform stays) */
+#floors.b-slide > * { translate: 0 var(--b-dy, 0px); transition: translate var(--b-slide-ms, 600ms) ease-in-out; }
+
+/* single floor to single floor: the old one slides out while the new one comes in (ui.building.slideMs) */
+#floors.b-sliding { position: relative; overflow: hidden; }
+#floors.b-sliding > .floor.b-out { position: absolute; left: 0; top: 0; }
+.floor.b-out { transition: transform var(--b-slide, 600ms) ease-in-out; }
+.floor.b-to-bottom { transform: translateY(110%); }
+.floor.b-to-top { transform: translateY(-110%); }
+.floor.b-from-top { animation: b-from-top var(--b-slide, 600ms) ease-in-out; }
+.floor.b-from-bottom { animation: b-from-bottom var(--b-slide, 600ms) ease-in-out; }
+@keyframes b-from-top { from { transform: translateY(-110%); } to { transform: none; } }
+@keyframes b-from-bottom { from { transform: translateY(110%); } to { transform: none; } }
+
+#topbar .tab.ceo { border-bottom-color: var(--c); }
+
+@media (prefers-reduced-motion: reduce) {
+  .b-cable.run, .fx-on .b-rack.on .b-rack-off { animation: none; }
+}
