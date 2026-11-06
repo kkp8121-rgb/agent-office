@@ -465,7 +465,7 @@ export function init(ctx) {
     const recs = ctx.life.members(f);
     const members = recs.map((rec) => ({
       id: idOf(rec), state: rec.state, isLead: rec.isLead, x: rec.x, y: rec.y, rec,
-      free: isFree({ ...rec, busy: acts.has(rec) || pending.has(rec), gone: rec.el.classList.contains('gone') }),
+      free: isFree({ ...rec, busy: acts.has(rec) || pending.has(rec) || (ctx.gesture ? !ctx.gesture.canAmbient(rec) : false), gone: rec.el.classList.contains('gone') }), // a stronger gesture (ctx.gesture) holds it: not free
     }));
     const desks = [];
     for (const m of members) {

@@ -29,6 +29,9 @@ import { init as initFxEvents } from './fx-events.mjs';
 import { init as initFxLed } from './fx-led.mjs';
 import { init as initFxHit } from './fx-hit.mjs';
 import { init as initOfficeLife } from './officelife.mjs';
+import { AREAS, SERVER_EVENTS } from './areas.mjs';
+import { createGestures } from './gesture.mjs';
+import { keepOpen, takeWhilePaused } from './keepalive.mjs';
 import { bindTag, createCard } from './card.mjs';
 import { createBoardPanel } from './board-panel.mjs';
 
@@ -144,18 +147,23 @@ let amb = null; // ui.ui.ambient (scaled down under ?debug=ambient)
 let catC = null; // ui.ui.cat (scaled down under ?debug=ambient)
 let cat = null; // the office cat: {rec, frec, timer, leaveAt, spotId, poke, force}; see "office cat"
 let sitSet = new Set(); // sprite keys that have a seated picture
-const liveTimers = new Map(); // token -> {win, id, fire, at}: pending timers (the ?debug=ambient counter reads this)
+const liveTimers = new Map(); // token -> {win, id, fire, at, floorId}: pending timers (the ?debug=ambient counter reads this)
 let timerToken = 0;
+const serverFns = new Map(); // server event type -> Set of listeners (ctx.onServer)
+const stateFns = new Set(); // listeners of ctx.onState
+let gestures = null; // the gesture arbiter (ctx.gesture), made with the effects context
+let keepAliveOn = false; // ctx.keepAlive: a hidden tab keeps its stream (the call-alert switch)
+let hiddenStream = false; // the stream was left open by pause(): only `state` frames are taken
 // While the small window is open its timers are used: a hidden opener tab gets its timers throttled (once a second, later once a minute).
 const clockTimers = {
-  setTimeout: (fn, ms) => {
+  setTimeout: (fn, ms, floorId = '_') => { // floorId: the floor the timer works for (ctx.timers; '_' = none), counted by ?debug=ambient timersByFloor()
     const win = pipWin ?? window;
     const token = ++timerToken;
     const fire = () => {
       liveTimers.delete(token);
       fn();
     };
-    liveTimers.set(token, { win, id: win.setTimeout(fire, ms), fire, at: Date.now() + ms });
+    liveTimers.set(token, { win, id: win.setTimeout(fire, ms), fire, at: Date.now() + ms, floorId });
     return token;
   },
   clearTimeout: (token) => {
@@ -207,6 +215,11 @@ function setupScenes() {
   if (DEBUG_AMBIENT) {
     window.__ambient = {
       timers: () => liveTimers.size,
+      timersByFloor: () => {
+        const by = {};
+        for (const t of liveTimers.values()) by[t.floorId] = (by[t.floorId] ?? 0) + 1;
+        return by;
+      },
       away: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.away).length, 0),
       held: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.press || a.grab).length, 0),
       busy: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.press || a.grab || a.play || a.say || a.steam || a.mood).length, 0),
@@ -587,6 +600,7 @@ function playFidget(rec, name) {
 function doFidget(frec, rec) {
   rec.m.nextFidgetAt = Date.now() + between(rec.rng, amb.fidgetEveryMs);
   if (rec.walk || rec.away || rec.grab || rec.play || rec.state === 'done' || rec.el.classList.contains('walking')) return;
+  if (gestures && !gestures.canAmbient(rec)) return; // a stronger gesture holds the character
   if (fidgetPickers.size && firstFrom(fidgetPickers, frec, rec)) return; // effects: the office life area did its own
   playFidget(rec, chooseFidget(rec.rng, rec.seated, amb));
 }
@@ -659,7 +673,7 @@ function startLeg(frec, rec) {
 
 function doTrip(frec, rec) {
   const range = tripRange(amb, whoOf(frec, rec));
-  const legs = range && !rec.walk && !rec.away && !rec.grab && !rec.play && rec.arrived && rec.state !== 'done' ? pickLegs(frec, rec) : null;
+  const legs = range && !rec.walk && !rec.away && !rec.grab && !rec.play && rec.arrived && rec.state !== 'done' && (!gestures || gestures.canAmbient(rec)) ? pickLegs(frec, rec) : null;
   if (!legs?.length) return scheduleTrip(frec, rec);
   rec.away = true;
   rec.trip = { legs, i: 0, cur: null };
@@ -3065,6 +3079,7 @@ function render(state) {
   lobbySync(list);
   card?.refresh();
   boardPanel?.refresh();
+  for (const fn of stateFns) fn(list, { hidden: false });
 }
 
 async function refreshState() {
@@ -3164,12 +3179,21 @@ function connect() {
   clearTimeout(retryTimer);
   es = new EventSource('/api/events');
   es.addEventListener('open', () => { connEl.hidden = true; });
-  es.addEventListener('state', (ev) => render(JSON.parse(ev.data)));
-  es.addEventListener('log', (ev) => appendLog(JSON.parse(ev.data)));
-  es.addEventListener('phase', (ev) => onPhase(JSON.parse(ev.data)));
-  es.addEventListener('fail', (ev) => onFail(JSON.parse(ev.data)));
-  es.addEventListener('weather', (ev) => onWeather(JSON.parse(ev.data)));
-  es.addEventListener('sysload', (ev) => { sysLoad = JSON.parse(ev.data); emitFx('sysload', { cpu: sysLoad.cpu, mem: sysLoad.mem }); if (lobby?.wall) drawSys(); });
+  // A tab hidden with its stream kept (ctx.keepAlive) takes `state` frames only and draws nothing; every other frame is dropped.
+  const drop = (type) => hiddenStream && !takeWhilePaused(type);
+  es.addEventListener('state', (ev) => {
+    const state = JSON.parse(ev.data);
+    if (!hiddenStream) return render(state);
+    lastNow = state.now;
+    const list = state.floors.filter((f) => !forcedHidden.has(f.sessionId));
+    for (const fn of stateFns) fn(list, { hidden: true });
+  });
+  es.addEventListener('log', (ev) => { if (!drop('log')) appendLog(JSON.parse(ev.data)); });
+  es.addEventListener('phase', (ev) => { if (!drop('phase')) onPhase(JSON.parse(ev.data)); });
+  es.addEventListener('fail', (ev) => { if (!drop('fail')) onFail(JSON.parse(ev.data)); });
+  es.addEventListener('weather', (ev) => { if (!drop('weather')) onWeather(JSON.parse(ev.data)); });
+  es.addEventListener('sysload', (ev) => { if (drop('sysload')) return; sysLoad = JSON.parse(ev.data); emitFx('sysload', { cpu: sysLoad.cpu, mem: sysLoad.mem }); if (lobby?.wall) drawSys(); });
+  for (const type of SERVER_EVENTS) es.addEventListener(type, (ev) => { if (!drop(type)) for (const fn of serverFns.get(type) ?? []) fn(JSON.parse(ev.data)); });
   es.addEventListener('error', () => {
     showConn('연결이 끊겼습니다. 다시 연결하는 중…');
     // The browser retries by itself unless the server refused the stream (then the state is CLOSED).
@@ -3185,7 +3209,8 @@ function pause() {
   stopLobbyLife();
   if (skyTimer) clockTimers.clearTimeout(skyTimer);
   skyTimer = 0;
-  if (es) es.close();
+  hiddenStream = Boolean(es) && es.readyState !== 2 && keepOpen({ hidden: document.hidden, pip: pipWin !== null, alerts: keepAliveOn });
+  if (es && !hiddenStream) es.close();
   document.body.classList.add('paused');
   notePause(true);
   closeBig();
@@ -3198,6 +3223,10 @@ function pause() {
 }
 
 async function resume() {
+  if (hiddenStream) { // the kept stream is closed and opened again below, so the log has no gap
+    hiddenStream = false;
+    es.close();
+  }
   document.body.classList.remove('paused');
   notePause(false);
   connEl.hidden = true;
@@ -3421,6 +3450,9 @@ function cardWho(rec) {
 
 /** Everything an effects area may use of the office, so it never reaches into this file (the typedef in web/fx.mjs is the documentation). */
 function buildFxCtx() {
+  gestures = createGestures(ui.ui.gesture.priority, clearGestures);
+  let stateAt = Date.now(); // when the last state frame (shown or not) arrived: ctx.serverNow() counts on from lastNow
+  stateFns.add(() => { stateAt = Date.now(); });
   const floorList = () => [...floorRecs.values(), ...(lobby ? [lobby] : [])];
   const charList = (floor) => (floor ? [...(floor.agents ?? floor.chars).values()] : [...floorList().flatMap((f) => [...(f.agents ?? f.chars).values()]), ...(cat ? [cat.rec] : [])]);
   const hook = (set) => (fn) => {
@@ -3437,6 +3469,37 @@ function buildFxCtx() {
     chars: charList,
     bySprite: (key) => charList().filter((r) => r.sprite === key),
     recOf: (e) => recOf.get(e),
+    onServer: (type, fn) => {
+      if (!serverFns.has(type)) serverFns.set(type, new Set());
+      serverFns.get(type).add(fn);
+      return () => serverFns.get(type).delete(fn);
+    },
+    onState: hook(stateFns),
+    view: (sessionId) => lastFloors.get(sessionId) ?? null,
+    serverNow: () => lastNow + (Date.now() - stateAt),
+    gesture: gestures,
+    signSlot: (frec, kind) => { // the `kind` cell in the row of the floor's name plate (cells keep the ui.signSlots order, made when first asked for)
+      const order = ui.ui.signSlots;
+      const sign = frec.fno?.parentElement;
+      if (!sign || !order.includes(kind)) return null;
+      let slot = [...sign.children].find((c) => c.dataset.slot === kind);
+      if (!slot) {
+        slot = el('span', 'sign-slot');
+        slot.dataset.slot = kind;
+        sign.insertBefore(slot, [...sign.children].find((c) => order.indexOf(c.dataset.slot) > order.indexOf(kind)) ?? null);
+      }
+      return slot;
+    },
+    keepAlive: {
+      set: (on) => {
+        keepAliveOn = Boolean(on);
+        if (!keepAliveOn && hiddenStream) { // the switch went off while the stream was kept: let it go
+          hiddenStream = false;
+          es.close();
+        }
+      },
+      on: () => keepAliveOn,
+    },
     cat: () => cat,
     line,
     addLinePicker: hook(linePickers),
@@ -3476,11 +3539,21 @@ function buildFxCtx() {
 /** Starts every effects area once; an area that fails to start is reported and skipped, the office goes on. */
 function initFxAreas() {
   const ctx = buildFxCtx();
+  const started = new Set();
   for (const init of [initFxWeather, initFxChars, initFxEvents, initFxLed, initFxHit, initOfficeLife]) {
     try {
       init(ctx);
+      started.add(init);
     } catch (err) {
       console.error('효과 영역을 시작하지 못했습니다:', err);
+    }
+  }
+  for (const { name, init } of AREAS) { // the areas added after the first six (areas.mjs lists all of them, in this order)
+    if (started.has(init)) continue;
+    try {
+      init(ctx);
+    } catch (err) {
+      console.error(`효과 영역을 시작하지 못했습니다 (${name}):`, err);
     }
   }
 }
