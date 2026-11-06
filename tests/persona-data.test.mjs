@@ -26,11 +26,21 @@ const expectedKeys = new Set([
   ...Object.values(config.roles).map((r) => r.key),
   'cat',
 ]);
+const CEO = config.ui.ceo.sprite;
 const people = Object.keys(P).filter((k) => k !== 'cat');
 
-test('version is 1 and persona keys equal the sprite keys', () => {
+test('the pool keeps 35 sprite keys', () => {
   assert.equal(persona.version, 1);
-  assert.deepEqual(new Set(Object.keys(P)), expectedKeys);
+  assert.equal(expectedKeys.size, 35);
+  assert.deepEqual(new Set(Object.keys(P)), new Set([...expectedKeys, CEO]));
+});
+
+test('the ceo key is the separate ceo.sprite and not in leads, extras or roles', () => {
+  assert.equal(CEO, 'ceo');
+  assert.ok(!expectedKeys.has(CEO));
+  assert.equal(P[CEO].type, 'proud');
+  assert.equal(P[CEO].voice, 0.9);
+  assert.deepEqual(P[CEO].snack.love, ['coffee']);
 });
 
 test('type, voice, about and hitWords are valid', () => {

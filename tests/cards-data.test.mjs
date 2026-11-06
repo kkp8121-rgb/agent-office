@@ -8,15 +8,24 @@ import { ROOT, cfg } from './helpers/fixture.mjs';
 const data = JSON.parse(readFileSync(join(ROOT, 'cards.json'), 'utf8'));
 const cards = data.cards;
 const len = (s) => Array.from(s).length;
-const KEYS = [...new Set([...Object.values(cfg.roles).map((r) => r.key), ...cfg.leads.map((l) => l.key), ...cfg.extras.map((e) => e.key), 'cat'])];
+const POOL = [...new Set([...Object.values(cfg.roles).map((r) => r.key), ...cfg.leads.map((l) => l.key), ...cfg.extras.map((e) => e.key), 'cat'])];
+const CEO = cfg.ui.ceo.sprite;
+const KEYS = [...POOL, CEO];
 const LIMITS = { age: 10, birthplace: 14, hair: 10, eye: 10, height: 10, weight: 14, bio: 120 };
 const SKILL_COUNT = [2, 4];
 const SKILL_MAX = 16;
 
-test('cards.json has version 1 and one card for each of the 35 sprite keys', () => {
+test('the pool keeps 35 sprite keys', () => {
   assert.equal(data.version, 1);
-  assert.equal(KEYS.length, 35);
+  assert.equal(POOL.length, 35);
   assert.deepEqual(Object.keys(cards).sort(), [...KEYS].sort());
+});
+
+test('the ceo key is the separate ceo.sprite and not in leads, extras or roles', () => {
+  assert.equal(CEO, 'ceo');
+  assert.ok(!POOL.includes(CEO));
+  assert.equal(cards[CEO].age, '비밀');
+  assert.equal(cards[CEO].birthplace, '비밀');
 });
 
 test('every field is a non-empty string within its limit', () => {
