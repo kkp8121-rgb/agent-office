@@ -46,6 +46,7 @@ const costFrames = (text) =>
   text.split('\n\n').filter((b) => b.startsWith('event: cost')).map((b) => JSON.parse(b.split('\n')[1].slice(6)));
 const pings = (text) => text.split(': ping').length - 1;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const waitFor = async (cond, ms = 2000) => { const end = Date.now() + ms; while (!cond()) { if (Date.now() > end) return false; await sleep(5); } return true; };
 
 test('cost-frame: cost is sent once on connect', async (t) => {
   const c = await start(t);
@@ -81,8 +82,9 @@ test('cost-frame: cost is sent once on connect', async (t) => {
 test('cost-frame: an unchanged value sends nothing on the next tick', async (t) => {
   const c = await start(t);
   c.ledger.add(use(T0 - HOUR, 'm1', 1000));
-  const got = sse(c, (x) => pings(x) >= 3);
-  await sleep(10);
+  let text = '';
+  const got = sse(c, (x) => { text = x; return pings(x) >= 3; });
+  await waitFor(() => costFrames(text).length >= 1);
   c.time.now += c.cfg.cost.sendMinMs * 2; // long enough since the last frame
   c.server.broadcast(); // the ledger has not changed
   c.ledger.add(use(T0 - HOUR, 'm1', 1000)); // the same message again: not counted, nothing changes
@@ -97,7 +99,7 @@ test('cost-frame: a change inside sendMinMs is held', async (t) => {
   const seen = [];
   let text = '';
   const got = sse(c, (x) => { text = x; return pings(x) >= 5; });
-  await sleep(10);
+  await waitFor(() => costFrames(text).length >= 1);
   assert.equal(costFrames(text).length, 1);
   c.ledger.add(use(T0 - HOUR, 'm2', 500));
   c.time.now = T0 + c.cfg.cost.sendMinMs - 1; // not yet sendMinMs since the frame on connect
@@ -107,7 +109,7 @@ test('cost-frame: a change inside sendMinMs is held', async (t) => {
   seen.push(costFrames(text).length);
   c.time.now = T0 + c.cfg.cost.sendMinMs; // now it may go
   c.server.broadcast();
-  await sleep(10);
+  await waitFor(() => costFrames(text).length >= 2);
   seen.push(costFrames(text).length);
   c.time.now += c.cfg.cost.sendMinMs;
   c.server.broadcast(); // and then it is quiet again
@@ -126,7 +128,7 @@ test('cost-frame: a new hour resends the frame without new usage, an unchanged h
   c.ledger.add(use(T0 - HOUR, 'm1', 1000));
   let text = '';
   const got = sse(c, (x) => { text = x; return pings(x) >= 6; });
-  await sleep(10);
+  await waitFor(() => costFrames(text).length >= 1);
   assert.equal(costFrames(text).length, 1);
   assert.equal(costFrames(text)[0].lastWeek.tokensSameHour, 300);
   c.time.now = T0 + 50 * 60 * 1000; // 10:50, still the 10 o'clock hour, long after sendMinMs
@@ -135,7 +137,7 @@ test('cost-frame: a new hour resends the frame without new usage, an unchanged h
   assert.equal(costFrames(text).length, 1, 'same hour, no new usage: nothing is sent');
   c.time.now = T0 + HOUR; // 11:00
   c.server.broadcast();
-  await sleep(10);
+  await waitFor(() => costFrames(text).length >= 2);
   assert.equal(costFrames(text).length, 2, 'the hour changed: sent again with no new usage');
   assert.equal(costFrames(text)[1].lastWeek.tokensSameHour, 1000);
   assert.equal(costFrames(text)[1].tokens, 1000, 'nothing else changed');
