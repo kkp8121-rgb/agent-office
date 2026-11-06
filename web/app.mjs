@@ -106,7 +106,7 @@ const recOf = new WeakMap(); // character element -> rec
 
 // ---------- small helpers ----------
 
-/** Scales the floors (CSS zoom) to the room: the widest one down to fit beside the panel (or above it in a narrow window); the single floor shown, or the stack once the panel is hidden, up or down. */
+/** Scales the floors (CSS zoom) to the room: the widest one down to fit beside the panel (or above it in a narrow window); the single floor shown, or the stack once the panel is hidden, up or down (in fullscreen the whole stack fits the screen height too). */
 function fitFloors() {
   const doc = floorsEl.ownerDocument; // the small window's document while the floors are there
   const mini = doc.body.classList.contains('pip-mini');
@@ -130,7 +130,10 @@ function fitFloors() {
     return;
   }
   const widest = Math.max(0, ...[...floorRecs.values()].map((r) => r.scene.r.size[0]));
-  floorsEl.style.zoom = !mini && widest > 0 && !panelEl.offsetWidth ? String(fitBox(availW, Infinity, widest, 0, SINGLE_MAX_ZOOM)) : fitZoom(availW, widest);
+  // fullscreen (or one floor alone): the whole stack has to fit the height too (scaled by width alone it is taller than the screen and the page scrolls); a taller stack in a window scrolls by design
+  const stack = [...floorRecs.values()].filter((r) => !r.off);
+  const stackH = !mini && (doc.body.classList.contains('fs') || stack.length === 1) ? stack.reduce((sum, r) => sum + r.scene.r.size[1], 0) + Math.max(0, stack.length - 1) * parseFloat(getComputedStyle(floorsEl).rowGap) : 0;
+  floorsEl.style.zoom = !mini && widest > 0 && !panelEl.offsetWidth ? String(fitBox(availW, stackH > 0 ? availH : Infinity, widest, stackH, SINGLE_MAX_ZOOM)) : fitZoom(availW, widest);
 }
 
 function showConn(text) {
