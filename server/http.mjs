@@ -73,9 +73,32 @@ function readBody(req, max) {
   });
 }
 
-export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConnect, weather, sysload, personas } = {}) {
+/** The `cost` frame: the ledger's day with names added from what is on screen. Strings in it: day, sessionId, agentKey, name, floorName. */
+function costFrame(today, floors, goneName) {
+  const byId = new Map(floors.map((f) => [f.sessionId, f]));
+  return {
+    day: today.day,
+    tokens: today.tokens,
+    cacheRead: today.cacheRead,
+    lastWeek: today.lastWeek,
+    floors: today.floors.filter((f) => byId.has(f.sessionId)),
+    top: today.top.map((p) => {
+      const floor = byId.get(p.sessionId);
+      const person = p.agentKey === null ? floor?.lead : floor?.agents.find((a) => a.agentId === p.agentKey);
+      return { sessionId: p.sessionId, agentKey: p.agentKey, name: person?.name ?? goneName, floorName: floor?.title ?? '', tokens: p.tokens };
+    }),
+    scanning: today.scanning,
+    partial: today.partial,
+  };
+}
+
+/** `cost` = the CostLedger; `now` = the clock for the cost frame (tests pass their own). */
+export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConnect, weather, sysload, personas, cost, now = Date.now } = {}) {
   const clients = new Set(); // open SSE responses
   let lastStateJson = null; // last floors JSON sent; null = send the next state in full
+  let costVersion = -1; // ledger version of the last cost frame sent to everyone
+  let costJson = null; // that frame
+  let costSentAt = 0;
 
   const server = http.createServer((req, res) => {
     for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
@@ -117,6 +140,16 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
       if (v) res.write(frame('sysload', v));
       sysload.connect();
     }
+    if (cost) { // the day's labour cost, once on connect; broadcast() sends the changes
+      const at = now();
+      const json = JSON.stringify(costFrame(cost.today(at), snap.floors, cfg.ui.cost.goneName));
+      res.write(`event: cost\ndata: ${json}\n\n`);
+      if (clients.size === 1) { // the only client: in sync now
+        costVersion = cost.version;
+        costJson = json;
+        costSentAt = at;
+      }
+    }
     onSseConnect?.();
   }
 
@@ -136,6 +169,17 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
       if (changed) res.write(frame('state', snap));
       if (entries.length) res.write(frame('log', entries));
       for (const sig of signals) res.write(frame(sig.type, sig));
+    }
+    // The cost frame follows the ledger: only after it changed, and not more often than cost.sendMinMs (a change inside that time waits for a later round).
+    if (cost && cost.version !== costVersion && now() - costSentAt >= cfg.cost.sendMinMs) {
+      const at = now();
+      const json = JSON.stringify(costFrame(cost.today(at), snap.floors, cfg.ui.cost.goneName));
+      costVersion = cost.version;
+      if (json !== costJson) {
+        costJson = json;
+        costSentAt = at;
+        for (const res of clients) res.write(`event: cost\ndata: ${json}\n\n`);
+      }
     }
   };
 
