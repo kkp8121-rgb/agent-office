@@ -22,6 +22,7 @@ export const INDEX_HTML = String.raw`<!doctype html>
 <link rel="stylesheet" href="/web/card.css">
 <link rel="stylesheet" href="/web/conflict.css">
 <link rel="stylesheet" href="/web/actor.css">
+<link rel="stylesheet" href="/web/commute.css">
 </head>
 <body>
 <header id="topbar">

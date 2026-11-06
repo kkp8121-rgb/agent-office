@@ -130,10 +130,10 @@ ui.commute.offDim number
 ui.commute.offDimNight number
 ui.commute.offFadeMs number
 ui.commute.panelText string
-ui.commute.door.studio2 null
-ui.commute.door.lounge null
-ui.commute.door.library null
-ui.commute.door.greenhouse null
+ui.commute.door.studio2 object
+ui.commute.door.lounge object
+ui.commute.door.library object
+ui.commute.door.greenhouse object
 ui.commute.door.ceo null
 ui.building.enabled boolean
 ui.building.mode string

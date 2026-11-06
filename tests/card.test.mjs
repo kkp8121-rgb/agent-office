@@ -231,7 +231,7 @@ test('fitScale: full size when the window is big, smaller when it is not, never 
 test('the page links card.css after the other area CSS, once', () => {
   const links = [...INDEX_HTML.matchAll(/href="\/web\/([\w-]+\.css)"/g)].map((m) => m[1]);
   assert.equal(links.filter((l) => l === 'card.css').length, 1);
-  assert.ok(links.indexOf('card.css') > links.indexOf('decor.css')); // card.css follows the area sheets (later sheets may follow it)
+  assert.ok(links.indexOf('card.css') > links.indexOf('decor.css')); // card.css follows the area sheets (later packages add their sheets after it; fx.test.mjs pins that tail)
 });
 
 test('/api/ui carries the validated cards of the cards.json in the root (and {} without one)', async (t) => {
