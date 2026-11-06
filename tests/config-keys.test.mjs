@@ -193,7 +193,7 @@ ui.empty.signA string
 ui.empty.cardTitle string
 ui.empty.cardSteps array
 ui.empty.readyDesign string
-ui.empty.catAt null
+ui.empty.catAt array
 ui.empty.dimA number
 ui.lines.bellCall array
 ui.lines.handoffGive array
