@@ -223,7 +223,7 @@ export class CostLedger {
     const out = { version: 1, seenUntil: this.#seenUntil, scannedDays: [...this.#scanned].filter((d) => d >= cutoff).sort(), days };
     const detail = ref && this.#detail.get(ref);
     if (detail) {
-      const people = {};
+      const people = Object.create(null);
       for (const { sessionId, agentKey, tokens } of detail.people.values()) {
         (people[sessionId] ??= Object.create(null))[agentKey ?? ''] = tokens;
       }
@@ -261,7 +261,7 @@ export class CostLedger {
       for (const [sessionId, agents] of Object.entries(saved.people && typeof saved.people === 'object' ? saved.people : {})) {
         for (const [key, tokens] of Object.entries(agents && typeof agents === 'object' ? agents : {})) {
           const agentKey = key === '' ? null : key;
-          rec.people.set(`${sessionId} ${key}`, { sessionId, agentKey, tokens: count(tokens) });
+          rec.people.set(`${sessionId}\0${key}`, { sessionId, agentKey, tokens: count(tokens) });
         }
       }
     }

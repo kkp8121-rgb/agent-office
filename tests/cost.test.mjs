@@ -233,6 +233,18 @@ test('cost: a restart on the same day keeps the floors and the top equal to befo
   assert.equal(more.top.find((p) => p.sessionId === 's1' && p.agentKey === 'a1').tokens, 409);
 });
 
+test('cost: a session id of __proto__ survives a restart without touching Object.prototype', () => {
+  const before = ledger();
+  before.add(use(at(DAY, 9), 'p1', 25, { sessionId: '__proto__', agentKey: 'zz' }));
+  const now = at(DAY, 11);
+  const json = saved(before, now);
+  assert.equal(({}).zz, undefined);
+  assert.equal(Object.prototype.hasOwnProperty('zz'), false);
+  const is = CostLedger.fromJSON(json, opts, now).today(now);
+  assert.deepEqual(is.floors, [{ sessionId: '__proto__', tokens: 25 }]);
+  assert.equal(is.top.find((p) => p.sessionId === '__proto__' && p.agentKey === 'zz').tokens, 25);
+});
+
 test('cost: floors and people saved for yesterday are ignored and dropped on a new day', () => {
   const yesterday = '2026-11-05';
   const l = ledger();
