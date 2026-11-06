@@ -51,9 +51,9 @@ export const INDEX_HTML = String.raw`<!doctype html>
       <fieldset id="fx-choices"><legend></legend></fieldset>
       <fieldset id="nl-choices"><legend></legend></fieldset>
       <fieldset id="sys-choices"><legend></legend></fieldset>
-      <fieldset id="alert-choices"><legend>호출 알림</legend>
-        <label class="wx-opt" title="켜면 층이 사장님을 부를 때 윈도 알림이 옵니다. 탭이 가려져도 받으려고 연결을 유지하며, 그동안 서버는 1.5초마다 기록을 확인합니다."><input type="checkbox" id="alert-switch"> 호출이 오면 알림 받기 (탭이 가려져도)</label>
-        <p id="alert-denied" hidden>브라우저에서 알림이 막혀 있습니다. 주소창의 자물쇠에서 알림을 허용해 주세요.</p>
+      <fieldset id="alert-choices"><legend></legend>
+        <label class="wx-opt"><input type="checkbox" id="alert-switch"></label>
+        <p id="alert-denied" hidden></p>
       </fieldset>
       <p id="wx-now" role="status"></p>
       <p class="wx-credit" id="wx-credit"></p>

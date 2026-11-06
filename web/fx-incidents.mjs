@@ -12,6 +12,7 @@ import { restDim, restSignText, faintPlan, faintTotalMs } from './incident-view.
 const PROPS = '/assets/props/';
 const SWITCH_ID = 'alert-switch';
 const NOTE_ID = 'alert-denied';
+const GROUP_ID = 'alert-choices';
 
 function make(tag, className) {
   const e = document.createElement(tag);
@@ -85,6 +86,15 @@ export function init(ctx) {
     const box = document.getElementById(SWITCH_ID);
     if (!box) return;
     const note = document.getElementById(NOTE_ID);
+    const S = ui.weather;
+    const group = document.getElementById(GROUP_ID);
+    if (group) group.querySelector('legend').textContent = S.alertGroup;
+    const label = box.closest('label');
+    if (label) {
+      label.append(` ${S.alertSwitch}`);
+      label.title = S.alertHint;
+    }
+    if (note) note.textContent = S.alertDenied;
     const showNote = () => {
       if (note) note.hidden = !supported || alerts.permission() !== 'denied';
     };
