@@ -373,7 +373,7 @@
           "gesture": { "priority": ["rest", "faint", "bellwave", "tug", "folder", "life"] },
           "signSlots": ["bell", "conflict"],
           "conflict": { "tugMs": 1400, "tugEveryMs": 5000, "blinkMs": 800, "tagText": "{floors}층과 같은 파일",
-                        "lobbyLampAt": null, "lobbyLampSize": [18, 18] },
+                        "lobbyLampAt": [848, 157], "lobbyLampSize": [18, 18] },
           "badge": { "bandPx": 3,
                      "labels": { "opus": "Opus", "sonnet": "Sonnet", "haiku": "Haiku", "other": "기타 모델", "codex": "Codex" },
                      "colors": { "opus": { "light": "#7a3fd1", "dark": "#b58cff" }, "sonnet": { "light": "#d9822b", "dark": "#ffb366" },

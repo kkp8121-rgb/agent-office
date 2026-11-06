@@ -18,6 +18,7 @@ export const INDEX_HTML = String.raw`<!doctype html>
 <link rel="stylesheet" href="/web/officelife.css">
 <link rel="stylesheet" href="/web/decor.css">
 <link rel="stylesheet" href="/web/card.css">
+<link rel="stylesheet" href="/web/conflict.css">
 </head>
 <body>
 <header id="topbar">
