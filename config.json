@@ -385,7 +385,7 @@
           "hourglass": { "tickMs": 5000, "flipMs": 2000, "text": "{m}분 {s}초", "textHour": "{h}시간 {m}분" },
           "commute": { "doorOpenMs": 500, "walkInDelayMs": 300, "leaveGapMs": 400, "leaveBudgetMs": 4200, "offDim": 0.5, "offDimNight": 0.25, "offFadeMs": 800,
                        "panelText": "{n}층",
-                       "door": { "studio2": null, "lounge": null, "library": null, "greenhouse": null, "ceo": null } },
+                       "door": { "studio2": { "dx": 8, "dy": -8, "scale": 3 }, "lounge": { "dx": 12, "dy": 0, "scale": 2.5 }, "library": { "dx": 8, "dy": -8, "scale": 3 }, "greenhouse": { "dx": 0, "dy": 12, "scale": 2.5 }, "ceo": null } },
           "building": { "enabled": true, "mode": "grow", "allTitle": "건물 단면", "innerW": 1024, "facadePx": 40, "shaftPx": 72, "slabPx": 10, "roofPx": 150, "basementPx": 170,
                         "minZoom": 0.32, "maxZoom": 1, "maxLiveFloors": 8, "liveMarginPx": 200, "slideMs": 600, "craneMs": 1800, "collapseMs": 600,
                         "carPxPerSec": 900, "carMinMs": 400, "carMaxMs": 2500, "lobbyFigures": false, "idleNightDim": 0.25, "roofSpots": 4,
