@@ -99,13 +99,13 @@ test('cost: days older than keepDays are left out when saved, and the saved file
   const json = JSON.parse(JSON.stringify(l.toJSON(now)));
   assert.deepEqual(Object.keys(json.days), ['2026-10-22', '2026-11-06']);
   assert.deepEqual(json.scannedDays, ['2026-11-06']);
-  assert.deepEqual(Object.keys(json).sort(), ['days', 'scannedDays', 'seenUntil', 'version']);
+  assert.deepEqual(Object.keys(json).sort(), ['days', 'detail', 'scannedDays', 'seenUntil', 'version']);
   const strings = [];
   (function walk(v) {
     if (typeof v === 'string') strings.push(v);
     else if (v && typeof v === 'object') Object.values(v).forEach(walk);
   })(json);
-  assert.deepEqual(strings, json.scannedDays, 'the only text in the file is the scannedDays list (the day keys are object keys)');
+  assert.deepEqual(strings, [...json.scannedDays, json.detail.day], 'the only text values in the file are day keys (the ids are object keys)');
   const back = CostLedger.fromJSON(json, { clock, keepDays: 15, dedupePerFile: 4096, topCount: 5 });
   assert.equal(back.today(now).tokens, 4);
   assert.equal(back.isScanned('2026-11-06'), true);
@@ -203,3 +203,75 @@ test('cost: the poller counts lead, agent, workflow agent and codex transcripts,
 });
 
 const ledger0 = () => new CostLedger({ clock: localClock(0), keepDays: 15, dedupePerFile: 4096, topCount: 20 });
+
+// ---- a restart on the same day keeps today's floors and people (review: tokens were the whole day, floors only the part after the restart) ----
+
+const opts = { clock, keepDays: 15, dedupePerFile: 4096, topCount: 5 };
+const saved = (l, nowTs) => JSON.parse(JSON.stringify(l.toJSON(nowTs)));
+const DAY = '2026-11-06';
+
+test('cost: a restart on the same day keeps the floors and the top equal to before, and consistent with tokens', () => {
+  const before = ledger();
+  before.add(use(at(DAY, 9), 'm1', 1000));
+  before.add(use(at(DAY, 9, 5), 'm2', 400, { agentKey: 'a1' }));
+  before.add(use(at(DAY, 9, 6), 'm3', 0, { agentKey: 'idle' })); // a person with no tokens yet is still listed
+  before.add(use(at(DAY, 10), 'm4', 70, { sessionId: 's2', provider: 'codex' }));
+  before.add(use(at(DAY, 10, 1), 'm5', 30, { sessionId: 's2', agentKey: 'a1' })); // the same agent key under another floor
+  const now = at(DAY, 11);
+  const after = CostLedger.fromJSON(saved(before, now), opts, now);
+  const was = before.today(now);
+  const is = after.today(now);
+  assert.deepEqual(is.floors, was.floors);
+  assert.deepEqual(is.top, was.top);
+  assert.deepEqual(is.floors, [{ sessionId: 's1', tokens: 1400 }, { sessionId: 's2', tokens: 100 }]);
+  assert.equal(is.tokens, 1500);
+  assert.equal(is.floors.reduce((a, f) => a + f.tokens, 0), is.tokens, 'the floors add up to the day');
+  assert.equal(after.add(use(at(DAY, 11, 5), 'm6', 9, { agentKey: 'a1' })), true, 'a new line after the restart adds on top');
+  const more = after.today(at(DAY, 12));
+  assert.equal(more.tokens, 1509);
+  assert.equal(more.floors.find((f) => f.sessionId === 's1').tokens, 1409);
+  assert.equal(more.top.find((p) => p.sessionId === 's1' && p.agentKey === 'a1').tokens, 409);
+});
+
+test('cost: floors and people saved for yesterday are ignored and dropped on a new day', () => {
+  const yesterday = '2026-11-05';
+  const l = ledger();
+  l.add(use(at(yesterday, 9), 'y1', 50, { sessionId: 'old-floor' }));
+  const json = saved(l, at(yesterday, 12));
+  assert.deepEqual(Object.keys(json.detail.floors), ['old-floor'], 'yesterday was saved while it was today');
+  const now = at(DAY, 8);
+  const restored = CostLedger.fromJSON(json, opts, now);
+  assert.deepEqual(restored.today(now).floors, [], 'the new day starts with no floors');
+  assert.deepEqual(restored.today(now).top, []);
+  assert.equal('detail' in restored.toJSON(now), false, 'and the file no longer holds them');
+  // without a clock reading the detail is kept but never shown for another day, and the next save drops it
+  const lazy = CostLedger.fromJSON(json, opts);
+  assert.deepEqual(lazy.today(now).floors, []);
+  assert.equal('detail' in lazy.toJSON(now), false);
+  // a ledger that lived across midnight writes only the new day
+  l.add(use(at(DAY, 1), 'n1', 5, { sessionId: 'new-floor' }));
+  assert.deepEqual(Object.keys(saved(l, at(DAY, 2)).detail.floors), ['new-floor']);
+  assert.equal(saved(l, at(DAY, 2)).detail.day, DAY);
+});
+
+test('cost: the saved file holds only numbers, booleans, day keys and the ids already used as keys', () => {
+  const l = ledger();
+  const ids = ['floor-one', 'floor-two', 'agent-x', 'agent-y'];
+  l.add(use(at(DAY, 9), 'm1', 10, { sessionId: ids[0] }));
+  l.add(use(at(DAY, 9, 1), 'm2', 20, { sessionId: ids[0], agentKey: ids[2] }));
+  l.add(use(at(DAY, 9, 2), 'm3', 30, { sessionId: ids[1], agentKey: ids[3] }));
+  l.markScanned(DAY, true);
+  const json = saved(l, at(DAY, 12));
+  const values = [];
+  const keys = new Set();
+  (function walk(v) {
+    if (typeof v === 'string') values.push(v);
+    else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { if (!Array.isArray(v)) keys.add(k); walk(x); }
+    else assert.ok(typeof v === 'number' || typeof v === 'boolean', 'no null, no undefined');
+  })(json);
+  assert.ok(values.every((s) => /^\d{4}-\d{2}-\d{2}$/.test(s)), `string values are day keys only: ${values}`);
+  const known = new Set(['version', 'seenUntil', 'scannedDays', 'days', 'detail', 'day', 'floors', 'people', 'tokens', 'cacheRead', 'byHour', 'partial', DAY, '', ...ids]);
+  assert.deepEqual([...keys].filter((k) => !known.has(k)), [], 'no key besides the field names, the day and the ids');
+  assert.deepEqual(json.detail.people, { 'floor-one': { '': 10, 'agent-x': 20 }, 'floor-two': { 'agent-y': 30 } });
+  assert.deepEqual(json.detail.floors, { 'floor-one': 30, 'floor-two': 30 });
+});

@@ -61,6 +61,11 @@ export class CostLedger {
     this.#topCount = topCount;
   }
 
+  /** The day and hour bucket of `ts`: the frame's "same hour last week" figure moves when this does. */
+  slot(ts) {
+    return `${this.#clock.dayKey(ts)}|${this.#clock.hourOf(ts)}`;
+  }
+
   /** Grows whenever something the frame shows may have changed. */
   get version() {
     return this.#version;
@@ -202,8 +207,10 @@ export class CostLedger {
   }
 
   /**
-   * The saved form: numbers, booleans and day keys only (no names, no ids, no paths). Per-floor and per-person totals are not
-   * saved; a new run counts today again from the records. `nowTs` picks the cut-off for `keepDays` (default: the newest day held).
+   * The saved form: numbers, booleans and day keys only (no names, no paths, no text). Today's per-floor and per-person totals
+   * are kept too, as numbers under the session and agent keys the ledger already uses, so a restart on the same day shows the
+   * same floors and top; an earlier day's detail is not written. `nowTs` picks the cut-off for `keepDays` and which day is today
+   * (default: the newest day held).
    */
   toJSON(nowTs) {
     const newest = [...this.#days.keys(), ...this.#scanned].sort().at(-1);
@@ -213,11 +220,27 @@ export class CostLedger {
     for (const [day, rec] of [...this.#days].sort(([a], [b]) => (a < b ? -1 : 1))) {
       if (day >= cutoff) days[day] = { tokens: rec.tokens, cacheRead: rec.cacheRead, byHour: [...rec.byHour], partial: rec.partial };
     }
-    return { version: 1, seenUntil: this.#seenUntil, scannedDays: [...this.#scanned].filter((d) => d >= cutoff).sort(), days };
+    const out = { version: 1, seenUntil: this.#seenUntil, scannedDays: [...this.#scanned].filter((d) => d >= cutoff).sort(), days };
+    const detail = ref && this.#detail.get(ref);
+    if (detail) {
+      const people = {};
+      for (const { sessionId, agentKey, tokens } of detail.people.values()) {
+        (people[sessionId] ??= Object.create(null))[agentKey ?? ''] = tokens;
+      }
+      out.detail = {
+        day: ref,
+        floors: Object.fromEntries(detail.floors),
+        people: Object.fromEntries(Object.entries(people).map(([k, v]) => [k, { ...v }])),
+      };
+    }
+    return out;
   }
 
-  /** A ledger from a saved form; anything malformed is skipped. */
-  static fromJSON(json, opts) {
+  /**
+   * A ledger from a saved form; anything malformed is skipped. With `nowTs`, saved per-floor and per-person totals of any other
+   * day than today are dropped instead of restored.
+   */
+  static fromJSON(json, opts, nowTs) {
     const ledger = new CostLedger(opts);
     if (!json || typeof json !== 'object') return ledger;
     for (const [day, rec] of Object.entries(json.days && typeof json.days === 'object' ? json.days : {})) {
@@ -231,6 +254,17 @@ export class CostLedger {
     }
     for (const day of Array.isArray(json.scannedDays) ? json.scannedDays : []) if (typeof day === 'string' && DAY_KEY.test(day)) ledger.#scanned.add(day);
     ledger.#seenUntil = ledger.#liveFloor = count(json.seenUntil);
+    const saved = json.detail;
+    if (saved && typeof saved === 'object' && DAY_KEY.test(saved.day) && ledger.#days.has(saved.day) && (!isNum(nowTs) || opts.clock.dayKey(nowTs) === saved.day)) {
+      const rec = ledger.#detailRec(saved.day);
+      for (const [sessionId, tokens] of Object.entries(saved.floors && typeof saved.floors === 'object' ? saved.floors : {})) rec.floors.set(sessionId, count(tokens));
+      for (const [sessionId, agents] of Object.entries(saved.people && typeof saved.people === 'object' ? saved.people : {})) {
+        for (const [key, tokens] of Object.entries(agents && typeof agents === 'object' ? agents : {})) {
+          const agentKey = key === '' ? null : key;
+          rec.people.set(`${sessionId} ${key}`, { sessionId, agentKey, tokens: count(tokens) });
+        }
+      }
+    }
     return ledger;
   }
 }
