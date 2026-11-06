@@ -381,7 +381,7 @@
                                  "codex": { "light": "#2463c4", "dark": "#6aa8ff" } },
                      "minLumaGap": 30 },
           "pile": { "wobbleMs": 900, "titles": ["", "서류 조금", "서류 보통", "서류 많음", "곧 넘침"],
-                    "offset": { "studio2": null, "lounge": null, "library": null, "greenhouse": null } },
+                    "offset": { "studio2": [-14, -27], "lounge": [-12, -14], "library": [-14, -24], "greenhouse": [-14, -24] } },
           "hourglass": { "tickMs": 5000, "flipMs": 2000, "text": "{m}분 {s}초", "textHour": "{h}시간 {m}분" },
           "commute": { "doorOpenMs": 500, "walkInDelayMs": 300, "leaveGapMs": 400, "leaveBudgetMs": 4200, "offDim": 0.5, "offDimNight": 0.25, "offFadeMs": 800,
                        "panelText": "{n}층",
