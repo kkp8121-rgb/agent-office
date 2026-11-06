@@ -42,10 +42,13 @@ export class Poller {
   #lastSeen = new Map(); // sessionId -> {session, missed}: absence is debounced per session
   #metaCache = new Map();
   #states = new Map(); // sessionId -> per-session tail state
+  #cost;
 
-  constructor(cfg, office) {
+  /** `cost` (optional CostLedger): `usage` events go there and not to Office. */
+  constructor(cfg, office, cost = null) {
     this.#cfg = cfg;
     this.#office = office;
+    this.#cost = cost;
     this.#codex = cfg.codex?.enabled ? new CodexSource(cfg) : null;
   }
 
@@ -110,14 +113,28 @@ export class Poller {
     }
   }
 
+  /**
+   * Token usage goes to the cost ledger and is taken out of the list Office sees. The owner is the floor and, for a person other
+   * than the lead, the agent id (the same names the start-up scan derives from the file path).
+   */
+  #takeUsage(evs, sessionId, agentKey, provider) {
+    if (!this.#cost) return evs;
+    return evs.filter((e) => {
+      if (e.kind !== 'usage') return true;
+      this.#cost.add({ ts: e.ts, sessionId, agentKey, provider, msgId: e.msgId, tokens: e.tokens, cacheRead: e.cacheRead });
+      return false;
+    });
+  }
+
   #applyCodex({ sessionEvents, agents, agentEvents }, now) {
     const opts = (id) => ({ logSince: this.#office.logSince(id, now) });
-    for (const [id, evs] of sessionEvents) this.#office.applySessionEvents(id, evs, now, opts(id));
+    for (const [id, evs] of sessionEvents) this.#office.applySessionEvents(id, this.#takeUsage(evs, id, null, 'codex'), now, opts(id));
     for (const [id, metas] of agents) this.#office.syncAgents(id, metas, now);
     for (const [key, evs] of agentEvents) {
       const cut = key.indexOf('/');
       const id = key.slice(0, cut);
-      this.#office.applyAgentEvents(id, key.slice(cut + 1), evs, now, opts(id));
+      const agentId = key.slice(cut + 1);
+      this.#office.applyAgentEvents(id, agentId, this.#takeUsage(evs, id, agentId, 'codex'), now, opts(id));
     }
   }
 
@@ -154,13 +171,13 @@ export class Poller {
     const opts = { logSince: this.#office.logSince(id, now) };
 
     st.tail ??= new FileTail(st.paths.transcript, this.#cfg.tail);
-    const evs = (await this.#pollTail(st.tail)).flatMap(parseLine);
+    const evs = this.#takeUsage((await this.#pollTail(st.tail)).flatMap(parseLine), id, null, 'claude');
     if (evs.length) this.#office.applySessionEvents(id, evs, now, opts);
 
     this.#trackLaunchedRuns(id, st);
     if (scan) await this.#scanAgents(id, st, now);
     for (const [agentId, tail] of st.agents) {
-      const aEvs = (await this.#pollTail(tail)).flatMap(parseLine);
+      const aEvs = this.#takeUsage((await this.#pollTail(tail)).flatMap(parseLine), id, agentId, 'claude');
       if (aEvs.length) this.#office.applyAgentEvents(id, agentId, aEvs, now, opts);
     }
     if (!scan) { // a scan tick already polled them

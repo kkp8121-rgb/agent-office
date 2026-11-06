@@ -213,6 +213,8 @@ test('face light mode: seated and present only; working and thinking ripple, idl
   assert.equal(litMode(rec({ state: 'idle' }), cfg), 'rest');
   for (const state of ['stale', 'done', 'enter', 'cat', '']) assert.equal(litMode(rec({ state }), cfg), '', state);
   assert.equal(litMode(rec({ seated: false }), cfg), '', 'standing');
+  assert.equal(litMode(rec({ frec: { lunch: true } }), cfg), '', 'a floor on its lunch break is dark at the desks');
+  assert.equal(litMode(rec({ frec: { lunch: false } }), cfg), 'work');
   assert.equal(litMode(rec({ away: true }), cfg), '', 'away on a trip');
   assert.equal(litMode(rec({ isCat: true }), cfg), '', 'the cat');
 });

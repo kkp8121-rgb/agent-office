@@ -8,21 +8,21 @@
 
 **Tech Stack:** Node.js v24 (npm 의존성 0, ES modules, `node:test`), 바닐라 HTML/CSS/JS, Python 3.12 + Pillow(그림 후처리·점검표), Codex CLI `codex exec` + 내장 imagegen(그림), 크롬 헤드리스 + CDP(화면 캡처·CPU 측정).
 
-**Spec (구속):** `C:\Users\gustj\agent-office\docs\superpowers\specs\2026-10-28-agent-office-layers-navmesh-design.md`(이하 「설계서」, §16 생활 움직임 · §17 앉은 자세 포함) + 본 설계서 `…\specs\2026-10-28-agent-office-design.md`. 실행자는 계획과 설계서를 함께 읽는다. 겹치면 설계서가 이긴다.
+**Spec (구속):** `<저장소>\docs\superpowers\specs\2026-10-28-agent-office-layers-navmesh-design.md`(이하 「설계서」, §16 생활 움직임 · §17 앉은 자세 포함) + 본 설계서 `…\specs\2026-10-28-agent-office-design.md`. 실행자는 계획과 설계서를 함께 읽는다. 겹치면 설계서가 이긴다.
 
 **순서:** Task 1 → Task 2 → (Task 3 · 4 · 5 · 6 병렬) → Task 7.
 
 ## Global Constraints
 
-- 저장소 `C:\Users\gustj\agent-office`(브랜치 `main`). 원격 `origin` 이 있으나 **push 금지**. 셸 명령은 `cd C:/Users/gustj/agent-office && …` 로 시작하고 경로는 절대경로.
+- 저장소 `<저장소>`(브랜치 `main`). 원격 `origin` 이 있으나 **push 금지**. 셸 명령은 `cd <저장소> && …` 로 시작하고 경로는 절대경로.
 - npm 의존성 0. 순수 HTML/CSS/JS. `requestAnimationFrame`·캔버스·`element.animate()` 금지 — 움직임은 CSS `transform` 트랜지션·키프레임만. 탭이 가려지면 멈춤.
 - 기획 수치는 `config.json` 또는 코드가 참조하는 장면 데이터에. 연출값(걷는 속도·찌그러짐 시간)은 지금 관례대로 `app.mjs`/`style.css` 상수.
 - 사용자에게 보이는 글은 한국어. 코드 식별자·주석은 영어. UTF-8 BOM 없음, LF. 주변 코드 스타일을 따른다(2칸 들여쓰기, 작은따옴표, 세미콜론).
-- 화면을 띄우지 않는다: `--open`·`start <url>`·`cmd /c start`·`-WindowStyle Hidden` 없는 `Start-Process` 금지. 화면 확인은 헤드리스 크롬 CDP `Page.captureScreenshot` 만(복사해 쓸 도우미: `C:\Users\gustj\AppData\Local\Temp\claude\C--Project\6106276a-a6e5-4468-8650-198bebbf83af\scratchpad\t8b\persist\cdpcap.mjs`). PNG 는 Read 도구로 본다.
-- 포트 47800 사용 금지. 띄우는 서버는 **47869**, `AGENT_OFFICE_DATA_DIR` = `C:\Users\gustj\AppData\Local\Temp\claude\C--Project\6106276a-a6e5-4468-8650-198bebbf83af\scratchpad\layers\data-47869\<task>`, `AGENT_OFFICE_CLAUDE_HOME`·`AGENT_OFFICE_CODEX_HOME` 는 가짜 홈(`scripts/demo-feed.mjs`) — Task 7 의 CPU 측정만 실제 홈. 자기가 띄운 PID 만 끈다. **Task 3~6 은 서버를 띄우지 않는다**(병렬 실행 중 포트 충돌).
+- 화면을 띄우지 않는다: `--open`·`start <url>`·`cmd /c start`·`-WindowStyle Hidden` 없는 `Start-Process` 금지. 화면 확인은 헤드리스 크롬 CDP `Page.captureScreenshot` 만(복사해 쓸 도우미: `<스크래치>\t8b\persist\cdpcap.mjs`). PNG 는 Read 도구로 본다.
+- 포트 47800 사용 금지. 띄우는 서버는 **47869**, `AGENT_OFFICE_DATA_DIR` = `<스크래치>\layers\data-47869\<task>`, `AGENT_OFFICE_CLAUDE_HOME`·`AGENT_OFFICE_CODEX_HOME` 는 가짜 홈(`scripts/demo-feed.mjs`) — Task 7 의 CPU 측정만 실제 홈. 자기가 띄운 PID 만 끈다. **Task 3~6 은 서버를 띄우지 않는다**(병렬 실행 중 포트 충돌).
 - 개인정보: 대화 본문·명령 전체·검색어·계정 id·토큰을 출력·저장하지 않는다. `~/.claude/sessions/*.key`·`.env`·`~/.codex/auth.json`·`config.toml`·`history.jsonl`·`logs/`·`threads/` 를 열지 않는다. 실제 홈으로 띄운 화면은 캡처하지 않는다(숫자만).
-- Codex 그림: `codex exec --skip-git-repo-check -s workspace-write -C <작업 폴더> -i <참고.png> -- "<프롬프트>"`(`--` 필수, 헤드리스). 작업 폴더·원본은 저장소 밖 `…\scratchpad\layers\<room>\`. 호출마다 `C:\Users\gustj\AppData\Local\Temp\claude\C--Project\6106276a-a6e5-4468-8650-198bebbf83af\scratchpad\layers\codex-calls.log` 에 한 줄 `<ISO 시각> <room> <목적> <초>`. 상한: studio2 6 · library 8 · greenhouse 8 · lounge 8(방 합계 30) · 앉은 자세 10. 넘기지 않는다. 「모델 혼잡」 오류면 `~/.codex/generated_images/<세션>/` 에서만 가져온다.
-- 커밋: 각 Task 끝에서 `git -C C:/Users/gustj/agent-office add <명시 경로>`(`-A`·`.`·`-f` 금지, 자기가 만든 파일만). `index.lock` 이면 몇 초 뒤 다시. 메시지는 파일로 `git -C C:/Users/gustj/agent-office commit -F <파일>`, 끝은 빈 줄 + 정확히 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Codex 그림: `codex exec --skip-git-repo-check -s workspace-write -C <작업 폴더> -i <참고.png> -- "<프롬프트>"`(`--` 필수, 헤드리스). 작업 폴더·원본은 저장소 밖 `…\scratchpad\layers\<room>\`. 호출마다 `<스크래치>\layers\codex-calls.log` 에 한 줄 `<ISO 시각> <room> <목적> <초>`. 상한: studio2 6 · library 8 · greenhouse 8 · lounge 8(방 합계 30) · 앉은 자세 10. 넘기지 않는다. 「모델 혼잡」 오류면 `~/.codex/generated_images/<세션>/` 에서만 가져온다.
+- 커밋: 각 Task 끝에서 `git -C <저장소> add <명시 경로>`(`-A`·`.`·`-f` 금지, 자기가 만든 파일만). `index.lock` 이면 몇 초 뒤 다시. 메시지는 파일로 `git -C <저장소> commit -F <파일>`, 끝은 빈 줄 + 정확히 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - 옛 `assets/floors/*.png` 와 `config.json` 의 `layouts.studio` 는 사용자가 정할 때까지 그대로 둔다.
 
 ## Review Focus
@@ -204,7 +204,7 @@ assets/
     - `scenes: CLI exits 1 on failure` — `spawnSync(process.execPath, ['scripts/check-scenes.mjs', '--dir', <망가진 사본>])` 의 `status === 1`, stdout 에 `FAIL`
   - `tests/server.test.mjs` 에 더함: `/api/ui` 의 `scenes`(장면 있는 디자인만, `url` 이 `/scenes/<design>/`), `sitSprites` 가 배열, `sitHeight === 50`; `GET /scenes/studio2/shell.png` 200 + 그림 캐시 머리; `GET /scenes/..%2Fconfig.json` 404.
   - 정적 단언(어느 시험 파일이든): `web/*.js`·`web/*.mjs` 에 `requestAnimationFrame`·`getContext(`·`.animate(` 가 없다.
-- [ ] **Step 3: 실패 확인** — Run: `cd C:/Users/gustj/agent-office && npm test` → Expected: 새 시험 FAIL(모듈 없음), 기존 시험 PASS.
+- [ ] **Step 3: 실패 확인** — Run: `cd <저장소> && npm test` → Expected: 새 시험 FAIL(모듈 없음), 기존 시험 PASS.
 - [ ] **Step 4: 순수 모듈 구현** — `web/scene.mjs` → `web/nav.mjs` → `web/depth.mjs` → `web/ambient.mjs`. DOM·`process` 를 쓰지 않는다(브라우저·Node 공용). 숫자는 인자로 받은 `nav`/`depth`/`amb` 블록에서만.
 - [ ] **Step 5: 서버 구현** — `config.json` 블록 추가, `server/scenes.mjs`, `server/config.mjs`, `server/scene-check.mjs`, `scripts/check-scenes.mjs`, `server/office.mjs` 장면 분기, `server/http.mjs`. 서버 시작 때는 1단계(형식)만, 무거운 2~9단계는 검증기·시험만.
 - [ ] **Step 6: 화면 구현** (`web/index.html` 은 `<script type="module" src="/web/app.mjs">`; `logrow.mjs` 는 그대로 일반 스크립트)
@@ -214,8 +214,8 @@ assets/
   - 앉기(설계서 §17): `.spr` 안에 `img.stand` + `img.sit`(`sitSprites` 에 없는 키는 `img.sit` 을 만들지 않고 선 그림 유지). `.ag.sitting` 클래스로 보이기만 바꿈, 앉은 그림 높이 `sitHeight`. 자기 자리(`slot.kind === 'seat'` 또는 팀장 자리)에 도착해 있으면 앉음, 걷기·지점·보고함 줄·대기점·넘침·등장·퇴장은 섬. 바뀔 때 `.body` 에 `squash` 키프레임(약 200ms, `animationend` 에서 클래스 제거). 옛 디자인은 앉지 않는다.
   - 생활 움직임(설계서 §16): 장면 층마다 `createFloorClock` 하나(`startAmbient`/`stopAmbient` — 층 제거·`pause` 때 stop, `resume` 때 예정 시각을 새로 뽑아 start). 몸짓 = `.body`·`.flip` 에 `fid-<name>` 클래스, `animationend` 에서 제거(타이머 없음). 나들이 = 일어서기 → `chooseSpot`(팀장 투어는 자리 찬 책상 `visit` 점 `leadTourDesks` 곳 또는 화이트보드 지점) → `walkPath` → `returnAt` 까지 머묾(둘이면 서로 마주 봄) → 자리로 걸어와 앉기. 서버 움직임(`renderAgent` 의 목표 바뀜, `done`, 퇴장, 나가 있는 동안 `working`)이 오면 나들이를 끊고 `retarget`. 옛 디자인은 몸짓만.
   - `?debug=nav`: 층마다 SVG 하나를 한 번(열린/막힌 칸, 다각형, 깊이선·id, 자리 `at`●·`approach`○·`sitAt`◆, 지점·`visit`·`pair`, 문·줄·대기·넘침 번호, 캐릭터마다 마지막 경로, 순간이동 빨간 표시). 없으면 관련 노드 0개.
-- [ ] **Step 7: 통과 확인** — Run: `cd C:/Users/gustj/agent-office && npm test` → Expected: 전부 PASS(기존 옛 배치 시험 포함). Run: `node scripts/check-scenes.mjs --dir tests/fixtures/scenes` → `OK studio2`, exit 0.
-- [ ] **Step 8: 헤드리스 확인(합성 장면)** — `node scripts/demo-feed.mjs <가짜 홈>` + `AGENT_OFFICE_SCENES_DIR=C:/Users/gustj/agent-office/tests/fixtures/scenes AGENT_OFFICE_PORT=47869 AGENT_OFFICE_DATA_DIR=…\layers\data-47869\task1 AGENT_OFFICE_CLAUDE_HOME=<가짜 홈> AGENT_OFFICE_CODEX_HOME=<빈 폴더> node server/main.mjs`(백그라운드, PID 기록). `cdpcap.mjs` 사본을 `…\scratchpad\layers\task1\` 에 두고 포트를 47869 로 바꿔 캡처: (a) 기본 화면 — 합성 studio2 층(사각형 가구, 앉은 캐릭터는 선 그림 대체)과 옛 그림 층이 함께 보임, (b) `?debug=nav`, (c) `?debug=ambient` 로 20초 뒤 — 몸짓·나들이 중인 캐릭터, (d) 새 캐릭터가 걷는 도중(가구를 돌아감·책상 뒤 다리 가림). Read 로 보고 확인. 콘솔 오류 0(`Runtime.consoleAPICalled`/`Runtime.exceptionThrown` 수집). 띄운 PID 둘(서버·시연기)과 크롬을 PID 로 끈다.
+- [ ] **Step 7: 통과 확인** — Run: `cd <저장소> && npm test` → Expected: 전부 PASS(기존 옛 배치 시험 포함). Run: `node scripts/check-scenes.mjs --dir tests/fixtures/scenes` → `OK studio2`, exit 0.
+- [ ] **Step 8: 헤드리스 확인(합성 장면)** — `node scripts/demo-feed.mjs <가짜 홈>` + `AGENT_OFFICE_SCENES_DIR=<저장소>/tests/fixtures/scenes AGENT_OFFICE_PORT=47869 AGENT_OFFICE_DATA_DIR=…\layers\data-47869\task1 AGENT_OFFICE_CLAUDE_HOME=<가짜 홈> AGENT_OFFICE_CODEX_HOME=<빈 폴더> node server/main.mjs`(백그라운드, PID 기록). `cdpcap.mjs` 사본을 `…\scratchpad\layers\task1\` 에 두고 포트를 47869 로 바꿔 캡처: (a) 기본 화면 — 합성 studio2 층(사각형 가구, 앉은 캐릭터는 선 그림 대체)과 옛 그림 층이 함께 보임, (b) `?debug=nav`, (c) `?debug=ambient` 로 20초 뒤 — 몸짓·나들이 중인 캐릭터, (d) 새 캐릭터가 걷는 도중(가구를 돌아감·책상 뒤 다리 가림). Read 로 보고 확인. 콘솔 오류 0(`Runtime.consoleAPICalled`/`Runtime.exceptionThrown` 수집). 띄운 PID 둘(서버·시연기)과 크롬을 PID 로 끈다.
 - [ ] **Step 9: 커밋** — `git add` 위 Files 의 경로를 하나씩 → 메시지 `feat(scenes): layered scene engine, navmesh walking, seated pose and ambient life`.
 
 ---
@@ -226,7 +226,7 @@ assets/
 - Modify: `art/snap.py`(모드 `shell`·`sheet`·`obj` 추가 — 기존 `sprite`·`bg` 는 그대로)
 - Create: `art/atlas.py`, `art/front.py`, `art/scene_sheet.py`, `art/scenes/studio2.json`, `assets/scenes/studio2/{scene.json,shell.png,front.png?,objects.png}`, `art/scenes-check/studio2.png`
 - Modify: `README.md` 「그림 다시 뽑기」(설계서 §9 순서로 갱신 — 설계서 §1.3 「빌더가 첫 방을 넘길 때」)
-- 읽기 전용: 그림 시험 산출물 `C:\Users\gustj\AppData\Local\Temp\claude\C--Project\6106276a-a6e5-4468-8650-198bebbf83af\scratchpad\layers-spike\`(`shell.png`·`sheet.png`·`proc.py` — 재사용 가능)
+- 읽기 전용: 그림 시험 산출물 `<스크래치>\layers-spike\`(`shell.png`·`sheet.png`·`proc.py` — 재사용 가능)
 
 **Interfaces:**
 - Consumes: Task 1 `scripts/check-scenes.mjs`(`--json` 포함), `scene.json` 형식(설계서 §4 + `spots`·`sitAt`·`visit`), `config.json` `nav`·`depth`·`sitHeight`.
@@ -243,7 +243,7 @@ assets/
 - [ ] **Step 2: 껍데기(1회)** — 설계서 §9.2 본작업 프롬프트(러그 유지, 벽 책장 유지, 2:1), `-i assets/floors/studio2.png`. `snap.py shell --size 1024x512`. 바닥 윤곽 IoU ≥ 0.9(설계서 §9.5)를 Pillow 로 재서 기록. 시험 껍데기(러그·벽 책장이 지워짐)는 프롬프트가 두 번 실패할 때만 대신 쓴다.
 - [ ] **Step 3: 스프라이트 시트(1~2회)** — 「two rows of 3-4 objects」, 같은 `-i`. 종류: 책상(「desk seen from the front, the back of the monitor faces the viewer, no chair」) · 의자(「office chair facing the viewer, its backrest behind a seated person」 — 앉은 캐릭터 뒤에 등받이가 보이게, 설계서 §17.4) · 팀장 탁자(보고함 포함) + 팀장 의자 · 소파 · 낮은 탁자 · 스탠드 조명 · 큰 화분 · 작은 화분 · 창 아래 낮은 장 · 화분 받침 장. 모니터 뒷면이 두 번 안 나오면 시험처럼 앞면 모니터 책상(설계서 §9.2).
 - [ ] **Step 4: 장면 데이터** — 설계서 §10.3 순서: `walkable`(옛 그림 바닥 윤곽) · `blocked`(벽 책장 앞 띠) · 종류별 `anchor`·`footprint`·`seat {at, sitAt, approach, visit, face}` · 책상 12개(줄 간격 ≥ 90px) · 팀장(`sitAt` 포함) · 보고함 줄 ≥ 12 · 대기점 ≥ 6 · 넘침 ≥ 8 · `board`·`reports`·`sign` 새 껍데기에서 재기 · **`spots` 4~8개**(예: 창가 2곳 — 하나는 `pair`, 화이트보드, 소파 앞, 큰 화분, 창 아래 장) · `front.png` 필요 여부.
-- [ ] **Step 5: 검증 → 점검표 → 고치기 반복** — Run: `node scripts/check-scenes.mjs studio2` → `OK studio2`(경고는 기록). Run: `python C:/Users/gustj/agent-office/art/scene_sheet.py studio2` → Read 로 확인: 키잉 테두리 없음, 크기가 64px 캐릭터와 맞음, 앉은 머리·어깨가 책상 위로 보임, 방이 옛 그림보다 밋밋하지 않음(비교판). 실패 항목만 다시 뽑기(남은 상한 안).
+- [ ] **Step 5: 검증 → 점검표 → 고치기 반복** — Run: `node scripts/check-scenes.mjs studio2` → `OK studio2`(경고는 기록). Run: `python <저장소>/art/scene_sheet.py studio2` → Read 로 확인: 키잉 테두리 없음, 크기가 64px 캐릭터와 맞음, 앉은 머리·어깨가 책상 위로 보임, 방이 옛 그림보다 밋밋하지 않음(비교판). 실패 항목만 다시 뽑기(남은 상한 안).
 - [ ] **Step 6: 시험·화면** — Run: `npm test` → PASS(`scenes: every shipped scene passes` 가 studio2 를 검사). 헤드리스 캡처 1장(Task 1 Step 8 방식, 가짜 홈, 포트 47869, `AGENT_OFFICE_SCENES_DIR` 없이 실제 `assets/scenes`) — studio2 층이 새 장면으로 보임. 서버·크롬 PID 로 끔.
 - [ ] **Step 7: 커밋** — `art/snap.py art/atlas.py art/front.py art/scene_sheet.py art/scenes/studio2.json art/scenes-check/studio2.png assets/scenes/studio2/* README.md` → `feat(art): scene art pipeline and layered studio2 room`. 보고: Codex 호출 수(≤ 6), IoU, 다시 뽑은 항목.
 
@@ -260,7 +260,7 @@ assets/
 - [ ] **Step 1: 껍데기(1회, 16:9)** — 설계서 §9.2 프롬프트, `-i assets/floors/library.png`, 「keep … bookshelves … ladders … drawn as part of the wall」, 러그 유지. `--size 1024x576`, IoU ≥ 0.9(못 미치면 1~2회 다시).
 - [ ] **Step 2: 시트(1~2회)** — 초록 스탠드 달린 책상(모니터 뒷면), 의자(보는 사람 쪽), 붉은 소파, 1인 안락의자 + 작은 탁자, 지구본 스탠드, 문 옆 작은 장(조명), 앞 왼쪽 네모 의자, 팀장 탁자 + 의자, 큰·작은 화분, 스탠드 조명.
 - [ ] **Step 3: 장면 데이터 + `front.png`(앞 가장자리 턱)** — Task 2 Step 4 와 같은 항목, `spots` 포함.
-- [ ] **Step 4: 검증·점검표 반복** — `node scripts/check-scenes.mjs library` → `OK library`; `python C:/Users/gustj/agent-office/art/scene_sheet.py library` → Read 확인(Task 2 Step 5 기준). Run: `node --test tests/scenes-shipped.test.mjs` → PASS.
+- [ ] **Step 4: 검증·점검표 반복** — `node scripts/check-scenes.mjs library` → `OK library`; `python <저장소>/art/scene_sheet.py library` → Read 확인(Task 2 Step 5 기준). Run: `node --test tests/scenes-shipped.test.mjs` → PASS.
 - [ ] **Step 5: 커밋** — 소유 파일만 → `feat(scenes): layered library room`. 보고: Codex 호출 수(≤ 8), IoU, 공유 코드 요청.
 
 ### Task 4: greenhouse 방 (Codex 상한 8)
@@ -304,7 +304,7 @@ assets/
 
 - [ ] **Step 1: 프롬프트** — `art/sit/prompts.json`: 공통 문장(「same characters as the attached reference sprites, same pixel-art style, palette, outline and pixel size; each one SITTING on an invisible chair, seen from a diagonal-front 3/4 view facing right, hands on an unseen desk/keyboard, no chair, no desk, no shadow; one row of N characters with wide gaps on flat solid #FF00FF magenta; do not use magenta inside the characters」) + 시트별 역할 목록(한 장 4~6명, 왼→오 순서 = 조각 순서) + `art/prompts.json` 의 생김새 문장.
 - [ ] **Step 2: 시트 뽑기(4~5회)** — 시트마다 그 역할들의 선 자세 그림을 `-i` 로 하나씩(여러 `-i`). 호출 로그 기록.
-- [ ] **Step 3: 후처리** — `python C:/Users/gustj/agent-office/art/snap.py sheet <sheet> <dir>` → 조각 수 = 역할 수 확인 → `python …/art/snap.py sprite <piece> C:/Users/gustj/agent-office/assets/sprites/<key>-sit.png --height 50 --colors 20`.
+- [ ] **Step 3: 후처리** — `python <저장소>/art/snap.py sheet <sheet> <dir>` → 조각 수 = 역할 수 확인 → `python …/art/snap.py sprite <piece> <저장소>/assets/sprites/<key>-sit.png --height 50 --colors 20`.
 - [ ] **Step 4: 점검표** — `art/sit/contact-sit.png`: 역할마다 선 그림 | 앉은 그림 | 앉은 그림 뒤집기를 나란히 + 갈색 책상 띠(높이 56)를 앉은 그림 앞에 겹쳐 머리·어깨가 보이는지. Read 로 확인: 같은 사람(머리색·옷), 키잉 테두리 없음, 크기 일관. 실패 역할만 다시(남은 상한 안, 4~6명 시트 단위).
 - [ ] **Step 5: 확인** — Pillow 로 18장 모두 높이 50·알파 0/255 를 확인하는 한 줄 검사(저장소 밖 스크립트) 결과를 보고에 적는다. Run: `npm test` → PASS(그림만 늘었으므로 기존 시험 영향 없음).
 - [ ] **Step 6: 커밋** — `assets/sprites/*-sit.png`(18개를 이름으로 나열) `art/sit/prompts.json art/sit/contact-sit.png` → `feat(sprites): seated diagonal-front sprites for every role`. 보고: 호출 수(≤ 10), 다시 뽑은 역할.
@@ -340,8 +340,8 @@ assets/
 ## 검증 명령 모음
 
 ```
-cd C:/Users/gustj/agent-office && npm test
-cd C:/Users/gustj/agent-office && node scripts/check-scenes.mjs
-cd C:/Users/gustj/agent-office && node scripts/check-scenes.mjs --dir tests/fixtures/scenes
-python C:/Users/gustj/agent-office/art/scene_sheet.py <design>
+cd <저장소> && npm test
+cd <저장소> && node scripts/check-scenes.mjs
+cd <저장소> && node scripts/check-scenes.mjs --dir tests/fixtures/scenes
+python <저장소>/art/scene_sheet.py <design>
 ```

@@ -10,6 +10,7 @@ import { loadConfig } from '../server/config.mjs';
 import { Office } from '../server/office.mjs';
 import { Poller } from '../server/poller.mjs';
 import { createServer } from '../server/http.mjs';
+import { CostLedger, localClock } from '../server/cost.mjs';
 
 const EMPTY = { hidden: [], names: {} };
 const iso = (ms) => new Date(ms).toISOString();
@@ -97,7 +98,7 @@ function codexHome(t, now) {
   return dir;
 }
 
-function get(port, path, { firstChunk = false } = {}) {
+function get(port, path, { firstChunk = false, until = null } = {}) {
   return new Promise((resolve, reject) => {
     const r = http.get({ host: '127.0.0.1', port, path, headers: { Host: `127.0.0.1:${port}` } }, (res) => {
       let body = '';
@@ -105,7 +106,7 @@ function get(port, path, { firstChunk = false } = {}) {
       res.on('data', (c) => {
         body += c;
         // the event stream stays open: stop once the opening state and log frames are in
-        if (firstChunk && body.includes('event: state') && body.includes('event: log') && body.endsWith('\n\n')) {
+        if ((firstChunk && body.includes('event: state') && body.includes('event: log') && body.endsWith('\n\n')) || (until && until(body))) {
           res.destroy();
           resolve(body);
         }
@@ -149,5 +150,88 @@ test('privacy e2e: no forbidden text from either home reaches /api/state, /api/l
 
   for (const [name, body] of [['state', state], ['log', log], ['events', events]]) {
     for (const s of FORBIDDEN) assert.ok(!body.includes(s), `/api/${name} contains ${s}`);
+  }
+});
+
+// ---- 1.1: what the new records may and may not carry out (usage numbers, edits, compaction, limit, a long command) ----
+
+const FORBIDDEN_11 = [
+  'SECRET', 'tok-', 'sk-', 'https://', 'example.invalid', // markers inside every private value below
+  'work\\\\proj', // the folders of an edited file: a path never leaves, a file name may
+  'claude-opus', // the raw model id: only one of five short names goes out
+  'f00d', // a hash of a path is not sent either
+];
+
+/** A Claude home with two floors of one working folder and the 1.1 records: token usage, an edit of the same file, a compaction, a usage limit and a long-running command. */
+function claudeHome11(t, now) {
+  const dir = mkdtempSync(join(tmpdir(), 'privacy11-claude-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  mkdirSync(join(dir, 'sessions'));
+  mkdirSync(join(dir, 'projects', 'P'), { recursive: true });
+  const cwd = 'C:\\work\\proj';
+  const file = 'C:\\work\\proj\\SECRET-DIR\\a.mjs';
+  const rec = (n, o) => JSON.stringify({ timestamp: iso(now - 60000 + n * 100), ...o }) + '\n';
+  const asst = (n, content, extra = {}, message = {}) => rec(n, { type: 'assistant', message: { id: `msg_${n}`, role: 'assistant', content, ...message }, ...extra });
+  const usage = { input_tokens: 10, cache_creation_input_tokens: 20, cache_read_input_tokens: 400, output_tokens: 5 };
+  const edit = (n) => asst(n, [{ type: 'tool_use', id: `toolu_E${n}`, name: 'Edit', input: { file_path: file, old_string: 'SECRET-OLD', new_string: 'tok-SECRET-NEW https://example.invalid/x' } }]);
+  const lines = {
+    s1: [
+      asst(1, [{ type: 'text', text: 'SECRET-ANSWER sk-SECRET' }], {}, { model: 'claude-opus-5-5', usage }),
+      edit(2),
+      rec(3, { type: 'system', subtype: 'compact_boundary', content: 'Conversation compacted SECRET-COMPACT https://example.invalid/summary', compactMetadata: { trigger: 'auto', preTokens: 150000, postTokens: 9000, durationMs: 4200 } }),
+      asst(4, [{ type: 'tool_use', id: 'toolu_SLOW', name: 'Bash', input: { command: 'sleep 99 SECRET-SLEEP' } }]),
+      rec(5, { type: 'assistant', isApiErrorMessage: true, error: 'rate_limit', apiError: '429 SECRET-APIERR sk-SECRET', quotaLimits: { status: 'rejected', resetsAt: Math.floor(now / 1000) + 3600, rateLimitType: 'five_hour' },
+        message: { id: 'msg_lim', model: '<synthetic>', role: 'assistant', content: [{ type: 'text', text: 'SECRET-LIMIT' }] } }),
+    ],
+    s2: [asst(1, [{ type: 'text', text: 'ok' }], {}, { model: 'claude-sonnet-5-5', usage }), edit(2)],
+  };
+  for (const [id, parts] of Object.entries(lines)) {
+    const pid = id === 's1' ? process.pid : process.ppid;
+    writeFileSync(join(dir, 'sessions', `${pid}.json`), JSON.stringify({ pid, sessionId: id, cwd, status: 'busy', name: '', startedAt: now - 120000 }));
+    writeFileSync(join(dir, 'projects', 'P', `${id}.jsonl`), parts.join(''));
+  }
+  return dir;
+}
+
+test('privacy e2e 1.1: usage, edits, compaction, a limit and a slow command leave only numbers and short names', async (t) => {
+  const now = Date.now();
+  const cfg = loadConfig({ agentScanEveryTicks: 1 });
+  cfg.claudeHome = claudeHome11(t, now);
+  cfg.codexHome = mkdtempSync(join(tmpdir(), 'privacy11-codex-'));
+  t.after(() => rmSync(cfg.codexHome, { recursive: true, force: true }));
+  const ledger = new CostLedger({ clock: localClock(cfg.cost.dayStartHour), keepDays: cfg.cost.keepDays, dedupePerFile: cfg.cost.dedupePerFile, topCount: cfg.ui.cost.topCount });
+  const office = new Office(cfg, EMPTY);
+  const poller = new Poller(cfg, office, ledger);
+  await poller.tick(now);
+  await poller.tick(now + 1500);
+  office.tick(now + 1500 + cfg.hourglass.afterMs + 1000);
+
+  const server = createServer(cfg, office, { cost: ledger });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => new Promise((r) => {
+    server.closeSse();
+    server.close(r);
+    server.closeAllConnections();
+  }));
+  const { port } = server.address();
+  const state = await get(port, '/api/state');
+  const log = await get(port, '/api/log?limit=2000');
+  const events = await get(port, '/api/events', { until: (b) => b.includes('event: state') && b.includes('event: log') && b.includes('event: cost') && b.endsWith('\n\n') });
+  const costJson = JSON.stringify(ledger.toJSON(now));
+
+  // the round did produce the 1.1 values, so the check below is not vacuous
+  const floors = JSON.parse(state).floors;
+  const s1 = floors.find((f) => f.sessionId === 's1');
+  assert.equal(floors.length, 2);
+  assert.equal(s1.lead.model, 'opus', 'one of the five short names');
+  assert.deepEqual(Object.keys(s1.rest ?? {}).sort(), ['limitKind', 'until'], 'the limit shows as a lunch break: when it ends and its kind');
+  assert.equal(floors.every((f) => f.conflicts.length === 1 && /^c\d+$/.test(f.conflicts[0].id)), true, 'the same file on two floors: a counter id, no path');
+  const cost = events.split('\n\n').find((b) => b.startsWith('event: cost'));
+  assert.ok(cost, 'a cost frame is sent');
+  assert.equal(JSON.parse(cost.split('\n')[1].slice(6)).tokens > 0, true);
+  assert.ok(ledger.today(now).tokens > 0 && costJson.includes('tokens'));
+
+  for (const [name, body] of [['state', state], ['log', log], ['events', events], ['cost.json', costJson]]) {
+    for (const bad of FORBIDDEN_11) assert.ok(!body.includes(bad), `${name} contains ${bad}`);
   }
 });

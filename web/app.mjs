@@ -6,8 +6,9 @@ import { createNav } from './nav.mjs';
 import { charZ, objectNodes, splitWalk } from './depth.mjs';
 import { localPlacement, planFloor, withPersonal } from './decor.mjs';
 import { fitZoom } from './pip.mjs';
-import { LOBBY_ID, orderFloors, nextFloor, fallbackFloor, fitBox, pruneEvents, activityScore, busiestFloor, chooseFollow, viewOrder } from './view.mjs';
+import { LOBBY_ID, orderFloors, nextFloor, fallbackFloor, fitBox, fitColumns, pruneEvents, activityScore, busiestFloor, chooseFollow, viewOrder } from './view.mjs';
 import { canStroll, nextStrollAt, scaleLife, strollTarget } from './lobbylife.mjs';
+import { restNewsText } from './incident-view.mjs';
 import { assignLobbySeats, backRowSeats, changeOf, clockParts, employeeRows, headline, indexRows, lobbyRoster, msToNextMinute, newsText, officeScore, pageCount, pageRows, pushSample, tableCapacity } from './lobby.mjs';
 import { dropPoint, restSpotNear, shouldLift } from './grab.mjs';
 import { daypart, nextPoke, openBox, pickLine, playPartner, throwPath, throwVelocity } from './play.mjs';
@@ -29,6 +30,8 @@ import { init as initFxEvents } from './fx-events.mjs';
 import { init as initFxLed } from './fx-led.mjs';
 import { init as initFxHit } from './fx-hit.mjs';
 import { init as initOfficeLife } from './officelife.mjs';
+import { AREAS, SERVER_EVENTS } from './areas.mjs';
+import { createGestures } from './gesture.mjs';
 import { bindTag, createCard } from './card.mjs';
 import { createBoardPanel } from './board-panel.mjs';
 
@@ -40,6 +43,7 @@ const DONE_STALE_MS = 4000; // a done agent older than this is not walked to the
 const HELD_Z = 7900; // a held character draws above every object and character of its floor (the name tags sit at 8000)
 const HELD_FOLLOW_MS = 80; // a held character trails the pointer by this much, which also softens the lift
 const SINGLE_MAX_ZOOM = 3; // a single floor (or the stack with the panel hidden) is scaled up to fit, at most this much
+const FULLSCREEN_SLACK_PX = 2; // the page counts as full screen (browser F11) when the window is this close to the screen size or closer
 const PANEL_KEY = 'agent-office.panelOff'; // localStorage: the session panel was hidden by the person
 const THEME_KEY = 'agent-office.theme'; // localStorage: 'dark' or 'light' when the person chose; absent = follow the OS
 const LIFT_PX = 28; // the held character's height above its shadow (--lift in style.css)
@@ -104,12 +108,26 @@ const recOf = new WeakMap(); // character element -> rec
 
 // ---------- small helpers ----------
 
-/** Scales the floors (CSS zoom) to the room: the widest one down to fit beside the panel (or above it in a narrow window); the single floor shown, or the stack once the panel is hidden, up or down. */
+/** Full screen: the page's own button (body.fs), or the browser's (F11), which the Fullscreen API does not report: display-mode media query, else a window as big as the screen. */
+function isFullscreen() {
+  return document.body.classList.contains('fs')
+    || window.matchMedia('(display-mode: fullscreen)').matches
+    || (Math.abs(window.innerWidth - screen.width) <= FULLSCREEN_SLACK_PX && Math.abs(window.innerHeight - screen.height) <= FULLSCREEN_SLACK_PX);
+}
+
+/** Lays the stacked floors out in `cols` columns (1 = the plain column; more only in full screen, see fitFloors). */
+function setFloorCols(cols) {
+  floorsEl.classList.toggle('floors-grid', cols > 1);
+  floorsEl.style.setProperty('--floor-cols', String(cols));
+}
+
+/** Scales the floors (CSS zoom) to the room: the widest one down to fit beside the panel (or above it in a narrow window); the single floor shown, or the stack once the panel is hidden, up or down (in full screen the whole stack fits the screen too, in as many columns as scale it the most). */
 function fitFloors() {
   const doc = floorsEl.ownerDocument; // the small window's document while the floors are there
   const mini = doc.body.classList.contains('pip-mini');
   let availW;
   let availH;
+  let sideBySide = false;
   if (mini) {
     // mini layout: floors only, the whole window minus the body padding
     const cs = doc.defaultView.getComputedStyle(doc.body);
@@ -117,17 +135,29 @@ function fitFloors() {
     availH = doc.documentElement.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   } else {
     const cs = getComputedStyle(appEl);
-    const sideBySide = cs.flexDirection === 'row';
+    sideBySide = cs.flexDirection === 'row';
     availW = appEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
       - (sideBySide && panelEl.offsetWidth ? panelEl.offsetWidth + parseFloat(cs.columnGap) : 0);
     availH = window.innerHeight - topbarEl.offsetHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   }
   const shown = shownId === null ? null : shownId === LOBBY_ID ? lobby : floorRecs.get(shownId);
   if (shown) {
+    setFloorCols(1);
     floorsEl.style.zoom = String(fitBox(availW, availH, ...shown.scene.r.size, SINGLE_MAX_ZOOM));
     return;
   }
   const widest = Math.max(0, ...[...floorRecs.values()].map((r) => r.scene.r.size[0]));
+  const stack = [...floorRecs.values()].filter((r) => !r.off);
+  // full screen (or one floor alone): the whole stack has to fit the height too (scaled by width alone it is taller than the screen and the page scrolls), in the columns that give the biggest floors; a taller stack in a window scrolls by design.
+  // Under a panel that sits below the floors (narrow window) the height is not the floors' own, so only a hidden panel or a side-by-side one counts.
+  const fit = !mini && widest > 0 && stack.length > 0 && (!panelEl.offsetWidth || (sideBySide && isFullscreen()));
+  if (fit && (stack.length === 1 || isFullscreen())) {
+    const { cols, scale } = fitColumns(stack.map((r) => r.scene.r.size), availW, availH, parseFloat(getComputedStyle(floorsEl).rowGap), SINGLE_MAX_ZOOM);
+    setFloorCols(cols);
+    floorsEl.style.zoom = String(scale);
+    return;
+  }
+  setFloorCols(1);
   floorsEl.style.zoom = !mini && widest > 0 && !panelEl.offsetWidth ? String(fitBox(availW, Infinity, widest, 0, SINGLE_MAX_ZOOM)) : fitZoom(availW, widest);
 }
 
@@ -144,18 +174,21 @@ let amb = null; // ui.ui.ambient (scaled down under ?debug=ambient)
 let catC = null; // ui.ui.cat (scaled down under ?debug=ambient)
 let cat = null; // the office cat: {rec, frec, timer, leaveAt, spotId, poke, force}; see "office cat"
 let sitSet = new Set(); // sprite keys that have a seated picture
-const liveTimers = new Map(); // token -> {win, id, fire, at}: pending timers (the ?debug=ambient counter reads this)
+const liveTimers = new Map(); // token -> {win, id, fire, at, floorId}: pending timers (the ?debug=ambient counter reads this)
 let timerToken = 0;
+const serverFns = new Map(); // server event type -> Set of listeners (ctx.onServer)
+const stateFns = new Set(); // listeners of ctx.onState
+let gestures = null; // the gesture arbiter (ctx.gesture), made with the effects context
 // While the small window is open its timers are used: a hidden opener tab gets its timers throttled (once a second, later once a minute).
 const clockTimers = {
-  setTimeout: (fn, ms) => {
+  setTimeout: (fn, ms, floorId = '_') => { // floorId: the floor the timer works for (ctx.timers; '_' = none), counted by ?debug=ambient timersByFloor()
     const win = pipWin ?? window;
     const token = ++timerToken;
     const fire = () => {
       liveTimers.delete(token);
       fn();
     };
-    liveTimers.set(token, { win, id: win.setTimeout(fire, ms), fire, at: Date.now() + ms });
+    liveTimers.set(token, { win, id: win.setTimeout(fire, ms), fire, at: Date.now() + ms, floorId });
     return token;
   },
   clearTimeout: (token) => {
@@ -207,6 +240,11 @@ function setupScenes() {
   if (DEBUG_AMBIENT) {
     window.__ambient = {
       timers: () => liveTimers.size,
+      timersByFloor: () => {
+        const by = {};
+        for (const t of liveTimers.values()) by[t.floorId] = (by[t.floorId] ?? 0) + 1;
+        return by;
+      },
       away: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.away).length, 0),
       held: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.press || a.grab).length, 0),
       busy: () => [...floorRecs.values()].reduce((n, f) => n + [...f.agents.values()].filter((a) => a.press || a.grab || a.play || a.say || a.steam || a.mood).length, 0),
@@ -587,6 +625,7 @@ function playFidget(rec, name) {
 function doFidget(frec, rec) {
   rec.m.nextFidgetAt = Date.now() + between(rec.rng, amb.fidgetEveryMs);
   if (rec.walk || rec.away || rec.grab || rec.play || rec.state === 'done' || rec.el.classList.contains('walking')) return;
+  if (gestures && !gestures.canAmbient(rec)) return; // a stronger gesture holds the character
   if (fidgetPickers.size && firstFrom(fidgetPickers, frec, rec)) return; // effects: the office life area did its own
   playFidget(rec, chooseFidget(rec.rng, rec.seated, amb));
 }
@@ -659,7 +698,7 @@ function startLeg(frec, rec) {
 
 function doTrip(frec, rec) {
   const range = tripRange(amb, whoOf(frec, rec));
-  const legs = range && !rec.walk && !rec.away && !rec.grab && !rec.play && rec.arrived && rec.state !== 'done' ? pickLegs(frec, rec) : null;
+  const legs = range && !rec.walk && !rec.away && !rec.grab && !rec.play && rec.arrived && rec.state !== 'done' && (!gestures || gestures.canAmbient(rec)) ? pickLegs(frec, rec) : null;
   if (!legs?.length) return scheduleTrip(frec, rec);
   rec.away = true;
   rec.trip = { legs, i: 0, cur: null };
@@ -1288,30 +1327,29 @@ function notePause(on) {
 }
 
 /**
- * A workflow went on to its next phase (SSE "phase"): the floor's characters walk to the meeting spots in front of the board, the boss
- * announces the phase, and after ui.meeting.seconds they walk back. Only a floor on show meets; there is no queue for the others.
+ * The one meeting machine (ctx.meeting): the characters of a floor walk to the meeting spots in front of the board, stand there
+ * (`hold`), and walk back. A workflow phase (`kind: 'phase'`, the default) is announced by the boss and ends ui.meeting.seconds later;
+ * a bell meeting (`kind: 'bell'`) says what it wants in `onHold` and ends when its caller says so (`endFloorMeeting`).
+ * @param {object} frec
+ * @param {{kind?: 'phase'|'bell', phase?: string, onHold?: Function, onEnd?: Function, onSwitch?: Function}} opts
+ *   the lead (when it can meet) stands at the boss spot and chairs; everybody else that can meet is called.
+ *   onHold(mt): everybody stands there now; onEnd(mt): the meeting is over; onSwitch(mt): a workflow phase took the meeting over.
+ * @returns {object|null} the meeting, or null when there is none to hold (no meeting spots, nobody to call, a meeting is running already)
  */
-function onPhase(sig) {
-  noteActivity(sig.sessionId, Date.now(), ui.ui.follow.phaseWeight);
-  followPoke();
-  const frec = floorRecs.get(sig.sessionId);
-  if (frec) emitFx('phase', { floor: frec, title: clipPhase(sig.phase, ui.ui.meeting.phaseMaxChars) });
-  const spots = frec?.scene.raw.meeting;
-  if (!spots || frec.off || paused() || frec.status === 'leaving') return;
+function startFloorMeeting(frec, opts = {}) {
+  const spots = frec.scene.raw.meeting;
+  if (!spots || frec.off || paused() || frec.status === 'leaving' || frec.lunch || frec.meeting) return null;
   const M = ui.ui.meeting;
-  const mt = frec.meeting;
-  const phase = clipPhase(sig.phase, M.phaseMaxChars);
-  if (mt) { // a new phase during a meeting: the boss says the new one and the time starts again
-    mt.phase = phase;
-    if (mt.hold) holdMeeting(mt);
-    return;
-  }
   const crew = [...frec.agents.values()].filter(meetable);
-  const boss = crew.find((a) => a.isLead) ?? null;
-  const place = assignSpots(crew.filter((a) => !a.isLead).map((a) => ({ id: a, x: a.x, y: a.y })), spots.spots);
-  if (place.size === 0) return;
-  if (boss) place.set(boss, spots.boss);
-  const next = { kind: 'meeting', frec, members: new Set(), boss, phase, hold: false, timer: 0 };
+  const chair = crew.find((a) => a.isLead) ?? null;
+  const place = assignSpots(crew.filter((a) => a !== chair).map((a) => ({ id: a, x: a.x, y: a.y })), spots.spots);
+  if (place.size === 0) return null;
+  if (chair) place.set(chair, spots.boss);
+  const phase = opts.phase ?? '';
+  const next = {
+    kind: 'meeting', type: opts.kind ?? 'phase', frec, members: new Set(), boss: chair, phase, hold: false, timer: 0,
+    onHold: opts.onHold ?? null, onEnd: opts.onEnd ?? null, onSwitch: opts.onSwitch ?? null,
+  };
   frec.meeting = next;
   emitFx('meeting-start', { floor: frec, title: phase });
   let walkMs = 0;
@@ -1325,13 +1363,50 @@ function onPhase(sig) {
     walkMs = Math.max(walkMs, goTo(rec, frec, { x: spot.at[0], y: spot.at[1], face: spot.face, seated: false, seat: null }));
   }
   next.timer = clockTimers.setTimeout(() => holdMeeting(next), walkMs + M.gatherPauseMs);
+  return next;
 }
 
-/** Everyone stands in place: the boss says the phase, and the meeting ends ui.meeting.seconds from now. */
+/** Ends the floor's meeting now (everybody walks back); false when there was none. */
+function endFloorMeeting(frec) {
+  const mt = frec.meeting;
+  if (!mt) return false;
+  clockTimers.clearTimeout(mt.timer);
+  endMeeting(mt);
+  return true;
+}
+
+/**
+ * A workflow went on to its next phase (SSE "phase"): the floor's characters walk to the meeting spots in front of the board, the boss
+ * announces the phase, and after ui.meeting.seconds they walk back. Only a floor on show meets; there is no queue for the others.
+ */
+function onPhase(sig) {
+  noteActivity(sig.sessionId, Date.now(), ui.ui.follow.phaseWeight);
+  followPoke();
+  const frec = floorRecs.get(sig.sessionId);
+  if (frec) emitFx('phase', { floor: frec, title: clipPhase(sig.phase, ui.ui.meeting.phaseMaxChars) });
+  if (!frec?.scene.raw.meeting || frec.off || paused() || frec.status === 'leaving') return;
+  const phase = clipPhase(sig.phase, ui.ui.meeting.phaseMaxChars);
+  const mt = frec.meeting;
+  if (mt) { // a new phase during a meeting: the boss says the new one and the time starts again
+    if (mt.type === 'bell') { // a bell meeting is taken over: the lead announces the phase from the boss spot
+      mt.onSwitch?.(mt);
+      mt.type = 'phase';
+      mt.onHold = mt.onEnd = mt.onSwitch = null;
+      mt.boss = [...mt.members].find((a) => a.isLead) ?? null;
+    }
+    mt.phase = phase;
+    if (mt.hold) holdMeeting(mt);
+    return;
+  }
+  startFloorMeeting(frec, { phase });
+}
+
+/** Everyone stands in place: a phase meeting has the boss say the phase and ends ui.meeting.seconds from now; a bell meeting hands over to its own onHold. */
 function holdMeeting(mt) {
-  const ms = ui.ui.meeting.seconds * 1000;
   mt.hold = true;
   clockTimers.clearTimeout(mt.timer);
+  if (mt.onHold) return mt.onHold(mt);
+  const ms = ui.ui.meeting.seconds * 1000;
   if (mt.boss && mt.members.has(mt.boss)) sayFor(mt.boss, line('meetingBoss', mt.phase), ms);
   mt.timer = clockTimers.setTimeout(() => endMeeting(mt), ms);
 }
@@ -1353,6 +1428,7 @@ function finishMeeting(mt) {
   if (mt.frec.meeting !== mt) return;
   mt.frec.meeting = null;
   emitFx('meeting-end', { floor: mt.frec });
+  mt.onEnd?.(mt);
 }
 
 /** One character leaves the meeting for its own reasons (picked up, finished, moved by the server, floor hidden); the caller deals with it from there. */
@@ -2225,8 +2301,9 @@ function renderFloor(fv, elm) {
   setText(rec.ff, fv.folder);
   rec.ff.hidden = fv.folder === '';
   setText(rec.prov, originText(fv));
-  setText(rec.fs, STATUS_TEXT[fv.status] ?? fv.status);
-  rec.fs.className = `fs ${fv.status}`;
+  rec.lunch = Boolean(fv.rest); // a usage limit has the floor on its lunch break: no meetings, no screen light, no thinking bubble for the lead
+  setText(rec.fs, fv.rest ? ui.ui.rest.lobbyStatus : STATUS_TEXT[fv.status] ?? fv.status);
+  rec.fs.className = `fs ${fv.rest ? 'rest' : fv.status}`;
   setText(rec.bt, fv.board.title);
   setText(rec.bl, fv.board.line);
   rec.bl.hidden = fv.board.line === '';
@@ -2251,7 +2328,7 @@ function renderFloor(fv, elm) {
     sprite: fv.lead.sprite,
     slot: { kind: 'seat', i: 0, x: lead.at[0], y: lead.at[1], approach: lead.approach, sit: lead.sitAt, face: lead.face, ring: 0 },
     state: fv.lead.state,
-    bubble: fv.lead.bubble,
+    bubble: fv.rest ? '' : fv.lead.bubble,
     since: fv.lead.bubble === (rec.leadBubble ?? null) ? rec.leadSince : lastNow,
   };
   rec.leadBubble = fv.lead.bubble;
@@ -2643,7 +2720,7 @@ function drawWall(now) {
     const clk = clockParts(now, L.days);
     put(w.date, clk.date);
     put(w.time, clk.time);
-    const rows = employeeRows(lb.roster, now, L, ui.ui.bubbleMaxChars, ui.ui.play.statusBubbles);
+    const rows = employeeRows(lb.roster, now, L, ui.ui.bubbleMaxChars, ui.ui.play.statusBubbles, ui.ui.rest.lobbyStatus);
     lb.pages = pageCount(rows.length, w.rows.length);
     lb.page %= lb.pages;
     if (lb.pages > 1 && lb.pageAt === 0) lb.pageAt = now + L.pageSeconds * 1000;
@@ -2687,6 +2764,23 @@ function drawNews() {
   if (tc) put(tc, line(a));
   if (tl) put(tl, line(b));
   if (tr) put(tr, line(c));
+}
+
+const lunchNoted = new Set(); // session ids whose lunch break the lobby news has mentioned
+
+/** The lobby news says once when a floor goes on its lunch break (ui.rest.news); the floor is noted again after it has been back at work. */
+function noteLunches(list) {
+  const now = Date.now();
+  for (const fv of list) {
+    if (!fv.rest) {
+      lunchNoted.delete(fv.sessionId);
+      continue;
+    }
+    if (lunchNoted.has(fv.sessionId)) continue;
+    lunchNoted.add(fv.sessionId);
+    lobbyNote({ id: `rest:${fv.sessionId}:${now}`, sessionId: fv.sessionId, ts: now, plain: restNewsText(ui.ui.rest, fv.rest, lobbyFill(ui.ui.lobby.floorLabel, { n: fv.floorNo })) });
+  }
+  for (const sid of [...lunchNoted]) if (!lastFloors.has(sid)) lunchNoted.delete(sid);
 }
 
 /** A log entry arrived (or was merged): keep the newest few for the strips. */
@@ -3041,6 +3135,7 @@ function render(state) {
   for (const id of [...floorRecs.keys()]) if (!ids.has(id)) removeSession(id, false);
 
   lastFloors = new Map(list.map((f) => [f.sessionId, f]));
+  noteLunches(list);
   const floorEls = [];
   const rowEls = [];
   for (const fv of list) {
@@ -3065,6 +3160,7 @@ function render(state) {
   lobbySync(list);
   card?.refresh();
   boardPanel?.refresh();
+  for (const fn of stateFns) fn(list);
 }
 
 async function refreshState() {
@@ -3170,6 +3266,7 @@ function connect() {
   es.addEventListener('fail', (ev) => onFail(JSON.parse(ev.data)));
   es.addEventListener('weather', (ev) => onWeather(JSON.parse(ev.data)));
   es.addEventListener('sysload', (ev) => { sysLoad = JSON.parse(ev.data); emitFx('sysload', { cpu: sysLoad.cpu, mem: sysLoad.mem }); if (lobby?.wall) drawSys(); });
+  for (const type of SERVER_EVENTS) es.addEventListener(type, (ev) => { for (const fn of serverFns.get(type) ?? []) fn(JSON.parse(ev.data)); });
   es.addEventListener('error', () => {
     showConn('연결이 끊겼습니다. 다시 연결하는 중…');
     // The browser retries by itself unless the server refused the stream (then the state is CLOSED).
@@ -3421,6 +3518,9 @@ function cardWho(rec) {
 
 /** Everything an effects area may use of the office, so it never reaches into this file (the typedef in web/fx.mjs is the documentation). */
 function buildFxCtx() {
+  gestures = createGestures(ui.ui.gesture.priority, clearGestures);
+  let stateAt = Date.now(); // when the last state frame arrived: ctx.serverNow() counts on from lastNow
+  stateFns.add(() => { stateAt = Date.now(); });
   const floorList = () => [...floorRecs.values(), ...(lobby ? [lobby] : [])];
   const charList = (floor) => (floor ? [...(floor.agents ?? floor.chars).values()] : [...floorList().flatMap((f) => [...(f.agents ?? f.chars).values()]), ...(cat ? [cat.rec] : [])]);
   const hook = (set) => (fn) => {
@@ -3437,6 +3537,27 @@ function buildFxCtx() {
     chars: charList,
     bySprite: (key) => charList().filter((r) => r.sprite === key),
     recOf: (e) => recOf.get(e),
+    onServer: (type, fn) => {
+      if (!serverFns.has(type)) serverFns.set(type, new Set());
+      serverFns.get(type).add(fn);
+      return () => serverFns.get(type).delete(fn);
+    },
+    onState: hook(stateFns),
+    view: (sessionId) => lastFloors.get(sessionId) ?? null,
+    serverNow: () => lastNow + (Date.now() - stateAt),
+    gesture: gestures,
+    signSlot: (frec, kind) => { // the `kind` cell in the row of the floor's name plate (cells keep the ui.signSlots order, made when first asked for)
+      const order = ui.ui.signSlots;
+      const sign = frec.fno?.parentElement;
+      if (!sign || !order.includes(kind)) return null;
+      let slot = [...sign.children].find((c) => c.dataset.slot === kind);
+      if (!slot) {
+        slot = el('span', 'sign-slot');
+        slot.dataset.slot = kind;
+        sign.insertBefore(slot, [...sign.children].find((c) => order.indexOf(c.dataset.slot) > order.indexOf(kind)) ?? null);
+      }
+      return slot;
+    },
     cat: () => cat,
     line,
     addLinePicker: hook(linePickers),
@@ -3461,6 +3582,11 @@ function buildFxCtx() {
     freeze,
     clearGestures,
     nav: { path: (d, a, b) => nav.path(d, a, b), snap: (d, p) => nav.snap(d, p), grid: (d) => nav.grid(d) },
+    meeting: { // the one meeting machine (startFloorMeeting): a workflow phase and a bell meeting both run on it
+      start: startFloorMeeting,
+      end: endFloorMeeting,
+      active: (frec) => frec.meeting?.type ?? null,
+    },
     life: {
       get ambient() { return amb; },
       get cat() { return catC; },
@@ -3476,11 +3602,21 @@ function buildFxCtx() {
 /** Starts every effects area once; an area that fails to start is reported and skipped, the office goes on. */
 function initFxAreas() {
   const ctx = buildFxCtx();
+  const started = new Set();
   for (const init of [initFxWeather, initFxChars, initFxEvents, initFxLed, initFxHit, initOfficeLife]) {
     try {
       init(ctx);
+      started.add(init);
     } catch (err) {
       console.error('효과 영역을 시작하지 못했습니다:', err);
+    }
+  }
+  for (const { name, init } of AREAS) { // the areas added after the first six (areas.mjs lists all of them, in this order)
+    if (started.has(init)) continue;
+    try {
+      init(ctx);
+    } catch (err) {
+      console.error(`효과 영역을 시작하지 못했습니다 (${name}):`, err);
     }
   }
 }

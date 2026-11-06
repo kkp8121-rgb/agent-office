@@ -1,5 +1,6 @@
 // Entry point: node server/main.mjs [--open]
 import { spawn } from 'node:child_process';
+import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { loadConfig, pollDelayMs } from './config.mjs';
 import { Office } from './office.mjs';
@@ -10,13 +11,22 @@ import { loadSaved, saveSaved } from './hidden.mjs';
 import { createWeather } from './weather.mjs';
 import { createSysLoad } from './sysload.mjs';
 import { loadPersonas, personaLimits } from './persona.mjs';
+import { CostLedger, localClock } from './cost.mjs';
+import { CostScan, planTargets, loadCostFile, saveCostFile } from './cost-scan.mjs';
 
 const EXIT_PORT_BUSY = 2;
 
 const cfg = loadConfig();
 const dataDir = cfg.dataDir;
 const office = new Office(cfg, loadSaved(dataDir));
-const poller = new Poller(cfg, office);
+// Labour cost: the live tails count into the ledger, one scan of the records at start-up counts today and last week's same weekday,
+// and data/cost.json keeps the day totals between runs.
+const costClock = localClock(cfg.cost.dayStartHour);
+const costFile = path.join(dataDir, cfg.cost.file);
+const ledger = CostLedger.fromJSON(loadCostFile(costFile), {
+  clock: costClock, keepDays: cfg.cost.keepDays, dedupePerFile: cfg.cost.dedupePerFile, topCount: cfg.ui.cost.topCount,
+}, Date.now());
+const poller = new Poller(cfg, office, ledger);
 // The only outbound connection (see README: Weather). AGENT_OFFICE_WEATHER_URL points it at a local fake server for checks.
 const weather = createWeather(cfg.weather, { baseUrl: process.env.AGENT_OFFICE_WEATHER_URL || undefined });
 const sysload = createSysLoad(cfg.sysload); // PC-wide CPU % and memory %: sampled only while a page is connected
@@ -35,6 +45,31 @@ function saveIfChanged() {
   return result;
 }
 
+let costSavedVersion = ledger.version;
+let costSavedAt = 0;
+
+/** Writes cost.json when the ledger changed and cost.saveMinMs has passed since the last write (`force`: now, at shutdown). */
+function saveCostIfDue(now, force = false) {
+  if (ledger.version === costSavedVersion || (!force && now - costSavedAt < cfg.cost.saveMinMs)) return Promise.resolve();
+  const version = ledger.version;
+  ledger.prune(now);
+  costSavedAt = now;
+  mkdirSync(dataDir, { recursive: true });
+  return saveCostFile(costFile, ledger.toJSON(now)).then(() => { costSavedVersion = version; });
+}
+
+let scanTimer = null;
+if (cfg.cost.backfill.enabled) {
+  const targets = planTargets({ ledger, clock: costClock, nowTs: Date.now(), backfill: cfg.cost.backfill });
+  if (targets.length) {
+    ledger.setScanning(true); // the screen says "counting" until the scan ends
+    const scan = new CostScan({ ledger, claudeHome: cfg.claudeHome, codexHome: cfg.codex?.enabled ? cfg.codexHome : '', cfg: { backfill: cfg.cost.backfill, tail: cfg.tail, codex: cfg.codex } });
+    scanTimer = setTimeout(() => {
+      scan.run(targets).catch((e) => console.error('인건비 집계 실패:', e?.message ?? e));
+    }, cfg.cost.backfill.delayMs);
+  }
+}
+
 // ---- server ----
 
 let timer = null;
@@ -48,11 +83,12 @@ function shutdown() {
   if (closing) return;
   closing = true;
   clearTimeout(timer);
+  clearTimeout(scanTimer);
   sysload.close(); // the CPU helper process ends with the server
   const closed = new Promise((resolve) => server.close(resolve));
   server.closeSse();
   server.closeAllConnections();
-  inflight.then(saveIfChanged).then(() => closed).finally(() => process.exit(0));
+  inflight.then(saveIfChanged).then(() => saveCostIfDue(Date.now(), true)).then(() => closed).finally(() => process.exit(0));
 }
 
 // A browser just connected while the loop sleeps at the idle rate: poll now instead of showing a stale floor.
@@ -64,7 +100,7 @@ function wake() {
 
 // persona.json (the lines work writes it, never this server); AGENT_OFFICE_PERSONA_FILE points a check at another file
 const personas = loadPersonas(process.env.AGENT_OFFICE_PERSONA_FILE || path.join(cfg.root, 'persona.json'), personaLimits(cfg));
-const server = createServer(cfg, office, { onSavedChange: saveIfChanged, onShutdown: shutdown, onSseConnect: wake, weather, sysload, personas });
+const server = createServer(cfg, office, { onSavedChange: saveIfChanged, onShutdown: shutdown, onSseConnect: wake, weather, sysload, personas, cost: ledger });
 
 server.on('error', (e) => {
   if (e.code === 'EADDRINUSE') {
@@ -100,6 +136,7 @@ async function round() {
     server.broadcast();
   });
   await step(failures, saveIfChanged);
+  await step(failures, () => saveCostIfDue(now));
   if (failures.length === 0) lastError = '';
   running = false;
   if (!closing) timer = setTimeout(() => { inflight = round(); }, pollDelayMs(cfg, server.sseClients));

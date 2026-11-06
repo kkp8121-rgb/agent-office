@@ -3,9 +3,11 @@
 // Pure model first (panelModel: what the panel shows), then the DOM. Nothing is invented: every field comes from the floor view of the snapshot.
 // The panel redraws when the office calls refresh() after a state update (no timers). Opening and closing animate opacity and transform only,
 // and only while the effects switch is on and the viewer does not ask for reduced motion; otherwise it appears and disappears at once.
-import { fmtDuration } from './lobby.mjs';
+import { fmtDuration, live as office, onLive } from './lobby.mjs';
 import { progressFrac, rowKind } from './board.mjs';
+import { floorCost } from './cost-view.mjs';
 
+const COST_PEOPLE = 3; // the floor's people listed under its cost
 const fill = (template, vars) => template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
 
 /** The count line and bar numbers of a list: {head, done, total, frac}. `template` = ui.board.todos / phases. */
@@ -14,12 +16,14 @@ function counted(template, done, total) {
 }
 
 /**
- * What the panel shows for a floor view `fv` at time `now` (ms). `L` = ui.boardPanel, `board` = ui.board, `lobby` = ui.lobby (state words, duration units).
- * {title, folder, lead: {name, role, state, doing}, runFor, todos, phases, staff}; todos / phases are null when the floor has none.
+ * What the panel shows for a floor view `fv` at time `now` (ms). `L` = ui.boardPanel, `board` = ui.board, `lobby` = ui.lobby (state words, duration units),
+ * `cost` = {frame, cfg} (the latest cost frame and ui.cost) or null.
+ * {title, folder, lead: {name, role, state, doing}, runFor, cost, todos, phases, staff}; todos / phases are null when the floor has none; cost is null without `cost`:
+ * {title, total, people, cache} (see floorCost): the floor's new tokens today, its top people, and the cache reads, which are never part of the total.
  * todos: {head, done, total, frac, rows: [{text, kind}], more}; phases: the same plus {summary} (done, now, next); no bar when the script lists no total.
  * The lists are what the server sent: a long list is a window, `more` counts the items it left out.
  */
-export function panelModel(fv, now, L, board, lobby) {
+export function panelModel(fv, now, L, board, lobby, cost = null) {
   const rowsOf = (items) => items.map((i) => ({ text: i.text, kind: rowKind(i.status) }));
   let todos = null;
   if (fv.todos && fv.todos.total > 0) todos = { ...counted(board.todos, fv.todos.done, fv.todos.total), rows: rowsOf(fv.todos.items), more: fv.todos.total - fv.todos.items.length };
@@ -43,11 +47,13 @@ export function panelModel(fv, now, L, board, lobby) {
     doing: a.bubble || '',
     since: a.since > 0 ? fmtDuration(Math.max(0, now - a.since), lobby) : '',
   }));
+  const floorName = fill(lobby.floorLabel, { n: fv.floorNo });
   return {
     title: fv.title,
     folder: fv.folder,
     lead: { name: fv.lead.name, role: fv.lead.role, state: stateWord(fv.lead.state), doing: fv.lead.bubble || '' },
     runFor: fv.startedAt > 0 ? fmtDuration(Math.max(0, now - fv.startedAt), lobby) : '',
+    cost: cost && floorCost(cost.frame, cost.cfg, fv.sessionId, { floor: floorName, cacheRead: `${floorName} ${cost.cfg.cacheReadLabel}` }, COST_PEOPLE),
     todos,
     phases,
     staff,
@@ -100,6 +106,16 @@ function bodyOf(doc, m, L) {
   add(L.lead, [m.lead.name, m.lead.role].filter(Boolean).join(' · '));
   add(L.runFor, m.runFor);
   frag.append(info);
+  if (m.cost) {
+    const s = section(doc, m.cost.title);
+    const dl = mk(doc, 'dl', 'bp-info');
+    for (const r of [m.cost.total, ...m.cost.people]) dl.append(mk(doc, 'dt', '', r.label), mk(doc, 'dd', '', r.text));
+    const small = mk(doc, 'small', '', m.cost.cache.text);
+    dl.append(mk(doc, 'dt', '', m.cost.cache.label), mk(doc, 'dd')); // cache reads: smaller, below the new tokens, never added to them
+    dl.lastChild.append(small);
+    s.append(dl);
+    frag.append(s);
+  }
   if (m.todos) {
     const s = section(doc, m.todos.head);
     s.append(barEl(doc, m.todos.frac), listEl(doc, m.todos.rows, m.todos.more, L));
@@ -149,7 +165,7 @@ export function createBoardPanel(deps) {
   function paint() {
     const fv = live.view();
     live.gone.hidden = fv !== null;
-    if (fv) live.body.replaceChildren(bodyOf(live.doc, panelModel(fv, deps.now(), L, board, lobby), L));
+    if (fv) live.body.replaceChildren(bodyOf(live.doc, panelModel(fv, deps.now(), L, board, lobby, office.cfg ? { frame: office.cost, cfg: office.cfg } : null), L));
   }
 
   function animate(c, opening) {
@@ -202,7 +218,8 @@ export function createBoardPanel(deps) {
       if (!panel.contains(e.target)) close();
     });
     closeBtn.addEventListener('click', close);
-    live = { key, view, boardEl, doc, back, panel, body, gone, closeBtn, stop: () => doc.removeEventListener('keydown', onKey, true) };
+    const offLive = onLive(() => live && paint()); // a new cost frame repaints the open panel
+    live = { key, view, boardEl, doc, back, panel, body, gone, closeBtn, stop: () => { doc.removeEventListener('keydown', onKey, true); offLive(); } };
     boardEl.setAttribute('aria-expanded', 'true');
     paint();
     if (motionOn()) {

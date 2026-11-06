@@ -1,5 +1,6 @@
 // Demo feeder: builds a fake ~/.claude (two sessions) and keeps feeding it so the office has something to show.
-//   node scripts/demo-feed.mjs <tmpHome>
+//   node scripts/demo-feed.mjs <tmpHome> [--sessions <n>]
+//   --sessions <n>: n fake sessions instead of the two (the two demo ones, then more of the same kinds; 0 = none)
 //   AGENT_OFFICE_CLAUDE_HOME=<tmpHome> AGENT_OFFICE_CODEX_HOME=<empty dir> AGENT_OFFICE_DATA_DIR=<tmp data dir> AGENT_OFFICE_PORT=47811 node server/main.mjs
 // AGENT_OFFICE_DATA_DIR keeps the demo's hide/rename records out of the repo's data/ folder (and the real instance's).
 // Every 2 s: tool lines, new subagents, finished subagents. To simulate "run the session again" (same sessionId,
@@ -9,9 +10,12 @@ import { spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const home = process.argv[2];
-if (!home) {
-  console.error('사용법: node scripts/demo-feed.mjs <tmpHome>');
+const args = process.argv.slice(2);
+const flag = args.indexOf('--sessions');
+const wanted = flag >= 0 ? Number.parseInt(args[flag + 1], 10) : 2;
+const home = args.find((a, i) => !a.startsWith('--') && i !== flag + 1);
+if (!home || !Number.isInteger(wanted) || wanted < 0 || wanted > 99) {
+  console.error('사용법: node scripts/demo-feed.mjs <tmpHome> [--sessions <0..99>]');
   process.exit(1);
 }
 const TICK_MS = 2000;
@@ -149,7 +153,11 @@ function step(s) {
   s.agents = s.agents.filter((a) => stepAgent(s, a));
 }
 
-const sessions = SESSIONS.map(startSession);
+// the first two are the demo sessions as they always were; more are the same two kinds under new ids and folders
+const defs = Array.from({ length: wanted }, (_, i) => (i < SESSIONS.length ? SESSIONS[i] : {
+  ...SESSIONS[i % SESSIONS.length], id: `demo-session-${i + 1}`, project: `C--demo-project-${i + 1}`, cwd: `C:\\demo\\project-${i + 1}`, title: `${SESSIONS[i % SESSIONS.length].title} ${i + 1}`,
+}));
+const sessions = defs.map(startSession);
 
 function checkRerun() {
   const file = join(home, 'rerun.txt');

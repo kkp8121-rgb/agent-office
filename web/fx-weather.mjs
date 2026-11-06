@@ -261,10 +261,10 @@ export function flashFrames(peak) {
 
 /**
  * What the monitor light does on a character: 'work' (working or thinking: the light ripples like a changing screen), 'rest' (idle: a steady
- * soft light) or '' (nothing: standing, away on a trip, asleep, finished). Only someone really seated at a desk is lit.
+ * soft light) or '' (nothing: standing, away on a trip, asleep, finished, or the floor is on its lunch break). Only someone really seated at a desk is lit.
  */
 export function litMode(rec, cfg) {
-  if (!rec.seated || rec.away || rec.isCat) return '';
+  if (!rec.seated || rec.away || rec.isCat || rec.frec?.lunch) return ''; // a floor on its lunch break is dark at the desks
   return cfg.glow.states[rec.state] ?? '';
 }
 

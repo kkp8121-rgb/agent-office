@@ -1,9 +1,9 @@
 """Run one Codex sheet: python art/sit/gen.py <sheet index> (see prompts.json)."""
-import shutil, json, os, subprocess, sys, time, datetime
+import shutil, json, os, subprocess, sys, tempfile, time, datetime
 
-ROOT = "C:/Users/gustj/agent-office"
-WORK = "C:/Users/gustj/AppData/Local/Temp/claude/C--Project/6106276a-a6e5-4468-8650-198bebbf83af/scratchpad/layers/sit"
-LOG = "C:/Users/gustj/AppData/Local/Temp/claude/C--Project/6106276a-a6e5-4468-8650-198bebbf83af/scratchpad/layers/codex-calls.log"
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+WORK = os.environ.get("AGENT_OFFICE_ART_WORK") or os.path.join(tempfile.gettempdir(), "agent-office-art", "sit")
+LOG = os.path.join(os.path.dirname(WORK), "codex-calls.log")
 P = json.load(open(ROOT + "/art/sit/prompts.json", encoding="utf-8"))
 i = int(sys.argv[1])
 keys = P["sheets"][i]

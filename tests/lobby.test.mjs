@@ -9,8 +9,9 @@ import { checkScene } from '../server/scene-check.mjs';
 import { readPngSize } from '../server/scenes.mjs';
 import {
   assignLobbySeats, backRowSeats, changeOf, changeText, clip, clockParts, employeeRows, fmtDuration, headline, indexRows, lobbyRoster, msToNextMinute,
-  newsText, officeScore, pageCount, pageRows, pushSample, stateLabel, tableCapacity,
+  newsText, officeScore, pageCount, pageRows, pushSample, stateLabel, tableCapacity, costPageRows, costPageStep, floorFigure, initCost, live,
 } from '../web/lobby.mjs';
+import { costView } from '../web/cost-view.mjs';
 import { quadFrame } from '../web/board.mjs';
 import { LOBBY_ID, busiestFloor, chooseFollow, fallbackFloor, nextFloor, viewOrder } from '../web/view.mjs';
 import { ROOT, cfg as rawCfg } from './helpers/fixture.mjs';
@@ -224,6 +225,24 @@ test('lobby board: state words, with the leaving floor overriding every state', 
   assert.equal(stateLabel({ ...e, floorStatus: 'leaving' }, L), '퇴근 중');
 });
 
+test('lobby board: a floor on its lunch break says the lunch word for everyone on it, and a leaving floor still says 퇴근 중', () => {
+  const e = { state: 'working', floorStatus: 'busy', rest: true };
+  assert.equal(stateLabel(e, L, '점심시간'), '점심시간');
+  assert.equal(stateLabel({ ...e, state: 'idle' }, L, '점심시간'), '점심시간');
+  assert.equal(stateLabel(e, L), '근무 중', 'no word given: the state word');
+  assert.equal(stateLabel({ ...e, rest: false }, L, '점심시간'), '근무 중');
+  assert.equal(stateLabel({ ...e, floorStatus: 'leaving' }, L, '점심시간'), '퇴근 중');
+  const roster = lobbyRoster([floor('a', 2, [agent('a:1')], { rest: { until: null, limitKind: 'other' } }), floor('b', 3, [agent('b:1')])]);
+  assert.deepEqual(roster.map((r) => r.rest), [true, true, false, false]);
+  const rows = employeeRows(roster, 60000, L, 16, [], '점심시간');
+  assert.deepEqual(rows.map((r) => r.cells[3]), ['점심시간', '점심시간', '대기', '근무 중']);
+});
+
+test('lobby news: an office sentence is shown as it is, clipped', () => {
+  assert.equal(newsText({ ts: 0, plain: '2층 점심시간 · 07:05 복귀' }, 2, L), '2층 점심시간 · 07:05 복귀');
+  assert.ok(newsText({ ts: 0, plain: 'x'.repeat(500) }, 2, L).length <= L.newsMax + 1);
+});
+
 test('lobby board: one row per roster entry with every column; the task is the bubble clipped like the bubble', () => {
   const now = 10 * 60000 + 5000;
   const roster = lobbyRoster([floor('a', 2, [agent('a:1', { name: '서진', bubble: '아주아주 긴 말풍선 내용을 적어 봅니다 열여섯자넘음', enteredAt: 60000, wf: true, state: 'done' })], { reports: 3, startedAt: 5000 })]);
@@ -419,8 +438,8 @@ test('lobby server: the snapshot adds no text field (privacy list unchanged)', (
   o.syncAgents('s1', [M('a1')], 100000);
   const f = floorOf(o, 's1');
   // 'phases' carries the same cleaned phase names the board's sheet already sends (the detail panel shows them next to the to-do list)
-  assert.deepEqual(Object.keys(f).sort(), ['agents', 'autoTitle', 'board', 'colorIndex', 'design', 'failAt', 'floorNo', 'folder', 'lead', 'origin', 'phases', 'provider', 'reports', 'sessionId', 'sheet', 'startedAt', 'status', 'title', 'todos', 'workflows']);
-  assert.deepEqual(Object.keys(f.agents[0]).sort(), ['agentId', 'bubble', 'enteredAt', 'key', 'name', 'role', 'since', 'slot', 'sprite', 'state', 'wf']);
+  assert.deepEqual(Object.keys(f).sort(), ['agents', 'autoTitle', 'board', 'colorIndex', 'conflicts', 'design', 'failAt', 'floorNo', 'folder', 'lead', 'origin', 'phases', 'provider', 'reports', 'rest', 'sessionId', 'sheet', 'startedAt', 'status', 'title', 'todos', 'workflows']);
+  assert.deepEqual(Object.keys(f.agents[0]).sort(), ['agentId', 'bubble', 'conflict', 'enteredAt', 'key', 'model', 'name', 'phase', 'pile', 'role', 'since', 'slot', 'slowKind', 'slowSince', 'sprite', 'state', 'wf']);
 });
 
 // ---- scene ----
@@ -594,4 +613,125 @@ test('lobby bubbles: only the back row (smallest y) of the shipped scene keeps a
   assert.equal(ys.size, 1);
   assert.equal([...ys][0], Math.min(...seats.map((s) => s.at[1])));
   assert.deepEqual([...backRowSeats([{ at: [1, 50] }, { at: [2, 30] }, { at: [3, 33] }, { at: [4, 90] }])].sort(), [1, 2]);
+});
+
+// ---- labour cost on the wall ----
+
+const costFrame = (o = {}) => ({
+  day: '2026-11-06', tokens: 5_000_000, cacheRead: 9_000_000, lastWeek: null, floors: [{ sessionId: 's1', tokens: 4_000_000 }],
+  top: [
+    { sessionId: 's1', agentKey: null, name: '하나', floorName: '제목 하나', tokens: 3_000_000 },
+    { sessionId: 'gone', agentKey: 'x', name: '', floorName: '', tokens: 2_000_000 },
+  ],
+  scanning: false, partial: false, ...o,
+});
+
+test('lobby cost: the cost page lists the top people with their floor, and a person whose floor left has none and no click target', () => {
+  const rows = costPageRows(costView(costFrame(), cfg.ui.cost), [floor('s1', 3)], L, 5);
+  assert.deepEqual(rows.map((r) => r.cells), [['하나', '3층', '제목 하나', '', '', '3.0M', ''], [cfg.ui.cost.goneName, '', '', '', '', '2.0M', '']]);
+  assert.deepEqual(rows.map((r) => r.sid), ['s1', '']);
+  assert.equal(costPageRows(costView(costFrame(), cfg.ui.cost), [floor('s1', 3)], L, 1).length, 1, 'at most as many rows as the table has');
+  assert.deepEqual(costPageRows(costView(costFrame({ scanning: true }), cfg.ui.cost), [floor('s1', 3)], L, 5), [], 'counting: no half-counted rows');
+  assert.deepEqual(costPageRows(costView(null, cfg.ui.cost), [], L, 5), []);
+});
+
+test('lobby cost: a floor line of the index panel starts with its tokens, an unlisted floor with the empty mark, counting with the scanning word', () => {
+  const C = cfg.ui.cost;
+  const v = costView(costFrame(), C);
+  assert.equal(floorFigure(v, costFrame(), 's1', C), '4.0M');
+  assert.equal(floorFigure(v, costFrame(), 's9', C), C.empty);
+  assert.equal(floorFigure(costView(costFrame({ scanning: true }), C), costFrame({ scanning: true }), 's1', C), C.scanning);
+  assert.equal(floorFigure(costView(null, C), null, 's1', C), C.empty);
+});
+
+test('lobby cost: the cost page comes after the last page of the table, which is held back one flip; a one-page table alternates', () => {
+  // three pages: it comes up when the table has wrapped to page 0 and puts the table back to its last page
+  assert.deepEqual(costPageStep(false, 3, 1), { show: false, rewind: null });
+  assert.deepEqual(costPageStep(false, 3, 2), { show: false, rewind: null });
+  assert.deepEqual(costPageStep(false, 3, 0), { show: true, rewind: 2 });
+  assert.deepEqual(costPageStep(true, 3, 0), { show: false, rewind: null }, 'the next tick hands the wall back to the table');
+  assert.deepEqual(costPageStep(false, 1, 0), { show: true, rewind: null });
+  assert.deepEqual(costPageStep(true, 1, 0), { show: false, rewind: null });
+  // walk a whole round: every table page is on the wall once, the cost page once, in order
+  let page = 0;
+  let shown = false;
+  const pages = 3;
+  const seen = [];
+  for (let flip = 0; flip < 8; flip++) {
+    seen.push(shown ? 'cost' : page);
+    page = (page + 1) % pages; // the table flips by itself
+    const step = costPageStep(shown, pages, page);
+    if (step.rewind !== null) page = step.rewind;
+    shown = step.show;
+  }
+  assert.deepEqual(seen, [0, 1, 2, 'cost', 0, 1, 2, 'cost']);
+});
+
+// ---- initCost on a stand-in page (review nits: the table's title row, no ic- class) ----
+
+class Node {
+  constructor(doc, tag) { Object.assign(this, { tag, ownerDocument: doc, children: [], dataset: {}, style: {}, hidden: false, className: '', textContent: '' }); }
+  get classList() { return { contains: (c) => this.className.split(' ').includes(c) }; }
+  append(...kids) { this.children.push(...kids); }
+  setAttribute() {}
+}
+const standIn = () => {
+  const doc = { createElement: (tag) => new Node(doc, tag) };
+  const el = new Node(doc, 'div');
+  const title = new Node(doc, 'div');
+  title.className = 'led-hd';
+  const cols = new Node(doc, 'div');
+  el.append(title, cols);
+  const lb = { sid: 'lobby', page: 0, pages: 1, pageAt: 0, wall: { boxes: new Map([['center', { el }]]), rows: [new Node(doc, 'div'), new Node(doc, 'div')], idxRows: [], tickers: [] } };
+  const hooks = { state: [], server: {}, fx: {}, timers: [] };
+  const ctx = {
+    ui: cfg.ui, lobby: () => lb, floorActive: () => true, now: () => 0,
+    timers: { setTimeout: (fn) => hooks.timers.push(fn), clearTimeout: () => {} },
+    onServer: (name, fn) => { hooks.server[name] = fn; },
+    onState: (fn) => hooks.state.push(fn),
+    onPauseChange: () => {},
+    fx: { onFx: (name, fn) => { hooks.fx[name] = fn; } },
+  };
+  return { ctx, lb, el, title, cols, hooks };
+};
+
+test('lobby cost page: its box is marked by a data attribute, and the whole table (title row too) steps aside while it shows', () => {
+  const was = globalThis.MutationObserver;
+  globalThis.MutationObserver = class { observe() {} };
+  try {
+    const { ctx, el, title, cols, hooks } = standIn();
+    initCost(ctx);
+    const box = el.children.at(-1);
+    assert.equal(box.className, '', 'no class of another package');
+    assert.ok('costPage' in box.dataset);
+    assert.equal(box.hidden, true);
+    hooks.timers.shift()(); // the rotation's first look: a one-page table alternates to the cost page
+    assert.equal(box.hidden, false);
+    assert.equal(title.style.display, 'none');
+    assert.equal(cols.style.display, 'none');
+    hooks.timers.shift()(); // and back
+    assert.equal(box.hidden, true);
+    assert.equal(title.style.display, '');
+  } finally {
+    globalThis.MutationObserver = was;
+  }
+});
+
+test('lobby cost page: a state frame keeps the data current and paints the wall', () => {
+  const was = globalThis.MutationObserver;
+  globalThis.MutationObserver = class { observe() {} };
+  try {
+    const { ctx, el, hooks } = standIn();
+    initCost(ctx);
+    const box = el.children.at(-1);
+    hooks.server.cost(costFrame());
+    hooks.timers.shift()(); // the cost page is on the wall
+    const firstRow = () => box.children[1];
+    assert.equal(firstRow().children[1].textContent, '', 'no floors known yet: no floor number');
+    hooks.state[0]([floor('s1', 3)]);
+    assert.equal(live.floors.length, 1, 'the data is kept current');
+    assert.equal(firstRow().children[1].textContent, '3층');
+  } finally {
+    globalThis.MutationObserver = was;
+  }
 });

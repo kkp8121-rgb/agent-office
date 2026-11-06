@@ -2,10 +2,10 @@
   python art/extras/gen.py stand <sheet 0-2> [tag]   standing sheets (4 girls each, looks in art/prompts.json "extras")
   python art/extras/gen.py sit   <sheet 0-2> [tag]   seated sheets, one reference per girl = her standing sprite
 Raw output goes to the work folder (AGENT_OFFICE_ART_WORK or the default below)."""
-import datetime, json, os, shutil, subprocess, sys, time
+import datetime, json, os, shutil, subprocess, sys, tempfile, time
 
-ROOT = "C:/Users/gustj/agent-office"
-WORK = os.environ.get("AGENT_OFFICE_ART_WORK") or "C:/Users/gustj/AppData/Local/Temp/claude/C--Project/6106276a-a6e5-4468-8650-198bebbf83af/scratchpad/varied/extras"
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+WORK = os.environ.get("AGENT_OFFICE_ART_WORK") or os.path.join(tempfile.gettempdir(), "agent-office-art", "extras")
 LOG = WORK + "/codex-calls.log"
 P = json.load(open(ROOT + "/art/prompts.json", encoding="utf-8"))
 X = P["extras"]

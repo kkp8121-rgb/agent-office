@@ -99,6 +99,12 @@
  * @property {(rec: object) => void} freeze    stop a walk where the character is
  * @property {(rec: object) => void} clearGestures
  * @property {{path: Function, snap: Function, grid: Function}} nav   the walking grid: path(design, from, to), snap(design, p), grid(design)
+ * @property {{start: (frec: object, opts?: {kind?: 'phase'|'bell', phase?: string, onHold?: Function, onEnd?: Function, onSwitch?: Function}) => object|null,
+ *   end: (frec: object) => boolean, active: (frec: object) => 'phase'|'bell'|null}} meeting
+ *                                             the one meeting machine (a workflow phase runs on it too): start gathers the crew at the meeting spots (the lead stands at
+ *                                             the boss spot and chairs), then calls onHold(mt); a 'phase' meeting ends by itself, a 'bell' one when you call end(frec);
+ *                                             onEnd(mt) after it; onSwitch(mt) when a workflow phase takes a bell meeting over. start returns null when
+ *                                             there is nothing to hold (no spots, nobody, a meeting runs already)
  * @property {object} life                     the life area's hooks (all optional to use; each returns an unsubscribe):
  *   life.ambient          ui.ambient as the office runs it (scaled under ?debug=ambient)
  *   life.cat              ui.cat as the office runs it

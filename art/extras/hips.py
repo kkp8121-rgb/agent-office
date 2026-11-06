@@ -5,11 +5,11 @@ hip   = the row just above where the legs part into two separate runs (first row
 split = the middle column of the gap between the two legs just inside that first run of rows, as a % of the width (4 decimals).
 The existing values were chosen by eye against art/walk/sheet.py; this reproduces their pattern (hip within ~2 rows of
 the first gap row, split inside the gap) and the result is checked with sheet.py."""
-import json, sys
+import json, os, sys
 import numpy as np
 from PIL import Image
 
-ROOT = "C:/Users/gustj/agent-office"
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def runs(row):
     out, s = [], None

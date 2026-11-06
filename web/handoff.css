@@ -1,0 +1,9 @@
+/* Handing work over (web/fx-handoff.mjs). Pictures are assets/props/folder.png (14x11) and plane.png (16x9); only transform is animated (by script).
+   .ho-carry sits in the name-tag layer next to the character (origin = its feet): a folder in the hand, then on the desk. .ho-fly rides the floor's .fx-layer. */
+.ho-prop { position: absolute; display: block; max-width: none; image-rendering: pixelated; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+.ho-carry { left: 12px; bottom: 26px; width: 14px; height: 11px; }
+.agt.sitting .ho-carry { bottom: 14px; }
+.ho-carry.ho-desk { left: -30px; bottom: 6px; }
+.agt.sitting .ho-carry.ho-desk { bottom: 6px; }
+.ho-fly { left: 0; top: 0; width: 14px; height: 11px; will-change: transform; }
+.ho-fly.ho-plane { width: 16px; height: 9px; }

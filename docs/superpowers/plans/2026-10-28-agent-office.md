@@ -8,11 +8,11 @@
 
 **Tech Stack:** Node.js v24.18.0 (npm 패키지 0, ES modules, `node:test`), 바닐라 HTML/CSS/JS, Python 3.12 + Pillow(그림 격자 정리), Codex CLI `codex exec` + 내장 `image_gen`(역할별 그림), 크롬 헤드리스(화면 캡처 확인).
 
-**Spec:** `C:\Users\gustj\agent-office\docs\superpowers\specs\2026-10-28-agent-office-design.md` — 실행자는 계획과 설계서를 함께 읽는다.
+**Spec:** `<저장소>\docs\superpowers\specs\2026-10-28-agent-office-design.md` — 실행자는 계획과 설계서를 함께 읽는다.
 
 ## Global Constraints
 
-- 프로젝트 루트: `C:\Users\gustj\agent-office\`. 모든 경로는 이 루트 기준.
+- 프로젝트 루트: `<저장소>\`. 모든 경로는 이 루트 기준.
 - npm 의존성 0. `package.json` 은 `"type": "module"` 과 `"test": "node --test tests/"` 만.
 - 외부 CDN·폰트·스크립트 0. 서버는 `127.0.0.1` 에만 listen.
 - 자원 절약 최우선: 그리기 반복 루프·캔버스 매 프레임 그리기 금지, 움직임은 CSS `transform` 애니메이션/transition 만. 서버 대기 CPU 1% 안팎·메모리 100MB 이하. 탭이 가려지면 애니메이션·수신 정지.
@@ -21,7 +21,7 @@
 - 사용자에게 보이는 글은 한국어. 코드 식별자·주석은 영어.
 - 파일 인코딩 UTF-8(BOM 없음 — 브라우저·Node 모듈이라 BOM 이 해롭다). 줄바꿈 LF.
 - 프로세스는 자기가 띄운 PID 로만 끈다(이름으로 끄기 금지).
-- 커밋: 사용자 승인(2026-10-28) — 각 Task 끝에서 이 저장소(`C:\Users\gustj\agent-office`)에 경로 지정 `git add <파일>` 후 커밋. `git add -A`/`.` 금지. 작성자는 전역 git 설정 그대로.
+- 커밋: 사용자 승인(2026-10-28) — 각 Task 끝에서 이 저장소(`<저장소>`)에 경로 지정 `git add <파일>` 후 커밋. `git add -A`/`.` 금지. 작성자는 전역 git 설정 그대로.
 - 원격 저장소: 사용자가 계정을 정해 알려 줄 예정 — 그 전까지 `git remote add`·push 금지.
 - 사무실 배경은 넓고 다양하고 디테일하게(설계서 §5.1): 배경 4종, 층마다 생성 순서대로 돌려 쓴다. 자리 좌표는 배경별 표.
 - 숨김은 **강제 숨김**(설계서 §5.4): 숨긴 세션은 상태·목록·기록 어디에도 나오지 않고, 그 세션의 프로세스(pid·startedAt)가 바뀌면 다시 나온다. 이름 바꾸기는 §5.5.
@@ -180,7 +180,7 @@ test('sanitize: bash without description exposes first word only', () => {
 test('sanitize: quoted exe path reduces to bare name', () =>
   assert.equal(describeTool('Bash', {command:'"C:/Program Files/nodejs/node.exe" x.mjs'}), 'node 실행'));
 test('sanitize: file tools show basename only', () => {
-  assert.equal(describeTool('Read', {file_path:'C:\\Users\\gustj\\secret\\PostController.cs'}), 'PostController.cs 읽는 중');
+  assert.equal(describeTool('Read', {file_path:'C:\\Users\\someone\\secret\\PostController.cs'}), 'PostController.cs 읽는 중');
   assert.equal(describeTool('Edit', {file_path:'/a/b/app.js'}), 'app.js 고치는 중');
   assert.equal(describeTool('Write', {file_path:'/a/b/new.md'}), 'new.md 쓰는 중');
 });

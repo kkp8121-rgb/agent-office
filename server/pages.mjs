@@ -8,6 +8,7 @@ export const INDEX_HTML = String.raw`<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>에이전트 사무실</title>
 <link rel="icon" href="data:,">
+<link rel="stylesheet" href="/web/incidents.css">
 <script>try{var t=localStorage.getItem("agent-office.theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="stylesheet" href="/web/style.css">
 <link rel="stylesheet" href="/web/fx-weather.css">
@@ -16,8 +17,12 @@ export const INDEX_HTML = String.raw`<!doctype html>
 <link rel="stylesheet" href="/web/fx-led.css">
 <link rel="stylesheet" href="/web/fx-hit.css">
 <link rel="stylesheet" href="/web/officelife.css">
+<link rel="stylesheet" href="/web/handoff.css">
 <link rel="stylesheet" href="/web/decor.css">
 <link rel="stylesheet" href="/web/card.css">
+<link rel="stylesheet" href="/web/conflict.css">
+<link rel="stylesheet" href="/web/actor.css">
+<link rel="stylesheet" href="/web/bell-floor.css">
 </head>
 <body>
 <header id="topbar">

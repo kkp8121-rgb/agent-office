@@ -95,3 +95,10 @@ test('server: the floor view carries the workflow phases next to the to-do list'
   f.todoItems = [];
   assert.deepEqual(o.snapshot().floors.find((x) => x.sessionId === 's1').sheet, { kind: 'phases', ...v.phases });
 });
+
+test('panel model: the cost block shows this floor\'s cache reads under a floor label, never the office figure', () => {
+  const frame = { day: '2026-11-06', tokens: 500, cacheRead: 9_000_000, lastWeek: null, floors: [{ sessionId: 'sx', tokens: 300, cacheRead: 2_500_000 }, { sessionId: 'sy', tokens: 200, cacheRead: 6_500_000 }], top: [], scanning: false, partial: false };
+  const m = panelModel(floor({ sessionId: 'sx', floorNo: 3 }), NOW, L, B, LB, { frame, cfg: cfg.ui.cost });
+  assert.deepEqual(m.cost.cache, { label: '3층 캐시 읽기', text: '2.5M' });
+  assert.deepEqual(m.cost.total, { label: '3층', text: '300' });
+});

@@ -1,0 +1,65 @@
+/* Conflict alarm (web/fx-conflict.mjs). Every class here starts with cf-. The markers (cf-sign, cf-tag, cf-lamp lit) are information and draw with the
+   effects off; the paper (cf-prop), the pull-back (cf-tugging) and the blink are decoration and wait for html.fx-on. Only transform and opacity move. */
+:root {
+  --cf-fg: #6b1a12;
+  --cf-bg: #ffe9a8;
+  --cf-edge: #d63c34;
+}
+:root[data-theme="dark"] {
+  --cf-fg: #ffd9ca;
+  --cf-bg: #5a2218;
+  --cf-edge: #ff826e;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --cf-fg: #ffd9ca;
+    --cf-bg: #5a2218;
+    --cf-edge: #ff826e;
+  }
+}
+
+/* beside the floor's name plate: lamp picture and the floors that share a file */
+[data-slot="conflict"] { flex: none; }
+.cf-sign { display: inline-flex; align-items: center; gap: 4px; padding: 0 5px; font-size: 10px; font-weight: 700; color: var(--cf-fg); background: var(--cf-bg); border: 1.5px solid var(--cf-edge); white-space: nowrap; }
+.cf-sign-lamp { width: 12px; height: 12px; image-rendering: pixelated; }
+.cf-sign-text:empty { display: none; }
+
+/* over the shoulder of the person who edited last (the name tag layer, above every character): it sits above the name tag and clear of the speech bubbles */
+.cf-tag {
+  position: absolute; left: 20px; top: -44px; z-index: 9000; pointer-events: none; white-space: nowrap;
+  padding: 0 4px; font-size: 9px; font-weight: 700; line-height: 1.3; color: var(--cf-fg); background: var(--cf-bg); border: 1.5px solid var(--cf-edge);
+}
+.cf-tag[hidden] { display: none; }
+
+/* the paper in the hand (decoration) */
+.cf-prop { display: none; }
+html.fx-on .cf-prop { display: block; position: absolute; left: 8px; top: -26px; z-index: 8999; pointer-events: none; image-rendering: pixelated; }
+html.fx-on .agt.sitting .cf-prop { top: -18px; }
+
+/* the pull-back: lean away from the paper and come back */
+@keyframes cf-lean {
+  0%, 100% { transform: none; }
+  30% { transform: translateX(-4px) rotate(-5deg); }
+  55% { transform: translateX(-2px) rotate(-2deg); }
+  75% { transform: translateX(-4px) rotate(-5deg); }
+}
+@keyframes cf-pull {
+  0%, 100% { transform: none; }
+  30%, 75% { transform: translateX(-3px); }
+  55% { transform: translateX(-1px); }
+}
+html.fx-on .fx-move.cf-tugging { transform-origin: 50% 100%; animation: cf-lean var(--cf-tug-ms, 1400ms) ease-in-out 1; }
+html.fx-on .cf-prop.cf-tugging { animation: cf-pull var(--cf-tug-ms, 1400ms) ease-in-out 1; }
+
+/* the lobby lamp: the dark picture always, the lit one over it while any conflict stands; blinking (opacity only) is decoration */
+.cf-lamp { position: absolute; z-index: 7600; pointer-events: none; }
+.cf-lamp img { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.cf-lamp-on { opacity: 0; }
+.cf-lamp[data-on="1"] .cf-lamp-on { opacity: 1; }
+@keyframes cf-blink { from { opacity: 1; } to { opacity: 0; } }
+html.fx-on .cf-lamp[data-on="1"][data-blink="1"] .cf-lamp-on { animation: cf-blink var(--cf-blink-ms, 800ms) steps(1) infinite alternate; }
+body.paused .cf-lamp[data-on="1"][data-blink="1"] .cf-lamp-on { animation-play-state: paused; }
+
+@media (prefers-reduced-motion: reduce) {
+  html.fx-on .fx-move.cf-tugging, html.fx-on .cf-prop.cf-tugging, html.fx-on .cf-lamp[data-on="1"][data-blink="1"] .cf-lamp-on { animation: none; }
+}

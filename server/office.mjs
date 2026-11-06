@@ -1,9 +1,10 @@
 // Pure office state: floors (sessions), characters (lead + subagents), desk slots and the activity log.
-// No I/O and no Date.now(): the server feeds every call with `now`. Only strings that already went
+// No I/O and no clock reads: the server feeds every call with `now`. Only strings that already went
 // through sanitize.mjs (Ev.text) or local JSON clipped here (descriptions, workflow labels) are kept.
 import { clip, cleanLine, TODO_TEXT_MAX } from './sanitize.mjs';
 import { overflowPoint, resolveScene } from '../web/scene.mjs';
 import { bakeGrid, isOpen } from '../web/nav.mjs';
+import { ConflictTracker } from './conflict.mjs';
 
 /** @typedef {import('./parse.mjs').Ev} Ev */
 
@@ -25,6 +26,19 @@ const PHASES_SEEN_MAX = 30; // phases kept for a run whose script lists none
 const FAIL_CAP = 500; // most failure times a floor keeps for the lobby wall (a storm of failures stops counting there)
 const SIGNAL_CAP = 100; // live events (phase, fail) waiting for the next broadcast; the oldest are dropped past this
 const LEAD_KEY = 'lead'; // agent key of the main session in fail events
+const AGENT_TOOL = 'Agent';
+const MESSAGE_TOOL = 'SendMessage';
+const CALLERS_MAX = 100; // Agent tool_use ids remembered per floor (who called which agent)
+const FALLBACK_KIND = 'other';
+
+/** The fields every person (lead or agent) carries for the model, paper pile and hourglass views. */
+const newTrack = () => ({
+  model: null, // 'opus' | 'sonnet' | 'haiku' | 'other' once a ctx event named it
+  pile: 0, // paper pile level 0..4 from the length of the conversation
+  large: false, // seen over the window of its model: counts against the large window from then on
+  open: new Map(), // toolUseId -> {name, ts} of the tools that have not returned
+  slow: null, // {since, kind} of the oldest tool that has run longer than hourglass.afterMs
+});
 
 /** At most TODO_VIEW_MAX of `all`: a window that keeps the in-progress (else first open) item. */
 function viewWindow(all) {
@@ -77,7 +91,11 @@ export class Office {
     this.departedColors = new Map(); // sessionId -> palette index of a floor that left, for the log page
     this.evicted = new WeakSet(); // entries that left the ring (a merge must not revive them)
     this.logSeq = 0;
-    this.signals = []; // live events for the page (type 'phase' / 'fail'), emptied by drainSignals()
+    this.signals = []; // live events for the page (type 'phase' / 'fail' / 'compact' / ...), emptied by drainSignals()
+    this.conflict = new ConflictTracker(cfg.conflict); // fileKey is only ever seen here, never in a view or signal
+    this.conflicts = new Map(); // sessionId -> conflicts of the floor at the last tick
+    this.modelKinds = new Set([...cfg.model.claude.map(([, family]) => family), FALLBACK_KIND]);
+    this.limitKinds = new Set([...cfg.incident.limitKinds, FALLBACK_KIND]);
 
     for (const h of Array.isArray(saved?.hidden) ? saved.hidden : []) {
       if (h && typeof h.sessionId === 'string' && isFiniteNum(h.pid) && isFiniteNum(h.startedAt)) {
@@ -127,6 +145,7 @@ export class Office {
       this.#bump();
     }
     f.hidden = true;
+    this.conflict.drop(sessionId);
     this.departedTitles.delete(sessionId);
     this.#purgeLog(sessionId);
     return true;
@@ -187,12 +206,14 @@ export class Office {
       } else {
         f.hidden = rec !== undefined;
       }
+      if (f.hidden) this.conflict.drop(f.sessionId);
     }
 
     for (const f of this.floors.values()) {
       if (!liveIds.has(f.sessionId) && f.leavingAt === null) {
         f.leavingAt = now;
         f.status = 'leaving';
+        this.conflict.drop(f.sessionId);
         this.#markLogged(f.sessionId);
       }
     }
@@ -218,7 +239,11 @@ export class Office {
       aiTitle: '',
       titleRank: 0,
       origin: '', // where the session was opened: '' (terminal), 'claudeApp', 'codexWork', 'codexApp'
-      lead: { name: lead.name, role: lead.role, sprite: lead.key, head: '', state: 'idle', bubble: '', lastRead: null },
+      lead: { name: lead.name, role: lead.role, sprite: lead.key, head: '', state: 'idle', bubble: '', lastRead: null, ...newTrack() },
+      rest: null, // {until, limitKind, ts} while a usage limit has the floor on lunch break
+      callers: new Map(), // toolUseId of an Agent tool_use -> key of the person who made it
+      pendingPhase: null, // {runId, from, until}: a phase handoff waiting for the first agent of the new phase
+      lastDone: '', // key of the workflow agent that reported last
       createdAt: this.now, // events stamped before this are backfill: they drive state but raise no live signal
       todoItems: [], // [{text, status, gone?}] of the main session
       liveRuns: new Set(), // runIds whose launch was seen live (not in backfill)
@@ -400,11 +425,108 @@ export class Office {
     }
   }
 
+  /** A person-key that is on the floor now, else the lead (signals only name people the page can see). */
+  #presentKey(f, key) {
+    return key === LEAD_KEY || [...f.agents.values()].some((a) => a.key === key) ? key : LEAD_KEY;
+  }
+
+  #handoff(f, handoffKind, from, to) {
+    if (f.hidden || f.rest) return;
+    this.#signal({ type: 'handoff', sessionId: f.sessionId, handoffKind, from, to });
+  }
+
+  /** Context window of this person's model, the observation stepping up to the large window for good once it is over. */
+  #pileLevel(actor, ev) {
+    const { windows, defaultWindow, largeWindow, levels } = this.cfg.context;
+    let window;
+    if (isFiniteNum(ev.window) && ev.window > 0) {
+      window = ev.window; // Codex says it
+    } else {
+      window = windows.find(([model]) => model === actor.model)?.[1] ?? defaultWindow;
+      if (ev.ctxTokens > window) actor.large = true;
+      if (actor.large) window = largeWindow;
+    }
+    const ratio = ev.ctxTokens / window;
+    return levels.filter((l) => ratio >= l).length;
+  }
+
+  /** The oldest tool still running after hourglass.afterMs (but not past maxMs: a cut-off record). Returns whether the person's hourglass changed. */
+  #refreshSlow(actor, now) {
+    const hg = this.cfg.hourglass;
+    if (actor.state === 'done' || actor.state === 'stale') actor.open.clear();
+    let oldest = null;
+    for (const o of actor.open.values()) if (now - o.ts <= hg.maxMs && (!oldest || o.ts < oldest.ts)) oldest = o;
+    let slow = null;
+    if (oldest && now - oldest.ts >= hg.afterMs) {
+      const kind = Object.hasOwn(hg.kinds, oldest.name) ? hg.kinds[oldest.name] : oldest.name.startsWith('mcp__') ? 'mcp' : FALLBACK_KIND;
+      slow = { since: oldest.ts, kind };
+    }
+    const changed = (slow?.since ?? null) !== (actor.slow?.since ?? null) || (slow?.kind ?? null) !== (actor.slow?.kind ?? null);
+    actor.slow = slow;
+    return changed;
+  }
+
+  /** Everything the 1.1 features read from one event: rest, conflict, model, paper pile, hourglass, handoff. State first, then (live only) signals. */
+  #observe(f, actor, ev, now, isLead) {
+    const t = ev.ts > 0 ? ev.ts : now;
+    const live = !f.hidden && this.#isLive(f, ev);
+    const who = isLead ? LEAD_KEY : actor.key;
+    const normal = ev.kind === 'think' || ev.kind === 'tool' || ev.kind === 'toolDone' || ev.kind === 'end';
+
+    if (normal && ev.ts > 0) { // anything the person does after the usage limit means the break is over
+      if (f.rest && ev.ts > f.rest.ts) f.rest = null;
+    }
+
+    switch (ev.kind) {
+      case 'tool': {
+        if (ev.name === AGENT_TOOL && ev.toolUseId) {
+          f.callers.set(ev.toolUseId, who);
+          if (f.callers.size > CALLERS_MAX) f.callers.delete(f.callers.keys().next().value);
+        }
+        if (!this.cfg.hourglass.ignoreTools.includes(ev.name)) {
+          actor.open.set(ev.toolUseId, { name: ev.name, ts: t });
+          if (actor.open.size > this.cfg.hourglass.maxOpen) actor.open.delete(actor.open.keys().next().value);
+        }
+        if (typeof ev.fileKey === 'string' && !f.hidden) this.conflict.touch(ev.fileKey, f.sessionId, who, t);
+        if (ev.name === MESSAGE_TOOL && live && typeof ev.sendTo === 'string') {
+          const to = [...f.agents.values()].find((a) => a.agentId === ev.sendTo || a.key === ev.sendTo || a.name === ev.sendTo);
+          this.#handoff(f, 'message', who, to ? to.key : null);
+        }
+        break;
+      }
+      case 'toolDone':
+        actor.open.delete(ev.toolUseId);
+        break;
+      case 'end':
+        actor.open.clear();
+        break;
+      case 'ctx':
+        if (typeof ev.model === 'string' && this.modelKinds.has(ev.model)) actor.model = ev.model;
+        if (isFiniteNum(ev.ctxTokens) && ev.ctxTokens >= 0) actor.pile = this.#pileLevel(actor, ev);
+        break;
+      case 'compact':
+        actor.pile = 0; // the next ctx event fills it again from the real length
+        if (live && !f.rest) this.#signal({ type: 'compact', sessionId: f.sessionId, agent: who });
+        break;
+      case 'limit': {
+        const until = isFiniteNum(ev.until) && ev.until > 0 ? ev.until : null;
+        const { graceMs, maxMs } = this.cfg.incident.rest;
+        if (now - t <= maxMs && (until === null || now < until + graceMs)) {
+          f.rest = { until, limitKind: this.limitKinds.has(ev.limitKind) ? ev.limitKind : FALLBACK_KIND, ts: t };
+        }
+        break;
+      }
+      default:
+    }
+    this.#refreshSlow(actor, now);
+  }
+
   #actorEvent(f, actor, ev, now, isLead, logSince = 0) {
     if (!isLead && actor.state === 'done') return;
     const t = ev.ts > 0 ? ev.ts : now;
     if (!isLead) actor.lastAt = Math.max(actor.lastAt, t);
     const quiet = ev.ts > 0 && ev.ts < logSince;
+    this.#observe(f, actor, ev, now, isLead);
 
     switch (ev.kind) {
       case 'tool':
@@ -450,6 +572,9 @@ export class Office {
         a.bubble = '';
         a.since = now;
         a.doneAt = now;
+        a.open.clear();
+        a.slow = null;
+        if (a.wf) f.lastDone = a.key;
         f.reports++;
         this.#logDone(f, a, now);
       }
@@ -480,12 +605,26 @@ export class Office {
       doneAt: 0,
       endLogged: false,
       lastRead: null,
+      phase: wf ? cleanLine(wf.phase, TODO_TEXT_MAX) : '', // workflow phase it was started for
+      runId: wf ? wf.runId : '',
+      ...newTrack(),
     };
     const startTs = m.mtimeMs > 0 ? m.mtimeMs : now; // discovered at server start: when it really started
     a.enteredAt = startTs;
     a.wf = Boolean(wf);
     f.agents.set(m.agentId, a);
     if (startTs >= this.logSince(f.sessionId, now)) this.#log(f, a, startTs, LOG_START);
+    if (startTs >= f.createdAt) this.#entered(f, a, m);
+  }
+
+  /** A live arrival hands work over: the caller (lead, or the agent whose Agent tool_use started it) to the newcomer; a workflow agent that opens a new phase carries the phase handoff that was waiting for it. */
+  #entered(f, a, m) {
+    if (!a.wf) {
+      this.#handoff(f, 'call', this.#presentKey(f, f.callers.get(m.toolUseId)), a.key);
+    } else if (f.pendingPhase && f.pendingPhase.runId === a.runId) {
+      if (this.now <= f.pendingPhase.until) this.#handoff(f, 'phase', f.pendingPhase.from, a.key);
+      f.pendingPhase = null;
+    }
   }
 
   /** Claude floors know Claude role names, Codex floors the `codex:` ones; anything else is null (see #faceFor). */
@@ -603,7 +742,10 @@ export class Office {
     let seen = f.runPhases.get(runId);
     if (!seen) f.runPhases.set(runId, (seen = { phase: '', armed: f.liveRuns.has(runId), list: [] }));
     if (current && current !== seen.phase) {
-      if (seen.armed && !f.hidden) this.#signal({ type: 'phase', sessionId, phase: current });
+      if (seen.armed && !f.hidden && !f.rest) {
+        this.#signal({ type: 'phase', sessionId, phase: current });
+        this.#phaseHandoff(f, runId, current);
+      }
       seen.phase = current;
       seen.armed = true;
     }
@@ -612,6 +754,19 @@ export class Office {
     f.boardRun = runId;
     f.boardPhases = this.#phaseList(seen, phases, current, Array.isArray(p.seen) ? p.seen : []);
     f.boardLine = !current ? name : phases.length && idx >= 0 ? `${name} · ${current} ${idx + 1}/${phases.length}` : `${name} · ${current}`;
+  }
+
+  /** The previous phase's last reporter hands over to the first agent of the new phase; while that agent has not arrived the handoff waits (workflow.doneQuietMs). */
+  #phaseHandoff(f, runId, current) {
+    const phase = cleanLine(current, TODO_TEXT_MAX);
+    const from = this.#presentKey(f, f.lastDone);
+    const to = [...f.agents.values()].find((a) => a.runId === runId && a.phase === phase && a.state !== 'done');
+    if (to) {
+      f.pendingPhase = null;
+      this.#handoff(f, 'phase', from, to.key);
+    } else {
+      f.pendingPhase = { runId, from, until: this.now + this.cfg.workflow.doneQuietMs };
+    }
   }
 
   /**
@@ -632,7 +787,11 @@ export class Office {
     return { list, at: cur ? list.indexOf(cur) : -1, known: known.length > 0 };
   }
 
-  /** Live events since the last call, oldest first: {type:'phase', sessionId, phase, at} and {type:'fail', sessionId, agent, streak, at}. */
+  /**
+   * Live events since the last call, oldest first: {type:'phase', sessionId, phase, at}, {type:'fail', sessionId, agent, streak, at},
+   * {type:'compact', sessionId, agent, at}, {type:'handoff', sessionId, handoffKind, from, to, at}
+   * and {type:'conflict', id, sessionIds, at}.
+   */
   drainSignals() {
     const out = this.signals;
     if (out.length) this.signals = [];
@@ -648,7 +807,7 @@ export class Office {
 
   tick(now) {
     this.now = now;
-    const { agent, floor } = this.cfg;
+    const { agent, floor, incident } = this.cfg;
     let changed = false;
     for (const f of [...this.floors.values()]) {
       if (f.leavingAt !== null && now - f.leavingAt >= floor.leaveMs) {
@@ -673,6 +832,28 @@ export class Office {
           changed = true;
         }
       }
+      if (f.rest && now >= (f.rest.until !== null ? f.rest.until + incident.rest.graceMs : f.rest.ts + incident.rest.maxMs)) {
+        f.rest = null; // the break is over
+        changed = true;
+      }
+      if (f.pendingPhase && now > f.pendingPhase.until) f.pendingPhase = null;
+      for (const p of [f.lead, ...f.agents.values()]) this.#refreshSlow(p, now); // an hourglass reaches the page through the snapshot, which broadcast compares itself: not counted in `changed`
+    }
+    return this.#evaluateConflicts(now) || changed;
+  }
+
+  /** Floors that edited the same file lately: stores them for the views and raises one live signal per conflicting set of floors. */
+  #evaluateConflicts(now) {
+    const { bySession, raised, changed } = this.conflict.evaluate(now);
+    this.conflicts = bySession;
+    const announced = new Set();
+    for (const c of raised) {
+      const set = c.sessionIds.join(',');
+      const floors = c.sessionIds.map((id) => this.floors.get(id));
+      if (announced.has(set) || floors.some((f) => !f || f.hidden)) continue;
+      if (c.since < Math.max(...floors.map((f) => f.createdAt))) continue; // both edits were found in the log at start: backfill
+      announced.add(set);
+      this.#signal({ type: 'conflict', id: c.id, sessionIds: c.sessionIds });
     }
     return changed;
   }
@@ -763,6 +944,15 @@ export class Office {
     const visible = [...this.floors.values()].filter((f) => !f.hidden);
     visible.sort((a, b) => a.startedAt - b.startedAt || a.seq - b.seq);
     const views = visible.map((f, i) => {
+      const conflicts = (this.conflicts.get(f.sessionId) ?? []).slice(0, this.cfg.conflict.maxPerFloor);
+      // what the page may know about one person: the five 1.1 badges, never a path, a model id or a token count
+      const badges = (p, key) => ({
+        conflict: conflicts.find((c) => c.actorKey === key)?.id ?? null,
+        model: f.provider === 'codex' ? 'codex' : p.model,
+        pile: p.pile,
+        slowSince: p.slow?.since ?? null,
+        slowKind: p.slow?.kind ?? null,
+      });
       const autoTitle = f.aiTitle || f.folder || (f.scratch ? this.cfg.ui.untitled : '');
       const title = this.#titleOf(f);
       const todos = this.#todoView(f);
@@ -777,7 +967,9 @@ export class Office {
         autoTitle,
         folder: f.folder,
         status: f.status,
-        lead: { name: f.lead.name, role: f.lead.role, sprite: f.lead.sprite, state: f.lead.state, bubble: f.lead.bubble },
+        rest: f.rest ? { until: f.rest.until, limitKind: f.rest.limitKind } : null,
+        conflicts: conflicts.map((c) => ({ id: c.id, with: [...c.with], since: c.since })),
+        lead: { name: f.lead.name, role: f.lead.role, sprite: f.lead.sprite, state: f.lead.state, bubble: f.lead.bubble, ...badges(f.lead, LEAD_KEY) },
         board: { title, line: f.boardLine },
         todos,
         sheet: this.#sheetView(f, todos),
@@ -798,6 +990,8 @@ export class Office {
           since: a.since,
           enteredAt: a.enteredAt,
           wf: a.wf,
+          phase: a.phase,
+          ...badges(a, a.key),
         })),
       };
     });

@@ -226,9 +226,11 @@ test('app.mjs emits exactly the documented events, each with the documented fiel
 });
 
 test('the pages link the six area style sheets right after style.css, scripts stay as they were', () => {
-  const css = ['fx-weather', 'fx-chars', 'fx-events', 'fx-led', 'fx-hit', 'officelife', 'decor'];
+  const css = ['fx-weather', 'fx-chars', 'fx-events', 'fx-led', 'fx-hit', 'officelife', 'handoff', 'decor'];
   const links = css.map((n) => `<link rel="stylesheet" href="/web/${n}.css">`).join('\n');
-  assert.ok(INDEX_HTML.includes(`<link rel="stylesheet" href="/web/style.css">\n${links}\n<link rel="stylesheet" href="/web/card.css">\n</head>`)); // the character card's sheet follows the six
+  assert.ok(INDEX_HTML.includes(`<link rel="stylesheet" href="/web/style.css">\n${links}\n<link rel="stylesheet" href="/web/card.css">\n`)); // the character card's sheet follows the six (later packages' sheets may follow it)
+  const tail = ['conflict', 'actor', 'bell-floor'].map((n) => `<link rel="stylesheet" href="/web/${n}.css">\n`).join('') + '</head>';
+  assert.ok(INDEX_HTML.includes(`<link rel="stylesheet" href="/web/card.css">\n${tail}`)); // after card.css the later packages' sheets in merge order (k, j, the bell floor), then the head ends
   assert.match(INDEX_HTML, /<fieldset id="wx-choices"><legend><\/legend><\/fieldset>\s*<fieldset id="fx-choices"><legend><\/legend><\/fieldset>/);
   for (const n of css) assert.ok(existsSync(join(ROOT, 'web', `${n}.css`)), `${n}.css exists`);
 });
@@ -332,4 +334,16 @@ test('walk events: start once per walk however many pieces, end once when it sto
   ctx.rec = rec;
   vm.runInContext('noteWalk(rec, true); noteWalk(rec, true); noteWalk(rec, true); noteWalk(rec, false); noteWalk(rec, false); noteWalk(rec, true)', ctx);
   assert.deepEqual(events, [['walk-start', 'r1'], ['walk-end', 'r1'], ['walk-start', 'r1']]);
+});
+
+// ---- the meeting machine and the context's other pieces (package N, minus the building) ----
+
+test('ctx: floorActive is shown and not paused; the meeting member is documented and built on the shared machine', () => {
+  assert.ok(appSrc.includes('floorActive: (f) => !f.off && !paused(),'));
+  assert.match(read('web', 'fx.mjs'), /\} meeting\n/, 'meeting is documented in the FxCtx typedef');
+  const ctxSrc = appSrc.slice(appSrc.indexOf('function buildFxCtx()'), appSrc.indexOf('/** Starts every effects area once'));
+  assert.match(ctxSrc, /meeting: \{[\s\S]*start: startFloorMeeting,\s*end: endFloorMeeting,\s*active:/);
+  assert.match(appSrc, /function startFloorMeeting\(frec, opts = \{\}\)/);
+  assert.match(appSrc, /startFloorMeeting\(frec, \{ phase \}\);/, 'onPhase starts its meeting on the shared machine');
+  assert.ok(appSrc.includes("emitFx('meeting-start', { floor: frec, title: phase });"));
 });

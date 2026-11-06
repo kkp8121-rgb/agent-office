@@ -1,0 +1,66 @@
+/* Incidents (web/fx-incidents.mjs): the lunch break and the faint after a compaction. Every class here starts with ic-.
+   Information marks (the lunch veil and sign, the tab marks) are drawn with the effects off too; body motion
+   (ic-faint, the nap pose) needs html.fx-on, which fx-incidents.mjs only turns into classes while the effects are on.
+   Only transform and opacity are animated. */
+
+:root {
+  --ic-rest-fg: #3b2f22;
+  --ic-rest-bg: #f6e8c8;
+  --ic-rest-edge: #8a7a5a;
+}
+:root[data-theme="dark"] {
+  --ic-rest-fg: #efe6d2;
+  --ic-rest-bg: #3a3124;
+  --ic-rest-edge: #b8aa8f;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --ic-rest-fg: #efe6d2;
+    --ic-rest-bg: #3a3124;
+    --ic-rest-edge: #b8aa8f;
+  }
+}
+
+/* ---- props (small pictures next to a head) ---- */
+.ic-prop { position: absolute; display: block; image-rendering: pixelated; pointer-events: none; }
+.ic-notepad { left: -36px; bottom: 30px; width: 20px; height: 28px; }
+.agt.sitting .ic-notepad { bottom: 16px; }
+
+/* ---- top bar: a floor on its lunch break ---- */
+#topbar .tab.ic-tab-rest { opacity: .6; filter: grayscale(1); }
+
+/* ---- the faint: falls to the side, lies, gets up (the lying part is 70% of the time, see FAINT_LIE_SHARE) ---- */
+.body.ic-faint { animation: ic-faint var(--ic-faint-ms, 2000ms) ease-in-out both; }
+@keyframes ic-faint {
+  0% { transform: rotate(0) translateY(0); }
+  15%, 85% { transform: rotate(84deg) translateY(2px); }
+  100% { transform: rotate(0) translateY(0); }
+}
+
+/* a seated one slumps to the side at the desk (a full fall would sink behind the chair and the desk) */
+.ag.sitting .body.ic-faint { animation-name: ic-faint-seated; }
+@keyframes ic-faint-seated {
+  0% { transform: rotate(0) translateY(0); }
+  15%, 85% { transform: rotate(34deg) translate(6px, 8px); }
+  100% { transform: rotate(0) translateY(0); }
+}
+
+/* ---- lunch break: nap pose, dim veil over the room, sign by the plaque ---- */
+.body.ic-nap { transform: rotate(-12deg) translateY(4px); }
+
+.ic-veil { position: absolute; inset: 0; z-index: 7502; pointer-events: none; background: rgb(6, 9, 28); opacity: 0; }
+.ic-veil.ic-on { opacity: var(--ic-dim, .4); }
+html.fx-on .ic-veil { transition: opacity .6s linear; }
+
+.ic-rest-sign {
+  position: absolute; z-index: 9000; margin-top: 6px; padding: 4px 10px; white-space: nowrap; font-size: 13px; font-weight: 800;
+  color: var(--ic-rest-fg); background: var(--ic-rest-bg); border: 2px solid var(--ic-rest-edge); box-shadow: 2px 2px 0 var(--shadow);
+}
+.ic-rest-sign[hidden] { display: none; }
+.sign-slot[hidden] { display: none; } /* an empty sign cell takes no room in the sign row */
+
+body.paused .body.ic-faint { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .body.ic-faint { animation: none !important; }
+  .ic-veil { transition: none !important; }
+}
