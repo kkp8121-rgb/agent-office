@@ -1,0 +1,114 @@
+/* Incidents (web/fx-incidents.mjs): the bell, the lunch break and the faint after a compaction. Every class here starts with ic-.
+   Information marks (the bell sign, the lunch veil and sign, the tab marks) are drawn with the effects off too; blinking and body motion
+   (ic-wave, ic-faint, the nap pose) need html.fx-on, which fx-incidents.mjs only turns into classes while the effects are on.
+   Only transform and opacity are animated. */
+
+:root {
+  --ic-bell-fg: #7a2412;
+  --ic-bell-bg: #fff0c2;
+  --ic-bell-edge: #d6431f;
+  --ic-rest-fg: #3b2f22;
+  --ic-rest-bg: #f6e8c8;
+  --ic-rest-edge: #8a7a5a;
+}
+:root[data-theme="dark"] {
+  --ic-bell-fg: #ffe2b0;
+  --ic-bell-bg: #5b2a14;
+  --ic-bell-edge: #ff8a5c;
+  --ic-rest-fg: #efe6d2;
+  --ic-rest-bg: #3a3124;
+  --ic-rest-edge: #b8aa8f;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --ic-bell-fg: #ffe2b0;
+    --ic-bell-bg: #5b2a14;
+    --ic-bell-edge: #ff8a5c;
+    --ic-rest-fg: #efe6d2;
+    --ic-rest-bg: #3a3124;
+    --ic-rest-edge: #b8aa8f;
+  }
+}
+
+/* ---- props (small pictures next to a head) ---- */
+.ic-prop { position: absolute; display: block; image-rendering: pixelated; pointer-events: none; }
+.ic-paper { left: -40px; bottom: 34px; width: 24px; height: 28px; transform-origin: 50% 100%; }
+.agt.sitting .ic-paper { bottom: 20px; }
+.ic-notepad { left: -36px; bottom: 30px; width: 20px; height: 28px; }
+.agt.sitting .ic-notepad { bottom: 16px; }
+
+/* ---- the bell sign in the floor sign's row (z 9000 like the sign itself, above the dim cover and the night picture) ---- */
+.ic-bell {
+  position: relative; display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 0 6px; box-sizing: border-box;
+  font-size: 11px; font-weight: 800; line-height: 1.5; white-space: nowrap; color: var(--ic-bell-fg); background: var(--ic-bell-bg);
+  border: 2px solid var(--ic-bell-edge);
+}
+.ic-bell-icon { position: static; width: 12px; height: 12px; }
+.ic-bell::after { content: ""; position: absolute; inset: -4px; border: 2px solid var(--ic-bell-edge); opacity: 0; pointer-events: none; }
+html.fx-on .ic-bell::after { animation: ic-blink var(--ic-blink, 900ms) ease-in-out infinite; }
+@keyframes ic-blink { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+
+/* ---- top bar: a floor that calls, a floor on its lunch break ---- */
+#topbar .tab.ic-tab-call { box-shadow: 0 0 0 2px var(--ic-bell-edge); }
+html.fx-on #topbar .tab.ic-tab-call { animation: ic-tab-blink 900ms ease-in-out infinite; }
+@keyframes ic-tab-blink { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+#topbar .tab.ic-tab-rest { opacity: .6; filter: grayscale(1); }
+
+/* the small window: a frame around the floors while one calls (a layer on top, so the floors themselves are never dimmed) */
+#floors.ic-has-call { position: relative; }
+#floors.ic-has-call::after { content: ""; position: absolute; inset: 0; border: 3px solid var(--ic-bell-edge); pointer-events: none; z-index: 9100; }
+html.fx-on #floors.ic-has-call::after { animation: ic-blink 900ms ease-in-out infinite; }
+
+/* ---- the wave: the lead sways and holds up a paper ---- */
+.body.ic-wave { animation: ic-wave var(--ic-wave-ms, 1200ms) ease-in-out both; }
+.ic-paper { animation: ic-paper var(--ic-wave-ms, 1200ms) ease-in-out both; }
+@keyframes ic-wave {
+  0%, 100% { transform: rotate(0) translateY(0); }
+  15% { transform: rotate(-4deg) translateY(-2px); } 35% { transform: rotate(4deg) translateY(0); }
+  55% { transform: rotate(-4deg) translateY(-2px); } 75% { transform: rotate(3deg) translateY(0); }
+}
+@keyframes ic-paper {
+  0% { transform: translateY(8px) rotate(0); opacity: 0; }
+  12% { transform: translateY(0) rotate(-18deg); opacity: 1; } 30% { transform: rotate(20deg); } 50% { transform: rotate(-20deg); }
+  70% { transform: rotate(18deg); opacity: 1; } 100% { transform: translateY(8px) rotate(0); opacity: 0; }
+}
+
+/* ---- the faint: falls to the side, lies, gets up (the lying part is 70% of the time, see FAINT_LIE_SHARE) ---- */
+.body.ic-faint { animation: ic-faint var(--ic-faint-ms, 2000ms) ease-in-out both; }
+@keyframes ic-faint {
+  0% { transform: rotate(0) translateY(0); }
+  15%, 85% { transform: rotate(84deg) translateY(2px); }
+  100% { transform: rotate(0) translateY(0); }
+}
+
+/* a seated one slumps to the side at the desk (a full fall would sink behind the chair and the desk) */
+.ag.sitting .body.ic-faint { animation-name: ic-faint-seated; }
+@keyframes ic-faint-seated {
+  0% { transform: rotate(0) translateY(0); }
+  15%, 85% { transform: rotate(34deg) translate(6px, 8px); }
+  100% { transform: rotate(0) translateY(0); }
+}
+
+/* ---- lunch break: nap pose, dim veil over the room, sign by the plaque ---- */
+.body.ic-nap { transform: rotate(-12deg) translateY(4px); }
+
+.ic-veil { position: absolute; inset: 0; z-index: 7502; pointer-events: none; background: rgb(6, 9, 28); opacity: 0; }
+.ic-veil.ic-on { opacity: var(--ic-dim, .4); }
+html.fx-on .ic-veil { transition: opacity .6s linear; }
+
+.ic-rest-sign {
+  position: absolute; z-index: 9000; margin-top: 6px; padding: 4px 10px; white-space: nowrap; font-size: 13px; font-weight: 800;
+  color: var(--ic-rest-fg); background: var(--ic-rest-bg); border: 2px solid var(--ic-rest-edge); box-shadow: 2px 2px 0 var(--shadow);
+}
+.ic-rest-sign[hidden] { display: none; }
+.sign-slot[hidden] { display: none; } /* an empty bell cell takes no room in the sign row */
+
+/* ---- settings: the 호출 알림 switch ---- */
+#alert-choices .wx-opt, #alert-denied { grid-column: 1 / -1; }
+#alert-denied { color: var(--err); font-size: 11px; }
+
+body.paused .body.ic-wave, body.paused .body.ic-faint, body.paused .ic-paper { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .body.ic-wave, .body.ic-faint, .ic-paper, .ic-bell::after, #floors.ic-has-call::after, #topbar .tab.ic-tab-call { animation: none !important; }
+  .ic-veil { transition: none !important; }
+}
