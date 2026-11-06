@@ -8,6 +8,7 @@ import { FileTail } from './tail.mjs';
 import { clip, cleanTodos, firstWord, MAX_LEN } from './sanitize.mjs';
 import { isSafeId } from './sessions.mjs';
 import { CodexIndex } from './codex-index.mjs';
+import config from '../config.json' with { type: 'json' };
 
 /** @typedef {import('./parse.mjs').Ev} Ev */
 /** @typedef {import('./sessions.mjs').Session} Session */
@@ -15,7 +16,13 @@ import { CodexIndex } from './codex-index.mjs';
 
 const ROLLOUT_NAME = /^rollout-[\w.-]+\.jsonl$/; // also excludes the old .jsonl.zst files
 
+const ASK_TOOL = 'request_user_input_async'; // the question the user is asked; its output is the answer
+const EPOCH_MS_MIN = 1e12; // a reset time below this is in seconds
+const ASK_OPEN_MAX = 16; // questions remembered as unanswered per rollout
+const APPROVAL_EVENTS = new Set(['exec_approval_request', 'apply_patch_approval_request']);
+
 const isObj = (v) => typeof v === 'object' && v !== null;
+const num = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0); // anything else counts as 0
 const timeOf = (v) => (typeof v === 'string' ? Date.parse(v) || 0 : 0);
 const folderOf = (cwd) => String(cwd ?? '').split(/[\\/]/).filter(Boolean).pop() ?? '';
 
@@ -190,8 +197,39 @@ function itemCompleted(p, ts) {
   }
 }
 
+/**
+ * Numbers of one `token_usage_record` line (one model response): {ts, msgId, tokens, cacheRead}, or null for any other line.
+ * `tokens` = (input - cached input) + cache writes + output, assuming cached input is part of input; cache reads are counted apart.
+ * `msgId` is the response id: the same response is counted once by whoever adds these up.
+ */
+export function codexUsage(o) {
+  const p = isObj(o) && o.type === 'token_usage_record' && isObj(o.payload) ? o.payload : null;
+  const u = p && isObj(p.usage) ? p.usage : null;
+  if (!u || typeof p.response_id !== 'string' || !p.response_id) return null;
+  const cached = num(u.cached_input_tokens);
+  return {
+    ts: timeOf(o.timestamp),
+    msgId: clip(p.response_id, config.parse.nameMaxChars),
+    tokens: Math.max(0, num(u.input_tokens) - cached) + num(u.cache_write_input_tokens) + num(u.output_tokens),
+    cacheRead: cached,
+  };
+}
+
+/** The latest time (ms) at which a rate-limit window that is full (used_percent >= 100) opens again, or null. */
+function fullWindowReset(limits) {
+  let at = null;
+  for (const w of isObj(limits) ? [limits.primary, limits.secondary] : []) {
+    if (!isObj(w) || !(w.used_percent >= 100) || typeof w.resets_at !== 'number' || !(w.resets_at > 0)) continue;
+    at = Math.max(at ?? 0, w.resets_at < EPOCH_MS_MIN ? w.resets_at * 1000 : w.resets_at);
+  }
+  return at;
+}
+
+/** What a rollout's lines leave behind for later lines: unanswered questions, and the last full rate-limit window. */
+const newLineState = () => ({ asks: new Set(), limitUntil: null });
+
 /** One line -> {ts, turn, evs}. `turn` is 'start'/'end' for turn boundaries (the source needs them, Office does not). */
-function parseEntry(text) {
+function parseEntry(text, st) {
   let o;
   try {
     o = JSON.parse(text);
@@ -210,10 +248,16 @@ function parseEntry(text) {
         break;
       case 'function_call':
         out.evs.push(functionCall(p, ts));
+        if (p.name === ASK_TOOL) {
+          st.asks.add(callId(p));
+          if (st.asks.size > ASK_OPEN_MAX) st.asks.delete(st.asks.values().next().value);
+          out.evs.push({ kind: 'ask', ts, open: true });
+        }
         break;
       case 'custom_tool_call_output':
       case 'function_call_output':
         out.evs.push(done(ts, callId(p)));
+        if (st.asks.delete(callId(p))) out.evs.push({ kind: 'ask', ts, open: false });
         break;
       case 'reasoning':
       case 'message':
@@ -228,18 +272,38 @@ function parseEntry(text) {
     } else if (p.type === 'task_complete' || p.type === 'turn_aborted') {
       out.turn = 'end';
       out.evs.push({ kind: 'end', ts });
+      // Only the error code is read, never its message: the usage limit is the one that rests the floor (server_overloaded is not).
+      if (p.type === 'task_complete' && isObj(p.error) && p.error.codex_error_info === 'usage_limit_exceeded') {
+        out.evs.push({ kind: 'limit', ts, until: st.limitUntil, limitKind: 'other' });
+      }
+    } else if (p.type === 'token_count') {
+      if (isObj(p.rate_limits)) st.limitUntil = fullWindowReset(p.rate_limits);
+      const last = isObj(p.info) && isObj(p.info.last_token_usage) ? p.info.last_token_usage : null;
+      if (last) {
+        const window = p.info.model_context_window;
+        out.evs.push({ kind: 'ctx', ts, ctxTokens: num(last.input_tokens), window: typeof window === 'number' && window > 0 ? window : null, model: null });
+      }
+    } else if (APPROVAL_EVENTS.has(p.type)) {
+      out.evs.push({ kind: 'approval', ts });
     } else if (p.type === 'exec_command_end' && Number.isFinite(p.exit_code)) {
       out.evs.push({ kind: 'toolResult', ts, error: p.exit_code !== 0 }); // only the exit code, never the output
     } else if (p.type === 'item_completed') {
       out.evs.push(...itemCompleted(p, ts));
     }
+  } else if (o.type === 'token_usage_record') {
+    const u = codexUsage(o);
+    if (u) out.evs.push({ kind: 'usage', ts, msgId: u.msgId, tokens: u.tokens, cacheRead: u.cacheRead });
   }
   return out;
 }
 
-/** @returns {Ev[]} */
-export function parseCodexLine(text) {
-  return parseEntry(text)?.evs ?? [];
+/**
+ * @param {{asks:Set<string>, limitUntil:number|null}} [st] what earlier lines of the same rollout left behind; without it a line
+ * is read alone (an answer cannot close a question, a limit has no reset time).
+ * @returns {Ev[]}
+ */
+export function parseCodexLine(text, st = newLineState()) {
+  return parseEntry(text, st)?.evs ?? [];
 }
 
 // ---- source ----------------------------------------------------------------------------------
@@ -332,7 +396,7 @@ export class CodexSource {
       if (!this.#recs.has(path)) {
         this.#recs.set(path, {
           path, size: -1, meta: null, ignored: false, tail: null, resumeAt: 0,
-          turn: 'none', lastTs: 0, activeFrom: null, batchFrom: null, titleSent: '', pending: [], hot: false, runs: null, busy: null,
+          turn: 'none', lines: newLineState(), lastTs: 0, activeFrom: null, batchFrom: null, titleSent: '', pending: [], hot: false, runs: null, busy: null,
         });
       }
     }
@@ -370,7 +434,7 @@ export class CodexSource {
     let openFrom = null;
     let prev = 0;
     for (const text of lines) {
-      const e = parseEntry(text);
+      const e = parseEntry(text, rec.lines);
       if (!e) continue;
       const ts = e.ts > 0 ? e.ts : now;
       if (first && rec.activeFrom === null) rec.activeFrom = ts;
@@ -488,7 +552,7 @@ export class CodexSource {
       listedRecs.add(rec);
       for (const k of mine) listedRecs.add(k);
       const id = rec.meta.id;
-      out.sessions.push({ provider: 'codex', origin: rec.meta.origin, pid: 0, sessionId: id, cwd: rec.meta.cwd, status: own ? 'busy' : 'waiting', name: '', startedAt: rec.activeFrom });
+      out.sessions.push({ provider: 'codex', origin: rec.meta.origin, pid: 0, sessionId: id, cwd: rec.meta.cwd, status: own ? 'busy' : 'waiting', waitingPermission: false, name: '', startedAt: rec.activeFrom });
 
       const evs = [];
       // The thread name from session_index.jsonl (set by the apps and by `codex resume`) wins over the folder; a rename is sent again.
