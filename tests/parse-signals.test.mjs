@@ -1,14 +1,11 @@
-// New Claude signals of the parser: usage, ctx, compact, limit, same-file keys, model, session wait. Fixtures are synthetic
+// New Claude signals of the parser: usage, ctx, compact, limit, same-file keys, model. Fixtures are synthetic
 // (tests/fixtures/signals); the private-looking text inside them must never reach an event.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import config from '../config.json' with { type: 'json' };
 import { claudeUsage, parseLine, setFileKeySalt } from '../server/parse.mjs';
 import { fileKey } from '../server/filekey.mjs';
-import { listLiveSessions } from '../server/sessions.mjs';
 
 const lines = (name) => readFileSync(new URL(`./fixtures/signals/${name}.jsonl`, import.meta.url), 'utf8').split('\n').filter(Boolean);
 const T = (iso) => Date.parse(iso);
@@ -167,31 +164,4 @@ test('ctxTokens is input plus cache creation plus cache read, window null', () =
   const [ctx] = kind(parseLine(lines('claude-usage')[0]), 'ctx');
   assert.deepEqual(keys(ctx), ['ctxTokens', 'kind', 'model', 'ts', 'window']);
   assert.deepEqual(ctx, { kind: 'ctx', ts: T('2026-11-06T09:00:00.000Z'), ctxTokens: 10 + 20 + 400, window: null, model: 'opus' });
-});
-
-// ---- session wait -----------------------------------------------------------------------------
-
-async function sessionWith(t, extra) {
-  const dir = mkdtempSync(join(tmpdir(), 'signals-sess-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  mkdirSync(join(dir, 'sessions'));
-  const body = { pid: process.pid, sessionId: 's-wait', cwd: 'C:\\fixture\\repo-alpha', status: 'waiting', name: 'x', startedAt: 1793170000000, ...extra };
-  writeFileSync(join(dir, 'sessions', `${process.pid}.json`), JSON.stringify(body));
-  const [s] = await listLiveSessions(dir, 0);
-  return s;
-}
-
-test('waiting with waitingFor input needed stays waiting, waitingPermission false', async (t) => {
-  const s = await sessionWith(t, { waitingFor: 'input needed' });
-  assert.equal(s.status, 'waiting');
-  assert.equal(s.waitingPermission, false);
-  assert.equal((await sessionWith(t, {})).waitingPermission, false); // no waitingFor at all
-});
-
-test('waitingFor containing permission sets waitingPermission, the text is dropped', async (t) => {
-  const s = await sessionWith(t, { waitingFor: 'Permission prompt: Bash SECRET' });
-  assert.equal(s.status, 'waiting');
-  assert.equal(s.waitingPermission, true);
-  assert.ok(!JSON.stringify(s).includes('SECRET'));
-  assert.ok(!('waitingFor' in s));
 });

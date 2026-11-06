@@ -1,4 +1,4 @@
-// New Codex signals of the parser: ask, approval, limit, usage, ctx. Fixtures are synthetic (tests/fixtures/signals).
+// New Codex signals of the parser: limit, usage, ctx. Fixtures are synthetic (tests/fixtures/signals).
 // A rollout's lines are read in order with one shared line state, as CodexSource does.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,29 +16,9 @@ const noLeak = (evs, extra = []) => {
 };
 /** All lines of a fixture read in order with a shared state -> one event list per line. */
 const rollout = (name) => {
-  const st = { asks: new Set(), limitUntil: null };
+  const st = { limitUntil: null };
   return lines(name).map((l) => parseCodexLine(l, st));
 };
-
-test('request_user_input_async opens ask', () => {
-  const [open] = kind(rollout('codex-ask')[0], 'ask');
-  assert.deepEqual(open, { kind: 'ask', ts: T('2026-11-06T10:00:00.000Z'), open: true });
-  assert.deepEqual(keys(open), ['kind', 'open', 'ts']);
-});
-
-test('its output closes ask', () => {
-  const evs = rollout('codex-ask');
-  assert.equal(kind(evs[1], 'ask').length, 0); // the output of some other call
-  assert.deepEqual(kind(evs[2], 'ask'), [{ kind: 'ask', ts: T('2026-11-06T10:01:00.000Z'), open: false }]);
-  assert.equal(kind(evs[2], 'toolDone').length, 1); // the plain tool end is still reported
-  assert.equal(kind(parseCodexLine(lines('codex-ask')[2]), 'ask').length, 0); // read alone, nothing was open
-});
-
-test('exec_approval_request gives approval', () => {
-  const evs = rollout('codex-ask');
-  assert.deepEqual(evs[3], [{ kind: 'approval', ts: T('2026-11-06T10:02:00.000Z') }]);
-  assert.deepEqual(evs[4], [{ kind: 'approval', ts: T('2026-11-06T10:03:00.000Z') }]); // apply_patch_approval_request
-});
 
 test('usage_limit_exceeded gives limit with the full rate limit resets_at', () => {
   const evs = rollout('codex-limit');
@@ -58,7 +38,7 @@ test('server_overloaded is not a limit', () => {
 });
 
 test('the error message text is not in the event', () => {
-  noLeak([...rollout('codex-limit'), ...rollout('codex-ask'), ...rollout('codex-usage')].flat(), ['repo-alpha', 'overloaded', 'usage limit']);
+  noLeak([...rollout('codex-limit'), ...rollout('codex-usage')].flat(), ['repo-alpha', 'overloaded', 'usage limit']);
 });
 
 test('a repeated response_id gives the same msgId', () => {

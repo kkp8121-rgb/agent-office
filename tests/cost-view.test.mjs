@@ -1,4 +1,4 @@
-// The labour cost view (feature 2): units, difference, scanning / partial honesty, and the pure model the lobby wall, the detail window, the card and the boss-room chalkboard share.
+// The labour cost view (feature 2): units, difference, scanning / partial honesty, and the pure model the lobby wall, the detail window and the card share.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadConfig } from '../server/config.mjs';
@@ -100,7 +100,6 @@ test('cost-view: the top list is cut at topN and a person who has left is named 
   assert.equal(v.top.length, C.topCount);
   assert.deepEqual(v.top.map((p) => p.name), ['하나', '둘', '셋', C.goneName, '다섯']);
   assert.deepEqual(v.top.map((p) => p.text), ['6.0M', '3.0M', '2.0M', '900.0k', '400.0k']);
-  assert.equal(costView(frame(), C, 2).top.length, 2, 'the chalkboard asks for its own count');
 });
 
 test('cost-view: a floor window shows the floor total, its top people, and the cache reads apart', () => {

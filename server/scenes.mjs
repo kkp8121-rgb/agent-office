@@ -34,7 +34,7 @@ export function readScene(dir, design, cfg, opts = {}) {
   return errors.length ? { errors } : { raw };
 }
 
-/** @returns {Record<string, {raw: object, url: string}>} every design in `designOrder` plus the lobby and the CEO room when they are on and have a scene folder; a design without a valid scene refuses to start. */
+/** @returns {Record<string, {raw: object, url: string}>} every design in `designOrder` plus the lobby when it is on; a design without a valid scene refuses to start. */
 export function loadScenes(cfg) {
   const out = {};
   for (const design of cfg.designOrder) {
@@ -43,12 +43,11 @@ export function loadScenes(cfg) {
     if (!res.raw) throw new Error(`장면 검사 실패: ${design}: ${res.errors[0]}`);
     out[design] = { raw: res.raw, url: `/scenes/${design}/` };
   }
-  for (const extra of [cfg.lobby, cfg.ceo]) { // the lobby and the CEO room: on their own switch, never in designOrder
-    const design = extra?.enabled ? extra.design : null;
-    if (!design || !fs.existsSync(path.join(cfg.scenesDir, design, 'scene.json'))) continue; // a custom scenes folder without it simply has none
-    const res = readScene(path.join(cfg.scenesDir, design), design, cfg);
-    if (!res.raw) throw new Error(`장면 검사 실패: ${design}: ${res.errors[0]}`);
-    out[design] = { raw: res.raw, url: `/scenes/${design}/` };
+  const lobby = cfg.lobby?.enabled ? cfg.lobby.design : null;
+  if (lobby && fs.existsSync(path.join(cfg.scenesDir, lobby, 'scene.json'))) { // a custom scenes folder without the lobby simply has no lobby
+    const res = readScene(path.join(cfg.scenesDir, lobby), lobby, cfg);
+    if (!res.raw) throw new Error(`장면 검사 실패: ${lobby}: ${res.errors[0]}`);
+    out[lobby] = { raw: res.raw, url: `/scenes/${lobby}/` };
   }
   return out;
 }

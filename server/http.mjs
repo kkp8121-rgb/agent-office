@@ -261,7 +261,6 @@ export function createServer(cfg, office, { onSavedChange, onShutdown, onSseConn
       spriteHeight: cfg.spriteHeight, ui: cfg.ui, bubbleShowMs: cfg.agent.bubbleShowMs, nameMaxChars: cfg.floor.nameMaxChars, roles, leads: cfg.leads.map((l) => l.key),
       scenes, sitSprites, sitHeight: cfg.sitHeight, nav: cfg.nav, depth: cfg.depth,
       lobby: cfg.lobby?.enabled ? { design: cfg.lobby.design } : null,
-      ceo: cfg.ceo?.enabled && cfg.scenes[cfg.ceo.design] ? { design: cfg.ceo.design } : null, // the CEO room: a screen-only floor, and only when its scene folder is there
       weather: { enabled: Boolean(weather?.enabled), city: cfg.weather?.city ?? '' },
       sysload: { taskManager: Boolean(sysload?.available), on: Boolean(sysload?.taskManager) }, // the Task Manager CPU basis: usable here, and on now
       personas: personas ?? {},

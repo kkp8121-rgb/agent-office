@@ -420,7 +420,7 @@ test('lobby server: the snapshot adds no text field (privacy list unchanged)', (
   o.syncAgents('s1', [M('a1')], 100000);
   const f = floorOf(o, 's1');
   // 'phases' carries the same cleaned phase names the board's sheet already sends (the detail panel shows them next to the to-do list)
-  assert.deepEqual(Object.keys(f).sort(), ['agents', 'autoTitle', 'board', 'call', 'callSince', 'colorIndex', 'conflicts', 'design', 'failAt', 'floorNo', 'folder', 'lead', 'origin', 'phases', 'provider', 'reports', 'rest', 'sessionId', 'sheet', 'startedAt', 'status', 'title', 'todos', 'workflows']);
+  assert.deepEqual(Object.keys(f).sort(), ['agents', 'autoTitle', 'board', 'colorIndex', 'conflicts', 'design', 'failAt', 'floorNo', 'folder', 'lead', 'origin', 'phases', 'provider', 'reports', 'rest', 'sessionId', 'sheet', 'startedAt', 'status', 'title', 'todos', 'workflows']);
   assert.deepEqual(Object.keys(f.agents[0]).sort(), ['agentId', 'bubble', 'conflict', 'enteredAt', 'key', 'model', 'name', 'phase', 'pile', 'role', 'since', 'slot', 'slowKind', 'slowSince', 'sprite', 'state', 'wf']);
 });
 
@@ -649,7 +649,7 @@ test('lobby cost: the cost page comes after the last page of the table, which is
   assert.deepEqual(seen, [0, 1, 2, 'cost', 0, 1, 2, 'cost']);
 });
 
-// ---- initCost on a stand-in page (review nits: the table's title row, no ic- class, a hidden tab paints nothing) ----
+// ---- initCost on a stand-in page (review nits: the table's title row, no ic- class) ----
 
 class Node {
   constructor(doc, tag) { Object.assign(this, { tag, ownerDocument: doc, children: [], dataset: {}, style: {}, hidden: false, className: '', textContent: '' }); }
@@ -699,7 +699,7 @@ test('lobby cost page: its box is marked by a data attribute, and the whole tabl
   }
 });
 
-test('lobby cost page: a state frame of a hidden tab does not paint the wall, a visible one does', () => {
+test('lobby cost page: a state frame keeps the data current and paints the wall', () => {
   const was = globalThis.MutationObserver;
   globalThis.MutationObserver = class { observe() {} };
   try {
@@ -710,10 +710,8 @@ test('lobby cost page: a state frame of a hidden tab does not paint the wall, a 
     hooks.timers.shift()(); // the cost page is on the wall
     const firstRow = () => box.children[1];
     assert.equal(firstRow().children[1].textContent, '', 'no floors known yet: no floor number');
-    hooks.state[0]([floor('s1', 3)], { hidden: true });
+    hooks.state[0]([floor('s1', 3)]);
     assert.equal(live.floors.length, 1, 'the data is kept current');
-    assert.equal(firstRow().children[1].textContent, '', 'but nothing is drawn');
-    hooks.state[0]([floor('s1', 3)], { hidden: false });
     assert.equal(firstRow().children[1].textContent, '3층');
   } finally {
     globalThis.MutationObserver = was;

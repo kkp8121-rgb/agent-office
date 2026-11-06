@@ -29,7 +29,7 @@ export function lampState(floors, lampAt) {
   return { on: floors.some((f) => f.conflicts?.length > 0), at: lampAt };
 }
 
-/** May a tug start now? `current` is what ctx.gesture.current says; a stronger gesture (rest, faint, bell wave) or a meeting on the floor puts it off. */
+/** May a tug start now? `current` is what ctx.gesture.current says; a stronger gesture (rest, faint) or a meeting on the floor puts it off. */
 export function tugAllowed(priority, current, inMeeting) {
   if (inMeeting) return false;
   if (current === null) return true;

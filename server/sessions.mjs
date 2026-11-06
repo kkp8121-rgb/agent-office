@@ -3,7 +3,7 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { uptime } from 'node:os';
 
-/** @typedef {{provider:'claude'|'codex', pid:number, sessionId:string, cwd:string, status:string, name:string, startedAt:number, waitingPermission:boolean}} Session */
+/** @typedef {{provider:'claude'|'codex', pid:number, sessionId:string, cwd:string, status:string, name:string, startedAt:number}} Session */
 
 export function isPidAlive(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
@@ -60,8 +60,6 @@ export async function listLiveSessions(claudeHome, bootMs = BOOT_MS) {
       sessionId: j.sessionId,
       cwd: str(j.cwd),
       status: str(j.status),
-      // Only whether the wait is for a permission is kept; the text of `waitingFor` is dropped.
-      waitingPermission: typeof j.waitingFor === 'string' && j.waitingFor.toLowerCase().includes('permission'),
       name: str(j.name),
       startedAt: j.startedAt,
     });

@@ -1,18 +1,12 @@
-// Area "incidents": what happens on a floor when it calls the boss (bell), when a usage limit sends it to lunch, and when a compaction
-// makes someone faint; plus the 「호출 알림」 switch and its Windows notifications.
-//  - Information marks are always drawn, effects on or off: the bell sign next to the floor sign, the lunch veil and sign, the tab marks,
-//    the tab title count, a line in a speech bubble.
-//  - Decoration and motion only while the effects are on: the blinking bell frame, the lead waving a paper, the napping pose, the fall and the notepad.
+// Area "incidents": what happens on a floor when a usage limit sends it to lunch and when a compaction makes someone faint.
+//  - Information marks are always drawn, effects on or off: the lunch veil and sign, the tab marks, a line in a speech bubble.
+//  - Decoration and motion only while the effects are on: the napping pose, the fall and the notepad.
 //  - Nothing here loops by itself: every timer is ctx.timers.setTimeout of a floor that is shown, and a gesture is held through ctx.gesture.
-// The rules are pure (web/call-view.mjs, web/incident-view.mjs, tested); this file is the DOM glue. Looks: web/incidents.css (classes ic-*).
+// The rules are pure (web/incident-view.mjs, tested); this file is the DOM glue. Looks: web/incidents.css (classes ic-*).
 
-import { bellOf, callingFloors, titleWith, createAlertSwitch, createNotifier } from './call-view.mjs';
 import { restDim, restSignText, faintPlan, faintTotalMs } from './incident-view.mjs';
 
 const PROPS = '/assets/props/';
-const SWITCH_ID = 'alert-switch';
-const NOTE_ID = 'alert-denied';
-const GROUP_ID = 'alert-choices';
 
 function make(tag, className) {
   const e = document.createElement(tag);
@@ -36,7 +30,6 @@ const isDark = () => {
 /** @param {import('./fx.mjs').FxCtx} ctx */
 export function init(ctx) {
   const { fx, ui } = ctx;
-  const bellCfg = ui.bell;
   const restCfg = ui.rest;
   const faintCfg = ui.faint;
   const floors = new Map(); // sessionId -> what this area keeps for the floor
@@ -44,159 +37,24 @@ export function init(ctx) {
   const faints = new Map(); // character record -> {token, timer, notepad, notepadTimer}
   const pendingFaint = new Map(); // character record -> sessionId, waiting for a meeting on that floor to end
   let lastList = [];
-  const baseTitle = document.title;
 
   const lead = (frec) => frec.agents.get('lead') ?? null;
-  const free = (rec, frec) => rec.arrived && !rec.walk && !rec.grab && !rec.press && !rec.play && !rec.away && !frec.meeting;
   const say = (rec, key) => ctx.sayFor(rec, ctx.line(key, undefined, rec), ui.officeLife.sayMs);
-
-  // ---------- the call-alert switch and the Windows notifications ----------
-
-  const supported = typeof Notification !== 'undefined';
-  const alerts = createAlertSwitch({
-    storage: window.localStorage,
-    key: bellCfg.notifyStorageKey,
-    keepAlive: ctx.keepAlive,
-    permission: () => (supported ? Notification.permission : 'denied'),
-    request: () => Notification.requestPermission(),
-  });
-
-  const tabButtons = () => new Map([...document.querySelectorAll('#tab-list > button')].map((b) => [b.textContent, b]));
-
-  const notifier = createNotifier({
-    cfg: bellCfg,
-    isOn: alerts.isOn,
-    now: ctx.now,
-    notify({ sessionId, title, body }) {
-      const view = lastList.find((v) => v.sessionId === sessionId);
-      try {
-        const n = new Notification(title, { body, tag: sessionId, silent: !ui.fx.sound });
-        n.onclick = () => {
-          window.focus();
-          if (view) tabButtons().get(String(view.floorNo))?.click();
-          n.close();
-        };
-      } catch {
-        // the platform refuses to build a notification (some mobile browsers): the bell on screen still shows
-      }
-    },
-  });
-
-  function initSwitch() {
-    const box = document.getElementById(SWITCH_ID);
-    if (!box) return;
-    const note = document.getElementById(NOTE_ID);
-    const S = ui.weather;
-    const group = document.getElementById(GROUP_ID);
-    if (group) group.querySelector('legend').textContent = S.alertGroup;
-    const label = box.closest('label');
-    if (label) {
-      label.append(` ${S.alertSwitch}`);
-      label.title = S.alertHint;
-    }
-    if (note) note.textContent = S.alertDenied;
-    const showNote = () => {
-      if (note) note.hidden = !supported || alerts.permission() !== 'denied';
-    };
-    box.disabled = !supported;
-    box.checked = alerts.restore();
-    showNote();
-    box.addEventListener('change', async () => {
-      if (box.checked) box.checked = await alerts.turnOn();
-      else alerts.turnOff();
-      showNote();
-    });
-  }
 
   // ---------- state of one floor ----------
 
   function stateOf(frec) {
     let st = floors.get(frec.sid);
     if (st && st.frec !== frec) { // the floor was built again under the same id
-      stopWave(st);
       endRest(st);
       floors.delete(frec.sid);
       st = null;
     }
     if (!st) {
-      st = { frec, call: null, spoke: false, waveTimer: 0, wave: null, restOn: false, restSeen: false, veil: null, sign: null, naps: new Map() };
+      st = { frec, restOn: false, restSeen: false, veil: null, sign: null, naps: new Map() };
       floors.set(frec.sid, st);
     }
     return st;
-  }
-
-  // ---------- the bell ----------
-
-  function drawBell(st, sign) {
-    const slot = ctx.signSlot(st.frec, 'bell');
-    if (!slot) return;
-    slot.hidden = !sign;
-    if (!sign) return;
-    let mark = slot.firstElementChild;
-    if (!mark) {
-      mark = make('span', 'ic-bell');
-      mark.style.setProperty('--ic-blink', `${bellCfg.blinkMs}ms`);
-      mark.append(prop('bell', 'ic-bell-icon'), make('span', 'ic-bell-text'));
-      slot.append(mark);
-    }
-    if (mark.dataset.kind !== sign.kind) mark.dataset.kind = sign.kind;
-    const text = mark.lastElementChild;
-    if (text.textContent !== sign.text) text.textContent = sign.text;
-  }
-
-  function stopWave(st, release = true) {
-    if (st.waveTimer) ctx.timers.clearTimeout(st.waveTimer);
-    st.waveTimer = 0;
-    const w = st.wave;
-    if (!w) return;
-    st.wave = null;
-    w.rec.body.classList.remove('ic-wave');
-    w.paper.remove();
-    if (release) ctx.gesture.release(w.token);
-  }
-
-  function later(st, ms, fn) {
-    st.waveTimer = ctx.timers.setTimeout(() => {
-      st.waveTimer = 0;
-      fn();
-    }, ms, st.frec.sid);
-  }
-
-  function tryWave(st) {
-    if (!st.call || !fx.fxOn() || !ctx.floorActive(st.frec)) return;
-    const rec = lead(st.frec);
-    const token = rec && free(rec, st.frec) ? ctx.gesture.acquire(rec, 'bellwave') : null;
-    if (!token) return later(st, bellCfg.blinkMs, () => tryWave(st)); // busy (walking, a meeting, a stronger gesture): look again soon
-    const paper = prop('paper', 'ic-paper');
-    paper.style.setProperty('--ic-wave-ms', `${bellCfg.waveMs}ms`);
-    rec.tagRoot.append(paper);
-    rec.body.style.setProperty('--ic-wave-ms', `${bellCfg.waveMs}ms`);
-    rec.body.classList.add('ic-wave');
-    st.wave = { rec, token, paper };
-    ctx.gesture.onPreempt(token, () => {
-      stopWave(st, false);
-      later(st, bellCfg.waveEveryMs, () => tryWave(st));
-    });
-    later(st, bellCfg.waveMs, () => {
-      stopWave(st);
-      later(st, Math.max(0, bellCfg.waveEveryMs - bellCfg.waveMs), () => tryWave(st));
-    });
-  }
-
-  function syncBell(st, sign) {
-    const kind = sign?.kind ?? null;
-    if (!kind) st.spoke = false;
-    st.call = kind;
-    drawBell(st, sign);
-    const active = ctx.floorActive(st.frec);
-    const rec = lead(st.frec);
-    if (kind && !st.spoke && active && rec) {
-      st.spoke = true;
-      say(rec, 'bellCall');
-    }
-    if (kind && active && fx.fxOn()) {
-      if (!st.wave && !st.waveTimer) later(st, 0, () => tryWave(st));
-    } else stopWave(st);
   }
 
   // ---------- lunch break ----------
@@ -322,21 +180,15 @@ export function init(ctx) {
     else startFaint(frec, rec);
   }
 
-  // ---------- tab marks, title, small-window frame ----------
+  // ---------- tab marks ----------
 
   function drawTabs(list) {
-    const buttons = tabButtons();
+    const buttons = new Map([...document.querySelectorAll('#tab-list > button')].map((b) => [b.textContent, b]));
     for (const view of list) {
       const b = buttons.get(String(view.floorNo));
       if (!b) continue;
-      b.classList.toggle('ic-tab-call', Boolean(bellOf(view, bellCfg)));
       b.classList.toggle('ic-tab-rest', Boolean(view.rest));
     }
-  }
-
-  function drawFrame(count) {
-    const host = [...ctx.floors()].find((f) => f.el?.parentElement)?.el.parentElement;
-    host?.classList.toggle('ic-has-call', count > 0);
   }
 
   // ---------- wiring ----------
@@ -348,26 +200,19 @@ export function init(ctx) {
       if (!frec) continue;
       ids.add(view.sessionId);
       const st = stateOf(frec);
-      syncBell(st, bellOf(view, bellCfg));
       syncRest(st, view.rest ?? null);
     }
     for (const [sid, st] of [...floors]) {
       if (ids.has(sid)) continue;
-      stopWave(st);
       endRest(st);
       floors.delete(sid);
     }
   }
 
-  ctx.onState((list, { hidden }) => {
+  ctx.onState((list) => {
     lastList = list;
-    notifier.update(list);
-    const count = callingFloors(list, bellCfg).length;
-    document.title = titleWith(baseTitle, count, bellCfg.titlePrefix);
-    if (hidden) return; // a hidden tab draws nothing
     drawFloors(list);
     drawTabs(list);
-    drawFrame(count);
   });
 
   ctx.onServer('compact', onCompact);
@@ -381,22 +226,15 @@ export function init(ctx) {
   });
 
   fx.onFx('floor-hidden', ({ floor, removed }) => {
-    const st = floors.get(floor.sid);
-    if (st) stopWave(st);
     for (const [rec, sid] of [...pendingFaint]) if (sid === floor.sid) pendingFaint.delete(rec);
     if (removed) floors.delete(floor.sid);
   }, { always: true });
 
   fx.onFx('floor-shown', () => drawFloors(lastList), { always: true });
 
-  ctx.onPauseChange((paused) => {
-    if (paused) for (const st of floors.values()) stopWave(st);
-  });
-
   fx.onFxChange(({ fx: on }) => {
     if (on) return drawFloors(lastList);
     for (const st of floors.values()) {
-      stopWave(st);
       for (const [rec, held] of st.naps) {
         rec.body.classList.remove('ic-nap');
         held.nap = false;
@@ -406,5 +244,4 @@ export function init(ctx) {
     pendingFaint.clear();
   });
 
-  initSwitch();
 }

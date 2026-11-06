@@ -1,6 +1,6 @@
 // Area "actor" (the marks on people): the model band under a name tag, the paper pile on a desk and the hourglass over a slow command.
 // The rules are pure and live in web/actor-view.mjs; this file only reads the floor views (ctx.onState) and keeps a few DOM nodes in step.
-// Nothing here moves a character, runs a frame loop or reads anything but the view fields model, pile, slowSince (and the floor's call, rest).
+// Nothing here moves a character, runs a frame loop or reads anything but the view fields model, pile, slowSince (and the floor's rest).
 //
 //   band       a strip under the name tag, floors and lobby (lobby: through ctx.chars(ctx.lobby())). Information: drawn with the effects off too.
 //   pile       a picture on the person's desk (stage 1..4, the last one wobbles). Decoration: built only while the effects are on.
@@ -119,7 +119,7 @@ export function init(ctx) {
       if (!rec) continue;
       alive.add(person.key);
       setBand(rec, person.model);
-      setGlass(rec, glassPlan({ slowSince: person.slowSince, nowMs, call: fv.call, rest: fv.rest, fxOn: on }, glassCfg));
+      setGlass(rec, glassPlan({ slowSince: person.slowSince, nowMs, rest: fv.rest, fxOn: on }, glassCfg));
       const plan = pilePlan({ pile: person.pile, design: fv.design, fxOn: on }, pileCfg);
       setPile(frec, person.key, plan.draw, deskOf(frec.scene.r, person.key, person.slot));
       setTitle(rec, plan.title);
@@ -160,8 +160,7 @@ export function init(ctx) {
     ticker.sync();
   };
 
-  ctx.onState((list, { hidden }) => {
-    if (hidden) return; // a hidden tab draws nothing
+  ctx.onState((list) => {
     last = list;
     syncAll();
   });

@@ -96,22 +96,21 @@ test('the time text for 59 s, 61 s and 3601 s', () => {
 });
 
 test('the time counts from the server clock and never goes negative', () => {
-  const at = (nowMs) => glassPlan({ slowSince: 1_000_000, nowMs, call: null, rest: null, fxOn: true }, hourglass);
+  const at = (nowMs) => glassPlan({ slowSince: 1_000_000, nowMs, rest: null, fxOn: true }, hourglass);
   assert.equal(at(1_000_000 + 61_000).text, '1분 1초');
   assert.equal(at(999_000).text, '0분 0초');
-  assert.equal(glassPlan({ slowSince: null, nowMs: 5, call: null, rest: null, fxOn: true }, hourglass), null);
+  assert.equal(glassPlan({ slowSince: null, nowMs: 5, rest: null, fxOn: true }, hourglass), null);
 });
 
-test('a floor with a bell or a lunch break hides the hourglass', () => {
+test('a floor on its lunch break hides the hourglass', () => {
   const base = { slowSince: 0, nowMs: 90_000, fxOn: true };
-  assert.ok(glassPlan({ ...base, call: null, rest: null }, hourglass));
-  assert.equal(glassPlan({ ...base, call: 'ask', rest: null }, hourglass), null);
-  assert.equal(glassPlan({ ...base, call: null, rest: { until: 5, limitKind: 'five_hour' } }, hourglass), null);
+  assert.ok(glassPlan({ ...base, rest: null }, hourglass));
+  assert.equal(glassPlan({ ...base, rest: { until: 5, limitKind: 'five_hour' } }, hourglass), null);
 });
 
 test('with the effects off the hourglass is a still picture and keeps its time text', () => {
-  const on = glassPlan({ slowSince: 0, nowMs: 90_000, call: null, rest: null, fxOn: true }, hourglass);
-  const off = glassPlan({ slowSince: 0, nowMs: 90_000, call: null, rest: null, fxOn: false }, hourglass);
+  const on = glassPlan({ slowSince: 0, nowMs: 90_000, rest: null, fxOn: true }, hourglass);
+  const off = glassPlan({ slowSince: 0, nowMs: 90_000, rest: null, fxOn: false }, hourglass);
   assert.equal(on.spin, true);
   assert.equal(off.spin, false);
   assert.equal(off.text, on.text);

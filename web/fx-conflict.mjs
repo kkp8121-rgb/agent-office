@@ -20,7 +20,7 @@ export function init(ctx) {
   const said = new Set(); // `${sid}|${key}|${id}`: the live bubble was spoken
   const live = new Set(); // conflict ids raised by a live signal
   let lamp = null; // {el}
-  let last = { list: [], hidden: false };
+  let lastList = [];
 
   const viewOf = (sid) => ctx.view(sid);
 
@@ -175,9 +175,8 @@ export function init(ctx) {
   }
 
   // ---------- state ----------
-  function sync(list, { hidden }) {
-    last = { list, hidden };
-    if (hidden) return;
+  function sync(list) {
+    lastList = list;
     const seen = new Set();
     for (const fv of list) {
       const frec = ctx.floor(fv.sessionId);
@@ -200,7 +199,7 @@ export function init(ctx) {
     syncLamp(list);
   }
 
-  const resync = () => sync(last.list, { hidden: last.hidden });
+  const resync = () => sync(lastList);
   ctx.onState(sync);
   ctx.onServer('conflict', (d) => {
     live.add(d.id);

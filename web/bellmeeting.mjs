@@ -27,14 +27,13 @@ export function speakingOrder(people, maxSpeakers) {
 }
 
 /**
- * Schedule of one bell meeting. Each speaker says their current bubble text, or `lines.idle` when it is empty;
- * the chair opens only when the boss comes down, and always closes. `effects` off means no boss: the lead chairs.
- * @returns {{chair: 'ceo'|'lead', slots: {id, text, atMs}[], open: ?{text, atMs}, close: {text, atMs}, totalMs: number, gatherOnly: any[]}}
+ * Schedule of one bell meeting: the lead chairs. Each speaker says their current bubble text, or `lines.idle` when it is empty;
+ * the chair (the lead, at the boss spot) always closes.
+ * @returns {{slots: {id, text, atMs}[], close: {text, atMs}, totalMs: number, gatherOnly: any[]}}
  */
 export function planBell(people, opts) {
   const { sayMs, gapMs, maxSpeakers } = opts.bm;
   const { speakers, gatherOnly } = speakingOrder(people, maxSpeakers);
-  const chair = opts.effects && !opts.reducedMotion ? 'ceo' : 'lead';
   const slots = speakers.map((p, i) => ({
     id: p.id,
     text: p.bubble ? p.bubble : opts.lines.idle,
@@ -43,17 +42,29 @@ export function planBell(people, opts) {
   const speakMs = speakers.length * sayMs + Math.max(0, speakers.length - 1) * gapMs;
   const close = { text: opts.lines.close, atMs: speakMs + (speakers.length ? gapMs : 0) };
   return {
-    chair,
     slots,
-    open: chair === 'ceo' ? { text: opts.lines.open, atMs: 0 } : null,
     close,
     totalMs: speakMs + (speakers.length ? gapMs : 0) + sayMs,
     gatherOnly,
   };
 }
 
+/** The meeting spot a person stands on: the nearest of `spots` ([{at: [x, y]}]) to (x, y). */
+export function nearestSpot(spots, x, y) {
+  let best = 0;
+  let bestD = Infinity;
+  spots.forEach((s, i) => {
+    const d = Math.hypot(s.at[0] - x, s.at[1] - y);
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  });
+  return best;
+}
+
 /** A phase signal arrives. During a bell meeting it ends the bell and hands over to a phase meeting chaired by the lead. */
 export function onPhaseSignal(bellActive) {
-  if (!bellActive) return { endBell: false, chair: 'lead', ceoStepAside: false };
-  return { endBell: true, clearBubbles: true, chair: 'lead', ceoStepAside: true };
+  if (!bellActive) return { endBell: false, chair: 'lead' };
+  return { endBell: true, clearBubbles: true, chair: 'lead' };
 }

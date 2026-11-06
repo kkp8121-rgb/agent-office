@@ -16,10 +16,7 @@ import config from '../config.json' with { type: 'json' };
 
 const ROLLOUT_NAME = /^rollout-[\w.-]+\.jsonl$/; // also excludes the old .jsonl.zst files
 
-const ASK_TOOL = 'request_user_input_async'; // the question the user is asked; its output is the answer
 const EPOCH_MS_MIN = 1e12; // a reset time below this is in seconds
-const ASK_OPEN_MAX = 16; // questions remembered as unanswered per rollout
-const APPROVAL_EVENTS = new Set(['exec_approval_request', 'apply_patch_approval_request']);
 
 const isObj = (v) => typeof v === 'object' && v !== null;
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0); // anything else counts as 0
@@ -225,8 +222,8 @@ function fullWindowReset(limits) {
   return at;
 }
 
-/** What a rollout's lines leave behind for later lines: unanswered questions, and the last full rate-limit window. */
-const newLineState = () => ({ asks: new Set(), limitUntil: null });
+/** What a rollout's lines leave behind for later lines: the last full rate-limit window. */
+const newLineState = () => ({ limitUntil: null });
 
 /** One line -> {ts, turn, evs}. `turn` is 'start'/'end' for turn boundaries (the source needs them, Office does not). */
 function parseEntry(text, st) {
@@ -248,16 +245,10 @@ function parseEntry(text, st) {
         break;
       case 'function_call':
         out.evs.push(functionCall(p, ts));
-        if (p.name === ASK_TOOL) {
-          st.asks.add(callId(p));
-          if (st.asks.size > ASK_OPEN_MAX) st.asks.delete(st.asks.values().next().value);
-          out.evs.push({ kind: 'ask', ts, open: true });
-        }
         break;
       case 'custom_tool_call_output':
       case 'function_call_output':
         out.evs.push(done(ts, callId(p)));
-        if (st.asks.delete(callId(p))) out.evs.push({ kind: 'ask', ts, open: false });
         break;
       case 'reasoning':
       case 'message':
@@ -283,8 +274,6 @@ function parseEntry(text, st) {
         const window = p.info.model_context_window;
         out.evs.push({ kind: 'ctx', ts, ctxTokens: num(last.input_tokens), window: typeof window === 'number' && window > 0 ? window : null, model: null });
       }
-    } else if (APPROVAL_EVENTS.has(p.type)) {
-      out.evs.push({ kind: 'approval', ts });
     } else if (p.type === 'exec_command_end' && Number.isFinite(p.exit_code)) {
       out.evs.push({ kind: 'toolResult', ts, error: p.exit_code !== 0 }); // only the exit code, never the output
     } else if (p.type === 'item_completed') {
@@ -298,8 +287,8 @@ function parseEntry(text, st) {
 }
 
 /**
- * @param {{asks:Set<string>, limitUntil:number|null}} [st] what earlier lines of the same rollout left behind; without it a line
- * is read alone (an answer cannot close a question, a limit has no reset time).
+ * @param {{limitUntil:number|null}} [st] what earlier lines of the same rollout left behind; without it a line
+ * is read alone (a limit has no reset time).
  * @returns {Ev[]}
  */
 export function parseCodexLine(text, st = newLineState()) {
@@ -552,7 +541,7 @@ export class CodexSource {
       listedRecs.add(rec);
       for (const k of mine) listedRecs.add(k);
       const id = rec.meta.id;
-      out.sessions.push({ provider: 'codex', origin: rec.meta.origin, pid: 0, sessionId: id, cwd: rec.meta.cwd, status: own ? 'busy' : 'waiting', waitingPermission: false, name: '', startedAt: rec.activeFrom });
+      out.sessions.push({ provider: 'codex', origin: rec.meta.origin, pid: 0, sessionId: id, cwd: rec.meta.cwd, status: own ? 'busy' : 'waiting', name: '', startedAt: rec.activeFrom });
 
       const evs = [];
       // The thread name from session_index.jsonl (set by the apps and by `codex resume`) wins over the folder; a rename is sent again.

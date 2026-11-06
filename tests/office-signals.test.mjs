@@ -1,4 +1,4 @@
-// Office signals of the 1.1 features: the call (bell) of a floor, work handed over between people, compaction and the usage-limit
+// Office signals of the 1.1 features: work handed over between people, compaction and the usage-limit
 // lunch break. All events are synthetic; floors are created at now = 1000, so an event stamped before that is backfill.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,7 +9,7 @@ const cfg = loadConfig();
 const EMPTY = { hidden: [], names: {} };
 
 const S = (id, o = {}) => ({
-  provider: 'claude', pid: 100, sessionId: id, cwd: 'C:\\Project', status: 'busy', waitingPermission: false, name: '', startedAt: 1000, ...o,
+  provider: 'claude', pid: 100, sessionId: id, cwd: 'C:\\Project', status: 'busy', name: '', startedAt: 1000, ...o,
 });
 const M = (id, o = {}) => ({
   agentId: id, agentType: 'worker', description: '기록 구조 조사', finished: false, transcriptPath: '', mtimeMs: 0, toolUseId: '', workflow: null, ...o,
@@ -31,97 +31,6 @@ function setup(live = [S('s1')], now = 1000) {
   o.syncSessions(live, now);
   return o;
 }
-
-// ---- bell --------------------------------------------------------------------------------------
-
-test('sessions waiting gives call input', () => {
-  const o = setup([S('s1', { status: 'waiting' })], 1000);
-  const f = floorOf(o, 's1');
-  assert.equal(f.status, 'waiting');
-  assert.equal(f.call, 'input');
-  assert.equal(f.callSince, 1000);
-  assert.equal(floorOf(setup([S('s2', { status: 'busy', waitingPermission: true })]), 's2').call, null, 'busy is not a wait, whatever waitingFor said');
-});
-
-test('waitingPermission gives call permission', () => {
-  const o = setup([S('s1', { status: 'waiting', waitingPermission: true })]);
-  assert.equal(floorOf(o, 's1').call, 'permission');
-  o.syncSessions([S('s1', { status: 'waiting', waitingPermission: false })], 2000); // the prompt went away, the session still waits
-  const f = floorOf(o, 's1');
-  assert.equal(f.call, 'input');
-  assert.equal(f.callSince, 1000, 'the call goes on: its start is not reset by a change of kind');
-});
-
-test('idle gives call null and status waiting', () => {
-  const f = floorOf(setup([S('s1', { status: 'idle' })]), 's1');
-  assert.equal(f.status, 'waiting');
-  assert.equal(f.call, null);
-  assert.equal(f.callSince, null);
-});
-
-test('an open AskUserQuestion gives call ask', () => {
-  const o = setup();
-  o.applySessionEvents('s1', [tool(2000, 'AskUserQuestion', 'q1')], 2000);
-  const f = floorOf(o, 's1');
-  assert.equal(f.call, 'ask');
-  assert.equal(f.callSince, 2000);
-  o.applySessionEvents('s1', [tool(2100, 'Read', 'r1')], 2100); // a later event of the person means it was answered
-  assert.equal(floorOf(o, 's1').call, null);
-});
-
-test('its toolDone clears the call', () => {
-  const o = setup([S('s1', { status: 'waiting' })]);
-  o.applySessionEvents('s1', [tool(2000, 'AskUserQuestion', 'q1')], 2000);
-  assert.equal(floorOf(o, 's1').call, 'ask', 'ask outranks input');
-  o.syncSessions([S('s1', { status: 'busy' })], 2050);
-  assert.equal(floorOf(o, 's1').call, 'ask', 'a busy session file alone does not close a question that has no answer yet');
-  o.applySessionEvents('s1', [done(2100, 'q1')], 2100);
-  const f = floorOf(o, 's1');
-  assert.equal(f.call, null);
-  assert.equal(f.callSince, null);
-});
-
-test('a resting floor has no call', () => {
-  const o = setup([S('s1', { status: 'waiting' })]);
-  assert.equal(floorOf(o, 's1').call, 'input');
-  o.applySessionEvents('s1', [limit(2000, 2000 + 3600000)], 2000);
-  const f = floorOf(o, 's1');
-  assert.deepEqual(f.rest, { until: 3602000, limitKind: 'five_hour' });
-  assert.equal(f.call, null);
-  assert.equal(f.callSince, null);
-});
-
-test('a hidden floor has no call', () => {
-  const o = new Office(cfg, { hidden: [{ sessionId: 's1', pid: 100, startedAt: 1000 }], names: {} });
-  o.syncSessions([S('s1', { status: 'waiting', waitingPermission: true })], 1000);
-  o.applySessionEvents('s1', [tool(2000, 'AskUserQuestion', 'q1')], 2000);
-  o.syncSessions([S('s1', { status: 'waiting', waitingPermission: true })], 3000);
-  assert.deepEqual(o.snapshot().floors, []);
-  assert.deepEqual(ofType(o.drainSignals(), 'bell'), []);
-  // hiding a floor that is calling takes the call away without a signal
-  const p = setup([S('p1', { status: 'idle' })]);
-  p.syncSessions([S('p1', { status: 'waiting' })], 2000);
-  assert.equal(ofType(p.drainSignals(), 'bell').length, 1);
-  p.hide('p1');
-  p.syncSessions([S('p1', { status: 'idle' })], 3000);
-  p.syncSessions([S('p1', { status: 'waiting' })], 4000);
-  assert.deepEqual(ofType(p.drainSignals(), 'bell'), []);
-});
-
-test('backfill gives no bell signal, live gives one', () => {
-  const live = (s3) => [S('s1'), S('s2', { status: 'waiting' }), S('s4'), S('s3', { startedAt: 1500, ...s3 })];
-  const o = setup([S('s1'), S('s2', { status: 'waiting' }), S('s4')], 1000);
-  assert.deepEqual(o.drainSignals(), [], 'a floor met already waiting is shown, not announced');
-  o.applySessionEvents('s1', [tool(500, 'AskUserQuestion', 'q0')], 1000); // stamped before the floor was found: backfill
-  assert.equal(floorOf(o, 's1').call, 'ask');
-  assert.deepEqual(o.drainSignals(), []);
-  o.applySessionEvents('s4', [tool(2000, 'AskUserQuestion', 'q4')], 2000); // live
-  o.syncSessions(live({}), 2500);
-  o.syncSessions(live({ status: 'waiting', waitingPermission: true }), 3000);
-  const bells = ofType(o.drainSignals(), 'bell');
-  assert.deepEqual(bells.map((b) => [b.sessionId, b.callKind, b.at]), [['s4', 'ask', 2000], ['s3', 'permission', 3000]]);
-  assert.deepEqual(keys(bells[0]), ['at', 'callKind', 'sessionId', 'type']);
-});
 
 // ---- handing work over -------------------------------------------------------------------------
 
@@ -248,7 +157,6 @@ test('a limit in an agent file rests the whole floor', () => {
   o.applyAgentEvents('s1', 'a1', [limit(2100, 9000000, 'seven_day')], 2100);
   const f = floorOf(o, 's1');
   assert.deepEqual(f.rest, { until: 9000000, limitKind: 'seven_day' });
-  assert.equal(f.call, null);
 });
 
 test('an old backfill limit is ignored', () => {

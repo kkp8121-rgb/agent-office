@@ -16,7 +16,6 @@ ROOMS = {  # origin x,y, size w,h, horizon scene y, quantize colours
  "lounge": ((344, 64), (376, 136), 130, 64),
  "library": ((304, 32), (304, 112), 88, 64),
  "greenhouse": ((16, 16), (992, 328), 119, 64),
- "ceo": ((64, 32), (624, 224), 96, 128),
 }
 HAZE = {"day": ((207, 229, 242), 0.30), "night": ((31, 44, 85), 0.25)}
 

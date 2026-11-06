@@ -30,25 +30,10 @@ PAL = {
     "d": (60, 66, 82, 255),  # dark detail
     "l": (210, 236, 250, 255),  # glass
     "t": (232, 196, 120, 255),  # sand
-    "x": (40, 34, 30, 255),  # dark gap (open door)
 }
 
 SHAPES = {}
 
-SHAPES["paper"] = [
-    "wwwwwwww..",
-    "wggggggwg.",
-    "wwwwwwwwgg",
-    "wggggggggw",
-    "wwwwwwwwww",
-    "wgggggggww",
-    "wwwwwwwwww",
-    "wggggggggw",
-    "wwwwwwwwww",
-    "wgggggggww",
-    "wwwwwwwwww",
-    "wwwwwwwwww",
-]
 SHAPES["folder"] = [
     "nnnnn.......",
     "nkkkknnnnnnn",
@@ -82,18 +67,6 @@ SHAPES["notepad"] = [
     "yggggyyy",
     "yyyyyyyy",
     "YYYYYYYY",
-]
-SHAPES["bell"] = [
-    "....yy....",
-    "...yyyy...",
-    "..yyRRyy..",
-    "..yRyyyy..",
-    "..yRyyyY..",
-    ".yyyyyyYY.",
-    ".yyyyyyYY.",
-    "yyyyyyyYYY",
-    "YYYYYYYYYY",
-    "....dd....",
 ]
 SHAPES["hourglass"] = [
     "nnnnnnnnnnnnnn",
@@ -183,44 +156,16 @@ SHAPES["tug-paper"] = [
 ]
 
 
-def door(open_):
-    """A lift door cover 22x30 inside: a steel frame; closed = two panels meeting at a seam with a glass slit, open = a dark gap between the panels."""
-    w, h = 22, 30
-    g = [["s"] * w for _ in range(h)]
-    for x in range(w):
-        g[0][x] = g[1][x] = g[h - 1][x] = "S"
-    for y in range(h):
-        g[y][0] = g[y][w - 1] = "S"
-    if open_:
-        for y in range(2, h - 2):
-            g[y][2] = g[y][4] = g[y][w - 3] = g[y][w - 5] = "S"
-            for x in range(6, w - 6):
-                g[y][x] = "x"
-    else:
-        for y in range(2, h - 2):
-            g[y][w // 2 - 1] = g[y][w // 2] = "S"
-        for y in range(4, 10):
-            for x in (4, 5, w - 6, w - 5):
-                g[y][x] = "l"
-    return ["".join(r) for r in g]
-
-
-SHAPES["elev-door-closed"] = door(False)
-SHAPES["elev-door-open"] = door(True)
-
 ORDER = [
-    "paper", "folder", "plane", "notepad", "bell",
+    "folder", "plane", "notepad",
     "hourglass", "pile-1", "pile-2", "pile-3", "pile-4",
     "bell-desk", "bell-desk-ring", "warn-lamp-on", "warn-lamp-off", "tug-paper",
-    "elev-door-closed", "elev-door-open",
 ]
 
 USE = {
-    "paper": "the lead's paper in the bell wave (call)",
     "folder": "the folder handed to the new hire (handoff)",
     "plane": "the paper plane that flies between floors (message)",
     "notepad": "the notepad held after waking up (compact)",
-    "bell": "the bell mark next to a floor sign (call)",
     "hourglass": "the slow-tool hourglass over a head",
     "pile-1": "desk paper pile, stage 1",
     "pile-2": "desk paper pile, stage 2",
@@ -231,8 +176,6 @@ USE = {
     "warn-lamp-on": "lobby conflict lamp, lit",
     "warn-lamp-off": "lobby conflict lamp, dark",
     "tug-paper": "the paper pulled in a file conflict (one end leaves the picture)",
-    "elev-door-closed": "lift door cover, closed",
-    "elev-door-open": "lift door cover, open",
 }
 
 
@@ -289,7 +232,7 @@ def readme(images):
         "# Props",
         "",
         "Hand-drawn pixel props, built by `python art/props/build.py` (PIL, no anti-aliasing, 1px dark outline, 1px transparent margin).",
-        "Heights follow the `assets/snacks/*.png` family (up to 16px; the paper piles are flatter because a pile is low); only the lift door covers are bigger (a door, not a hand prop).",
+        "Heights follow the `assets/snacks/*.png` family (up to 16px; the paper piles are flatter because a pile is low).",
         "A test reads this table: the sizes below must match the PNG files.",
         "",
         "| file | size | use |",

@@ -1,5 +1,0 @@
-{"timestamp":"2026-11-06T10:00:00.000Z","type":"response_item","payload":{"type":"function_call","name":"request_user_input_async","call_id":"call-q-1","arguments":"{\"questions\":[{\"title\":\"SECRET which one https://example.invalid/q\",\"options\":[\"sk-abc123\"]}]}"}}
-{"timestamp":"2026-11-06T10:00:30.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call-other-1","output":"unrelated tok-xyz789"}}
-{"timestamp":"2026-11-06T10:01:00.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call-q-1","output":"{\"answers\":[\"SECRET\"]}"}}
-{"timestamp":"2026-11-06T10:02:00.000Z","type":"event_msg","payload":{"type":"exec_approval_request","call_id":"call-appr-1","command":["rm","-rf","SECRET"],"cwd":"C:\\fixture\\repo-alpha"}}
-{"timestamp":"2026-11-06T10:03:00.000Z","type":"event_msg","payload":{"type":"apply_patch_approval_request","call_id":"call-appr-2","changes":{"C:\\fixture\\repo-alpha\\a.mjs":"SECRET"}}}

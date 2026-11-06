@@ -36,7 +36,7 @@ test('an equal or lower kind is refused', () => {
 test('release frees the character', () => {
   const g = createGestures(PRIORITY);
   const rec = {};
-  const token = g.acquire(rec, 'bellwave');
+  const token = g.acquire(rec, 'faint');
   g.release(token);
   assert.equal(g.current(rec), null);
   assert.ok(g.acquire(rec, 'life')); // anything may start again

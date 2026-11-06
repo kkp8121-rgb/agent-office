@@ -31,10 +31,10 @@ test('the lobby lamp burns while any floor has a conflict and is not drawn when 
   assert.equal(lampState([], [10, 20]).on, false);
 });
 
-test('a bell wave, a faint or a rest puts the tug off, a meeting too; folder and office life give way to it', () => {
+test('a faint or a rest puts the tug off, a meeting too; folder and office life give way to it', () => {
   const p = ui.gesture.priority;
   assert.equal(tugAllowed(p, null, false), true);
-  for (const stronger of ['rest', 'faint', 'bellwave']) assert.equal(tugAllowed(p, stronger, false), false, stronger);
+  for (const stronger of ['rest', 'faint']) assert.equal(tugAllowed(p, stronger, false), false, stronger);
   assert.equal(tugAllowed(p, 'tug', false), false);
   assert.equal(tugAllowed(p, 'folder', false), true);
   assert.equal(tugAllowed(p, 'life', false), true);

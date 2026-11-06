@@ -1,5 +1,5 @@
 // Labour cost view (pure: no DOM, no clock, no I/O): the numbers of the `cost` frame turned into what the screens write.
-// Used by the lobby wall, the floor detail window and the character card (this package), and by the boss-room chalkboard (package O).
+// Used by the lobby wall, the floor detail window and the character card.
 //
 // Totals are NEW tokens only (input + cache writes + output). Cache reads come as `cacheRead` (the office's, and one per floor in `floors`), a separate figure that only the detail window shows (owner decision D4).
 // The frame can say the figures are not final: `scanning` (the first read of the old logs is still running) and `partial` (the read stopped at its size limit).
@@ -37,9 +37,9 @@ export const diffText = (pct) => `${pct > 0 ? '+' : ''}${pct}%`;
  * text(n): a figure for a row (the plain number; the scanning / empty word instead while that is what is true); tagged(n): the same with the partial word when the day is partial.
  * Returns {state, partial, text, tagged, total, cacheRead, lastWeek, diff, news, top}:
  *   total / cacheRead: the figure texts (total carries the partial word); lastWeek: null or {text, partial}; diff: null or 「+12%」 (not shown when either side is partial);
- *   news: the one-line sentence of the lobby ticker; top: up to `topN` people {sessionId, agentKey, name, floorName, tokens, text}.
+ *   news: the one-line sentence of the lobby ticker; top: up to `cfg.topCount` people {sessionId, agentKey, name, floorName, tokens, text}.
  */
-export function costView(frame, cfg, topN = cfg.topCount) {
+export function costView(frame, cfg) {
   const state = !frame ? 'none' : frame.scanning ? 'scanning' : 'ready';
   const partial = state === 'ready' && frame.partial === true;
   const word = state === 'none' ? cfg.empty : cfg.scanning;
@@ -59,7 +59,7 @@ export function costView(frame, cfg, topN = cfg.topCount) {
     lastWeek,
     diff,
     news: state === 'ready' ? newsLine(cfg, tagged(frame.tokens), lastWeek, diff) : `${cfg.title} ${word}`,
-    top: state === 'none' ? [] : frame.top.slice(0, topN).map((p) => ({ ...p, name: p.name || cfg.goneName, text: text(p.tokens) })),
+    top: state === 'none' ? [] : frame.top.slice(0, cfg.topCount).map((p) => ({ ...p, name: p.name || cfg.goneName, text: text(p.tokens) })),
   };
 }
 

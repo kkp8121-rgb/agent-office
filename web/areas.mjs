@@ -11,9 +11,7 @@ import { init as initFxHandoff } from './fx-handoff.mjs';
 import { initCost } from './lobby.mjs';
 import { init as initFxConflict } from './fx-conflict.mjs';
 import { init as initFxActor } from './fx-actor.mjs';
-import { init as initFxCommute } from './fx-commute.mjs';
-import { init as initCeo } from './ceo-floor.mjs';
-import { init as initFxEmpty } from './fx-empty.mjs';
+import { init as initBellFloor } from './bell-floor.mjs';
 
 export const AREAS = [
   { name: 'fx-weather', init: initFxWeather },
@@ -27,10 +25,8 @@ export const AREAS = [
   { name: 'cost', init: initCost },
   { name: 'fx-conflict', init: initFxConflict },
   { name: 'fx-actor', init: initFxActor },
-  { name: 'fx-commute', init: initFxCommute },
-  { name: 'ceo', init: initCeo },
-  { name: 'fx-empty', init: initFxEmpty },
+  { name: 'bell-floor', init: initBellFloor },
 ];
 
 /** SSE event names, besides state/log/phase/fail/weather/sysload, that connect() relays to ctx.onServer. */
-export const SERVER_EVENTS = ['bell', 'compact', 'handoff', 'conflict', 'cost'];
+export const SERVER_EVENTS = ['compact', 'handoff', 'conflict', 'cost'];

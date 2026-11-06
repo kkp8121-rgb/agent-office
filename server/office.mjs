@@ -26,21 +26,16 @@ const PHASES_SEEN_MAX = 30; // phases kept for a run whose script lists none
 const FAIL_CAP = 500; // most failure times a floor keeps for the lobby wall (a storm of failures stops counting there)
 const SIGNAL_CAP = 100; // live events (phase, fail) waiting for the next broadcast; the oldest are dropped past this
 const LEAD_KEY = 'lead'; // agent key of the main session in fail events
-const ASK_TOOL = 'AskUserQuestion'; // Claude's question to the user: open until its result arrives
 const AGENT_TOOL = 'Agent';
 const MESSAGE_TOOL = 'SendMessage';
 const CALLERS_MAX = 100; // Agent tool_use ids remembered per floor (who called which agent)
-const ASKS_MAX = 16; // unanswered questions remembered per person
 const FALLBACK_KIND = 'other';
 
-/** The fields every person (lead or agent) carries for the call, model, paper pile and hourglass views. */
+/** The fields every person (lead or agent) carries for the model, paper pile and hourglass views. */
 const newTrack = () => ({
   model: null, // 'opus' | 'sonnet' | 'haiku' | 'other' once a ctx event named it
   pile: 0, // paper pile level 0..4 from the length of the conversation
   large: false, // seen over the window of its model: counts against the large window from then on
-  asks: new Map(), // toolUseId -> ts of the AskUserQuestion not answered yet
-  askOpen: false, // Codex question not answered yet
-  approvalAt: 0, // ts of a Codex approval request not followed by anything yet
   open: new Map(), // toolUseId -> {name, ts} of the tools that have not returned
   slow: null, // {since, kind} of the oldest tool that has run longer than hourglass.afterMs
 });
@@ -96,7 +91,7 @@ export class Office {
     this.departedColors = new Map(); // sessionId -> palette index of a floor that left, for the log page
     this.evicted = new WeakSet(); // entries that left the ring (a merge must not revive them)
     this.logSeq = 0;
-    this.signals = []; // live events for the page (type 'phase' / 'fail' / 'bell' / ...), emptied by drainSignals()
+    this.signals = []; // live events for the page (type 'phase' / 'fail' / 'compact' / ...), emptied by drainSignals()
     this.conflict = new ConflictTracker(cfg.conflict); // fileKey is only ever seen here, never in a view or signal
     this.conflicts = new Map(); // sessionId -> conflicts of the floor at the last tick
     this.modelKinds = new Set([...cfg.model.claude.map(([, family]) => family), FALLBACK_KIND]);
@@ -151,7 +146,6 @@ export class Office {
     }
     f.hidden = true;
     this.conflict.drop(sessionId);
-    this.#updateCall(f, this.now, false);
     this.departedTitles.delete(sessionId);
     this.#purgeLog(sessionId);
     return true;
@@ -188,7 +182,6 @@ export class Office {
 
     for (const s of live) {
       let f = this.floors.get(s.sessionId);
-      const existed = f !== undefined;
       if (!f) {
         f = this.#createFloor(s);
         this.floors.set(s.sessionId, f);
@@ -201,8 +194,6 @@ export class Office {
       f.folder = f.scratch ? '' : folderOf(s.cwd);
       if (s.origin !== undefined) f.origin = s.origin;
       f.status = s.status === 'busy' ? 'busy' : 'waiting';
-      // Only a Claude session file says what it waits for ('waiting'): a Codex 'waiting' just means no turn is running.
-      f.callSession = f.provider === 'claude' && s.status === 'waiting' ? (s.waitingPermission === true ? 'permission' : 'input') : null;
       // The session file is the authority for waiting: a turn that ended without an end event must not leave the lead busy.
       if (f.status === 'waiting' && (f.lead.state === 'working' || f.lead.state === 'thinking')) this.#setState(f.lead, 'idle', '', now);
 
@@ -216,7 +207,6 @@ export class Office {
         f.hidden = rec !== undefined;
       }
       if (f.hidden) this.conflict.drop(f.sessionId);
-      this.#updateCall(f, now, existed); // a floor met for the first time raises no bell: its call is shown, not announced
     }
 
     for (const f of this.floors.values()) {
@@ -224,7 +214,6 @@ export class Office {
         f.leavingAt = now;
         f.status = 'leaving';
         this.conflict.drop(f.sessionId);
-        this.#updateCall(f, now, false);
         this.#markLogged(f.sessionId);
       }
     }
@@ -251,9 +240,6 @@ export class Office {
       titleRank: 0,
       origin: '', // where the session was opened: '' (terminal), 'claudeApp', 'codexWork', 'codexApp'
       lead: { name: lead.name, role: lead.role, sprite: lead.key, head: '', state: 'idle', bubble: '', lastRead: null, ...newTrack() },
-      callSession: null, // what the session file says it waits for: null | 'permission' | 'input'
-      call: null, // null | 'ask' | 'permission' | 'input' (see #updateCall)
-      callSince: null,
       rest: null, // {until, limitKind, ts} while a usage limit has the floor on lunch break
       callers: new Map(), // toolUseId of an Agent tool_use -> key of the person who made it
       pendingPhase: null, // {runId, from, until}: a phase handoff waiting for the first agent of the new phase
@@ -439,25 +425,6 @@ export class Office {
     }
   }
 
-  /** The call of the floor: permission > ask > input; none while it rests, is hidden or has left. A bell signal only when `live` and the call is new. */
-  #updateCall(f, at, live) {
-    let next = null;
-    if (!f.hidden && f.leavingAt === null && !f.rest) {
-      const people = [f.lead, ...f.agents.values()];
-      if (f.callSession === 'permission' || people.some((p) => p.approvalAt > 0)) next = 'permission';
-      else if (people.some((p) => p.asks.size > 0 || p.askOpen)) next = 'ask';
-      else if (f.callSession === 'input') next = 'input';
-    }
-    if (next === f.call) return;
-    if (f.call === null) {
-      f.callSince = at;
-      if (live) this.#signal({ type: 'bell', sessionId: f.sessionId, callKind: next });
-    } else if (next === null) {
-      f.callSince = null;
-    }
-    f.call = next;
-  }
-
   /** A person-key that is on the floor now, else the lead (signals only name people the page can see). */
   #presentKey(f, key) {
     return key === LEAD_KEY || [...f.agents.values()].some((a) => a.key === key) ? key : LEAD_KEY;
@@ -499,17 +466,15 @@ export class Office {
     return changed;
   }
 
-  /** Everything the 1.1 features read from one event: call, rest, conflict, model, paper pile, hourglass, handoff. State first, then (live only) signals. */
+  /** Everything the 1.1 features read from one event: rest, conflict, model, paper pile, hourglass, handoff. State first, then (live only) signals. */
   #observe(f, actor, ev, now, isLead) {
     const t = ev.ts > 0 ? ev.ts : now;
     const live = !f.hidden && this.#isLive(f, ev);
     const who = isLead ? LEAD_KEY : actor.key;
     const normal = ev.kind === 'think' || ev.kind === 'tool' || ev.kind === 'toolDone' || ev.kind === 'end';
 
-    if (normal && ev.ts > 0) { // anything the person does after a request means the request is over
+    if (normal && ev.ts > 0) { // anything the person does after the usage limit means the break is over
       if (f.rest && ev.ts > f.rest.ts) f.rest = null;
-      for (const [id, at] of actor.asks) if (ev.ts > at || (ev.kind === 'toolDone' && ev.toolUseId === id)) actor.asks.delete(id);
-      if (actor.approvalAt > 0 && ev.ts > actor.approvalAt) actor.approvalAt = 0;
     }
 
     switch (ev.kind) {
@@ -518,10 +483,7 @@ export class Office {
           f.callers.set(ev.toolUseId, who);
           if (f.callers.size > CALLERS_MAX) f.callers.delete(f.callers.keys().next().value);
         }
-        if (ev.name === ASK_TOOL) {
-          actor.asks.set(ev.toolUseId, t);
-          if (actor.asks.size > ASKS_MAX) actor.asks.delete(actor.asks.keys().next().value);
-        } else if (!this.cfg.hourglass.ignoreTools.includes(ev.name)) {
+        if (!this.cfg.hourglass.ignoreTools.includes(ev.name)) {
           actor.open.set(ev.toolUseId, { name: ev.name, ts: t });
           if (actor.open.size > this.cfg.hourglass.maxOpen) actor.open.delete(actor.open.keys().next().value);
         }
@@ -534,11 +496,9 @@ export class Office {
       }
       case 'toolDone':
         actor.open.delete(ev.toolUseId);
-        actor.asks.delete(ev.toolUseId);
         break;
       case 'end':
         actor.open.clear();
-        actor.askOpen = false;
         break;
       case 'ctx':
         if (typeof ev.model === 'string' && this.modelKinds.has(ev.model)) actor.model = ev.model;
@@ -556,16 +516,9 @@ export class Office {
         }
         break;
       }
-      case 'ask':
-        actor.askOpen = ev.open === true;
-        break;
-      case 'approval':
-        actor.approvalAt = t;
-        break;
       default:
     }
     this.#refreshSlow(actor, now);
-    this.#updateCall(f, t, live);
   }
 
   #actorEvent(f, actor, ev, now, isLead, logSince = 0) {
@@ -619,9 +572,6 @@ export class Office {
         a.bubble = '';
         a.since = now;
         a.doneAt = now;
-        a.asks.clear(); // a person who has reported waits for nothing
-        a.askOpen = false;
-        a.approvalAt = 0;
         a.open.clear();
         a.slow = null;
         if (a.wf) f.lastDone = a.key;
@@ -631,7 +581,6 @@ export class Office {
     }
     this.#reseat(f);
     for (const m of fresh) this.#enterAgent(f, m, now); // after the releases, so a freed desk goes to a waiter first
-    this.#updateCall(f, now, false);
   }
 
   #enterAgent(f, m, now) {
@@ -840,7 +789,7 @@ export class Office {
 
   /**
    * Live events since the last call, oldest first: {type:'phase', sessionId, phase, at}, {type:'fail', sessionId, agent, streak, at},
-   * {type:'bell', sessionId, callKind, at}, {type:'compact', sessionId, agent, at}, {type:'handoff', sessionId, handoffKind, from, to, at}
+   * {type:'compact', sessionId, agent, at}, {type:'handoff', sessionId, handoffKind, from, to, at}
    * and {type:'conflict', id, sessionIds, at}.
    */
   drainSignals() {
@@ -889,9 +838,6 @@ export class Office {
       }
       if (f.pendingPhase && now > f.pendingPhase.until) f.pendingPhase = null;
       for (const p of [f.lead, ...f.agents.values()]) this.#refreshSlow(p, now); // an hourglass reaches the page through the snapshot, which broadcast compares itself: not counted in `changed`
-      const before = f.call;
-      this.#updateCall(f, now, false);
-      if (f.call !== before) changed = true;
     }
     return this.#evaluateConflicts(now) || changed;
   }
@@ -1021,8 +967,6 @@ export class Office {
         autoTitle,
         folder: f.folder,
         status: f.status,
-        call: f.call,
-        callSince: f.callSince,
         rest: f.rest ? { until: f.rest.until, limitKind: f.rest.limitKind } : null,
         conflicts: conflicts.map((c) => ({ id: c.id, with: [...c.with], since: c.since })),
         lead: { name: f.lead.name, role: f.lead.role, sprite: f.lead.sprite, state: f.lead.state, bubble: f.lead.bubble, ...badges(f.lead, LEAD_KEY) },

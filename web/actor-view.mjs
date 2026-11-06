@@ -6,7 +6,7 @@
 //   band       an information mark: always, whatever the effects switch says. No model (null) = no band.
 //   pile       a decoration: only while the effects are on. With them off only the last stage speaks, in the name tag's title.
 //   hourglass  an information mark: always (a still picture, the time text stays). It only spins while the effects are on.
-//              A floor with a call (bell) or a rest (lunch) hides it. The hourglass is not drawn in the lobby.
+//              A floor on its lunch break (rest) hides it. The hourglass is not drawn in the lobby.
 
 /** Where a pile picture lives (assets/props/README.md). */
 export const pileSrc = (level) => `/assets/props/pile-${level}.png`;
@@ -75,11 +75,11 @@ export function hourglassText(cfg, seconds) {
 }
 
 /**
- * The hourglass of one person: `slowSince` (ms, from the view), `nowMs` (the server's clock), `call` / `rest` (the floor's view).
+ * The hourglass of one person: `slowSince` (ms, from the view), `nowMs` (the server's clock), `rest` (the floor's view).
  * @returns {{text: string, spin: boolean}|null} null = none (no slow command, or the floor's bell / lunch comes first)
  */
-export function glassPlan({ slowSince, nowMs, call, rest, fxOn }, cfg) {
-  if (slowSince == null || call || rest) return null;
+export function glassPlan({ slowSince, nowMs, rest, fxOn }, cfg) {
+  if (slowSince == null || rest) return null;
   return { text: hourglassText(cfg, (nowMs - slowSince) / 1000), spin: !!fxOn };
 }
 

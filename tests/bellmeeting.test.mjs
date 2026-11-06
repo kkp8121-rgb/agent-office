@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ringDecision, speakingOrder, planBell, onPhaseSignal } from '../web/bellmeeting.mjs';
+import { ringDecision, speakingOrder, planBell, nearestSpot, onPhaseSignal } from '../web/bellmeeting.mjs';
 import { cfg } from './helpers/fixture.mjs';
 
 const BM = { ...cfg.ui.bellMeeting, sayMs: 2600, gapMs: 300, maxSpeakers: 7, cooldownMs: 20000 };
-const LINES = { open: 'OPEN', idle: 'IDLE', close: 'CLOSE' };
+const LINES = { idle: 'IDLE', close: 'CLOSE' };
 const mk = (n) => [
   { id: 's3', isLead: false, spot: 3, bubble: 'c' },
   { id: 'lead', isLead: true, spot: 0, bubble: 'L' },
@@ -25,7 +25,7 @@ test('maxSpeakers cut: the rest only gather', () => {
 });
 
 test('empty bubble falls back to the idle line', () => {
-  const p = planBell(mk(4), { bm: BM, effects: true, lines: LINES });
+  const p = planBell(mk(4), { bm: BM, lines: LINES });
   assert.equal(p.slots.find((s) => s.id === 's2').text, 'IDLE');
   assert.equal(p.slots.find((s) => s.id === 's1').text, 'a');
 });
@@ -42,7 +42,6 @@ test('phase signal during a bell meeting hands over to a phase meeting chaired b
   const r = onPhaseSignal(true);
   assert.equal(r.endBell, true);
   assert.equal(r.chair, 'lead');
-  assert.equal(r.ceoStepAside, true);
   assert.equal(onPhaseSignal(false).endBell, false);
 });
 
@@ -57,17 +56,22 @@ test('cooldown ignores a second ring inside cooldownMs', () => {
 });
 
 test('schedule total = n*sayMs + (n-1)*gapMs + close', () => {
-  const p = planBell(mk(4), { bm: BM, effects: true, lines: LINES });
+  const p = planBell(mk(4), { bm: BM, lines: LINES });
   const n = 4;
   assert.equal(p.totalMs, n * BM.sayMs + (n - 1) * BM.gapMs + BM.gapMs + BM.sayMs);
   assert.equal(p.slots[n - 1].atMs + BM.sayMs + BM.gapMs, p.close.atMs);
 });
 
-test('effects off means no boss', () => {
-  const off = planBell(mk(4), { bm: BM, effects: false, lines: LINES });
-  assert.equal(off.chair, 'lead');
-  assert.equal(off.open, null);
-  const on = planBell(mk(4), { bm: BM, effects: true, lines: LINES });
-  assert.equal(on.chair, 'ceo');
-  assert.equal(on.open.text, 'OPEN');
+test('the lead chairs: the plan has no boss line and closes after the last speaker', () => {
+  const p = planBell(mk(4), { bm: BM, lines: LINES });
+  assert.equal('open' in p, false);
+  assert.equal(p.slots[0].atMs, 0);
+  assert.equal(p.close.text, 'CLOSE');
+});
+
+test('nearestSpot: the meeting spot closest to a person', () => {
+  const spots = [{ at: [100, 100] }, { at: [200, 100] }, { at: [200, 200] }];
+  assert.equal(nearestSpot(spots, 198, 104), 1);
+  assert.equal(nearestSpot(spots, 205, 190), 2);
+  assert.equal(nearestSpot(spots, 0, 0), 0);
 });

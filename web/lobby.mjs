@@ -463,9 +463,9 @@ export function initCost(ctx) {
     setLive({ cost: frame });
     paintWall();
   });
-  ctx.onState((list, { hidden }) => {
+  ctx.onState((list) => {
     setLive({ floors: list });
-    if (!hidden) paintWall(); // a hidden tab draws nothing; the next visible frame paints
+    paintWall();
   });
   for (const name of ['floor-shown', 'floor-hidden']) {
     ctx.fx.onFx(name, ({ floor }) => {

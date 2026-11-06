@@ -8,9 +8,6 @@ export function orderFloors(views) {
 /** View id of the lobby (1F): it stands where a session id does in `shownId`; session ids are never this string. */
 export const LOBBY_ID = 'lobby';
 
-/** View id of the CEO room (the top floor of the building): a fixed button like the lobby's, never in the rotation or the follow choice. */
-export const CEO_ID = 'ceo';
-
 /** The ids rotation walks through: the lobby first when it is on, then the floors in order. Follow and the whole stack never use it. */
 export const viewOrder = (ids, lobbyOn) => (lobbyOn ? [LOBBY_ID, ...ids] : ids);
 
@@ -26,7 +23,7 @@ export function nextFloor(ids, current) {
  * else the nearest one before it. Null when nothing is left. `current` itself is returned while it is still there.
  */
 export function fallbackFloor(oldIds, current, ids) {
-  if (current === CEO_ID || ids.includes(current)) return current;
+  if (ids.includes(current)) return current;
   const at = oldIds.indexOf(current);
   const after = oldIds.slice(at + 1).find((id) => ids.includes(id));
   if (after !== undefined) return after;

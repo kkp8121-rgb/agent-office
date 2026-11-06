@@ -1,7 +1,8 @@
 // Lunch break (a usage limit) and the faint after a compaction as plain rules, no DOM. web/fx-incidents.mjs draws;
 // tests/incident-view.test.mjs checks these. Numbers and words come from config ui.rest, ui.faint and ui.lines.
 
-import { fill } from './call-view.mjs';
+/** `{n}`-style placeholders of a config text. */
+const fill = (text, vars) => String(text).replace(/\{(\w+)\}/g, (_, key) => String(vars[key] ?? ''));
 
 /** How long a faint lasts in total: the character lies down for `downMs`, which is this share of the whole fall-lie-rise (the keyframes in incidents.css). */
 export const FAINT_LIE_SHARE = 0.7;

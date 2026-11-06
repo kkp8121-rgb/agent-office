@@ -10,7 +10,7 @@ const cfg = loadConfig();
 const EMPTY = { hidden: [], names: {} };
 
 const S = (id, o = {}) => ({
-  provider: 'claude', pid: 100, sessionId: id, cwd: 'C:\\Project', status: 'busy', waitingPermission: false, name: '', startedAt: 1000, ...o,
+  provider: 'claude', pid: 100, sessionId: id, cwd: 'C:\\Project', status: 'busy', name: '', startedAt: 1000, ...o,
 });
 const M = (id, o = {}) => ({
   agentId: id, agentType: 'worker', description: '기록 구조 조사', finished: false, transcriptPath: '', mtimeMs: 0, toolUseId: '', workflow: null, ...o,
@@ -116,7 +116,7 @@ test("a worker file's model is on that worker only", () => {
   assert.equal(f.lead.model, 'sonnet');
   assert.equal(f.agents[0].model, 'haiku');
   assert.deepEqual(Object.keys(f.lead).sort(), ['bubble', 'conflict', 'model', 'name', 'pile', 'role', 'slowKind', 'slowSince', 'sprite', 'state']);
-  assert.deepEqual(Object.keys(f).sort(), ['agents', 'autoTitle', 'board', 'call', 'callSince', 'colorIndex', 'conflicts', 'design', 'failAt', 'floorNo', 'folder', 'lead', 'origin', 'phases', 'provider', 'reports', 'rest', 'sessionId', 'sheet', 'startedAt', 'status', 'title', 'todos', 'workflows']);
+  assert.deepEqual(Object.keys(f).sort(), ['agents', 'autoTitle', 'board', 'colorIndex', 'conflicts', 'design', 'failAt', 'floorNo', 'folder', 'lead', 'origin', 'phases', 'provider', 'reports', 'rest', 'sessionId', 'sheet', 'startedAt', 'status', 'title', 'todos', 'workflows']);
   assert.ok(Object.keys(f.agents[0]).includes('phase'));
 });
 

@@ -57,10 +57,8 @@
 //                                                    change of either (and once at start-up).
 //   'daylight'      {phase}                          the light outside changed: day | sunset | night (dark mode counts as night).
 //   'sysload'       {cpu, mem}                       the server's CPU / memory sample (integer percents), every ui sample.
-//   'floor-shown'   {floor}                          a floor came on screen (also a floor created while shown, the lobby, the CEO room, and a floor of the building
-//                                                    that is alive again after standing still).
-//   'floor-hidden'  {floor, removed}                 a floor went off screen, or (in the building view) stands still: its picture stays, nothing moves;
-//                                                    removed = true when the floor is gone for good.
+//   'floor-shown'   {floor}                          a floor came on screen (also a floor created while shown, and the lobby).
+//   'floor-hidden'  {floor, removed}                 a floor went off screen; removed = true when the floor is gone for good.
 //
 // ---- ctx: what init(ctx) of an area receives (built in app.mjs, "effects"). An area never needs app.mjs internals. ----
 /**
@@ -69,7 +67,7 @@
  * @property {object} server            the whole /api/ui answer (scenes, nav, depth, lobby, weather, ...)
  * @property {object} fx                this module: fxOn, sfxOn, fxVolume, onFxChange, emitFx, onFx
  * @property {() => Iterable<object>} floors   live: every floor record {el, stage, layer, sid, off, design, scene, agents: Map, status, ...} and the lobby's
- * @property {(id: string) => object|null} floor   one floor record by session id ('lobby' = the lobby, 'ceo' = the CEO room: a floor record with no characters of its own)
+ * @property {(id: string) => object|null} floor   one floor record by session id ('lobby' = the lobby)
  * @property {() => object|null} lobby         the lobby's floor record (agents live in .chars) or null
  * @property {(floor?: object) => object[]} chars   live: the character records of one floor (the lobby's figures included), or of all
  *                                              floors plus the cat. Record: {el, tagRoot, body, flip, spr, fxMove, fxHit, tag, img, sprite,
@@ -83,7 +81,7 @@
  * @property {(rec: object, text: string, ms: number, shiftPx?: number) => void} sayFor   a short bubble (replaces its current one)
  * @property {(rec: object) => void} clearSay
  * @property {(rec: object, text: string, ms: number, force?: boolean) => void} chatter   small talk / greeting bubble (skipped while busy)
- * @property {(floor: object) => boolean} floorActive   shown (not off), not standing still (the building view keeps at most ui.building.maxLiveFloors alive) AND page not hidden
+ * @property {(floor: object) => boolean} floorActive   shown (not off) AND page not hidden
  * @property {() => boolean} paused            the page is hidden (nothing may run)
  * @property {(fn: (paused: boolean) => void) => () => void} onPauseChange
  * @property {() => number} now                the clock (Date.now)
@@ -101,20 +99,12 @@
  * @property {(rec: object) => void} freeze    stop a walk where the character is
  * @property {(rec: object) => void} clearGestures
  * @property {{path: Function, snap: Function, grid: Function}} nav   the walking grid: path(design, from, to), snap(design, p), grid(design)
- * @property {{start: (frec: object, opts?: {kind?: 'phase'|'bell', chair?: object|null, crew?: object[], phase?: string, onHold?: Function, onEnd?: Function, onSwitch?: Function}) => object|null,
+ * @property {{start: (frec: object, opts?: {kind?: 'phase'|'bell', phase?: string, onHold?: Function, onEnd?: Function, onSwitch?: Function}) => object|null,
  *   end: (frec: object) => boolean, active: (frec: object) => 'phase'|'bell'|null}} meeting
- *                                             the one meeting machine (a workflow phase runs on it too): start gathers the crew at the meeting spots (chair = who stands at
- *                                             the boss spot, default the lead, a visitor is fine), then calls onHold(mt); a 'phase' meeting ends by itself, a 'bell' one when
- *                                             you call end(frec); onEnd(mt) after it; onSwitch(mt) when a workflow phase takes a bell meeting over. start returns null when
+ *                                             the one meeting machine (a workflow phase runs on it too): start gathers the crew at the meeting spots (the lead stands at
+ *                                             the boss spot and chairs), then calls onHold(mt); a 'phase' meeting ends by itself, a 'bell' one when you call end(frec);
+ *                                             onEnd(mt) after it; onSwitch(mt) when a workflow phase takes a bell meeting over. start returns null when
  *                                             there is nothing to hold (no spots, nobody, a meeting runs already)
- * @property {{active: () => boolean, floorBox: (id: string) => ({left, top, w, h, scale}|null), elevator: (fromId: string, toId: string, o?: {holdMs?: number}) => Promise<boolean>,
- *   entryOf: (id: string) => number[]|null, setEmptyRenderer: (fn: ({floorCount: number, view: string}) => void) => void, onLayout: (fn: (layout: object) => void) => () => void}} building
- *                                             the building cross-section (ui.building): active() = the whole building is on show; floorBox = a floor's box in building px;
- *                                             elevator = one ride of the shared car (true = it got there, false = skipped: effects off, merged into a nearer request, ...);
- *                                             entryOf = the floor point where the lift opens; setEmptyRenderer: the empty-office screen is told floorCount and the view
- *                                             ('building' or a view id) whenever either may have changed (the old one-line notice is hidden); onLayout after every layout
- * @property {{createVisitor: (floor: object, who: {sprite: string, name: string, role?: string}) => object, removeVisitor: (rec: object) => void}} room
- *                                             characters of the screen only (no session behind them) on a floor's stage; they walk, say and meet like any character
  * @property {object} life                     the life area's hooks (all optional to use; each returns an unsubscribe):
  *   life.ambient          ui.ambient as the office runs it (scaled under ?debug=ambient)
  *   life.cat              ui.cat as the office runs it
