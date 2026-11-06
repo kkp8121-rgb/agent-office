@@ -299,3 +299,49 @@ test('css: the module prefix, plain alpha (no blend, no mask, no contain), opaci
   const style = readFileSync(join(ROOT, 'web', 'style.css'), 'utf8');
   assert.match(style, /\.stage::after \{ content: ""; position: absolute; inset: 0; z-index: 7500; pointer-events: none; background: rgb\(6, 9, 28\); opacity: var\(--room-dim\); \}/, 'today\'s veil is untouched');
 });
+
+// ---- the lead (and any seated figure that is waiting) keeps its pool: the pool follows the face light's own decision, working and idle alike ----
+
+test('the real night: a seated lead and a seated staff member get the same pool in every state the face light lights (working, thinking, idle), none when standing, away or in a state without light', async () => {
+  const { litMode } = await import('../web/fx-weather.mjs');
+  const wcfg = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8')).ui.fx.weather;
+  const realFetch = globalThis.fetch;
+  const realGcs = globalThis.getComputedStyle;
+  globalThis.fetch = async () => ({ json: async () => data });
+  globalThis.getComputedStyle = () => ({ getPropertyValue: () => '0.5' });
+  try {
+    const deskObj = { id: 'desk-1', kind: 'desk', rect: [0, 0, 83, 57], at: [322, 250], anchor: [41, 56], flipX: false };
+    const leadObj = { id: 'lead-desk', kind: 'lead-desk', rect: [0, 0, 83, 57], at: [622, 250], anchor: [41, 56], flipX: false };
+    const nodes = [
+      { id: 'desk-1', objId: 'desk-1', x: 281, y: 194, w: 83, h: 57, bgX: 0, bgY: 0, z: 1500, flipX: false },
+      { id: 'lead-desk', objId: 'lead-desk', x: 581, y: 194, w: 83, h: 57, bgX: 0, bgY: 0, z: 1500, flipX: false },
+    ];
+    const fills = async (rec) => {
+      const stage = fakeEl();
+      stage.querySelector = () => null;
+      const floor = { stage, off: false, design: 'library', scene: { r: { size: [1024, 576], objects: [deskObj, leadObj], lead: { deskId: 'lead-desk' }, seats: [{ deskId: 'desk-1', at: [1, 1] }] }, nodes } };
+      const doc = { documentElement: {}, createElement: (t) => { const e = fakeEl(t); if (t === 'img') e.decode = () => Promise.resolve(); return e; } };
+      const ctx = { fx: { fxOn: () => true }, chars: () => [rec], timers: { setTimeout: () => 1, clearTimeout: () => {} }, server: { sitHeight: 50 } };
+      const night = createNightmap({ ctx, cfg, doc, modeOf: (r) => litMode(r, wcfg), resync: () => {} });
+      night.setEnabled(true);
+      await new Promise((r) => setTimeout(r, 10));
+      night.sync(floor);
+      await new Promise((r) => setTimeout(r, 10));
+      const n = stage.children.filter((c) => c.className === 'fxn-f').length;
+      night.setEnabled(false);
+      return n;
+    };
+    const lead = (o) => ({ isLead: true, seated: true, x: 622, y: 212, state: 'working', ...o });
+    const staff = (o) => ({ isLead: false, seated: true, x: 322, y: 212, slot: { kind: 'seat', i: 0 }, state: 'working', ...o });
+    for (const [state, want] of [['working', 1], ['thinking', 1], ['idle', 1], ['enter', 0], ['stale', 0], ['done', 0]]) {
+      assert.equal(await fills(staff({ state })), want, `staff ${state}`);
+      assert.equal(await fills(lead({ state })), want, `lead ${state}`);
+    }
+    assert.equal(await fills(lead({ seated: false, state: 'idle' })), 0, 'a standing lead has no pool');
+    assert.equal(await fills(staff({ seated: false })), 0, 'a standing staff member has no pool');
+    assert.equal(await fills(lead({ away: true, state: 'idle' })), 0, 'a lead away on a trip has no pool');
+  } finally {
+    globalThis.fetch = realFetch;
+    globalThis.getComputedStyle = realGcs;
+  }
+});

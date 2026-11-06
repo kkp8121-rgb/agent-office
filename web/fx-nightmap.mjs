@@ -1,4 +1,4 @@
-// The real night (「실감 나는 밤」): at night the room is dark and cool wherever no light reaches, every working seat lights its own pool with the light of its screen,
+// The real night (「실감 나는 밤」): at night the room is dark and cool wherever no light reaches, every lit seat (working, thinking or idle at its desk) lights its own pool with the light of its screen,
 // and the lamps the room art draws as lit warm the places round them. A piece of the weather area (web/fx-weather.mjs creates it, calls it from its own sync and turns it
 // on and off with the viewer's night light choice, setting 「밤 모니터 빛」). The numbers are config ui.fx.weather.night, the places of monitors and lamps are the data file
 // assets/nightmap/nightmap.json (keyed by room design, the lobby too) and the pictures <design>-mon.png / <design>-rim.png drawn from it by scripts/make-nightmap.mjs.
@@ -6,9 +6,9 @@
 // What is on the page while it is on (one stage = one floor or the lobby):
 //   - the veil (.stage::after) becomes ONE picture, an SVG data: URL built here: the veil colour (darker and cooler than the plain dark mode) with a hole at every pool and every
 //     lamp and the warm light of the lamps drawn into it, and the floor plaque's rectangle left exactly as the plain veil (the plaque is
-//     see-through, so what lies under it must not change). The picture is built again only when a seat starts or stops working, a seat moves, the plaque's box or the
+//     see-through, so what lies under it must not change). The picture is built again only when a seat starts or stops being lit, a seat moves, the plaque's box or the
 //     theme changes: no timer, no frame loop, no canvas, no mask, no blend mode.
-//   - per working seat: .fxn-f the fill (the veil's colour in the shape of the hole: opacity 1 = no pool, 0 = the full pool; it is what fades in and out), .fxn-m the near-black copy of the monitor back (above the desk and the cool light, so the monitor stays a dark shape inside the light) and .fxn-r the light
+//   - per lit seat: .fxn-f the fill (the veil's colour in the shape of the hole: opacity 1 = no pool, 0 = the full pool; it is what fades in and out), .fxn-m the near-black copy of the monitor back (above the desk and the cool light, so the monitor stays a dark shape inside the light) and .fxn-r the light
 //     round the monitor's edge (between the figure and the desk), .fxn-t the cool light of the screen (plain alpha, over the desk and the figure, under the monitor copy).
 // A pool is an ellipse nearer the monitor than the face (mix), so the desk and the face are lit and the wall behind the figure falls off fast.
 // Day mode (light theme), effects off and rooms the data file does not know: nothing is built and the page keeps its own pixels. There is no flicker: the face light already ripples, and an animated layer
@@ -297,14 +297,14 @@ export function createNightmap({ ctx, cfg, doc, modeOf, resync }) {
     st.timers.add(timer);
   }
 
-  /** The pools a floor wants right now: working seats at a desk the data file knows, each with its plan. */
+  /** The pools a floor wants right now: lit seats (the face light says work or rest) at a desk the data file knows, each with its plan. */
   function wanted(floor) {
     const r = floor.scene.r;
     const sitH = ctx.server.sitHeight;
     const specs = data.monitors?.[floor.design] ?? {};
     const out = new Map();
     for (const rec of ctx.chars(floor)) {
-      if (modeOf(rec) !== 'work') continue;
+      if (!modeOf(rec)) continue; // every seat the face light lights (working, thinking and idle at the desk) has its pool: a lead waiting at its desk is the one figure that sits idle
       const obj = r.objects.find((o) => o.id === deskIdOf(rec, r));
       const spec = specs[obj?.kind];
       if (obj && spec) out.set(rec, { plan: poolPlan(facePoint(rec, sitH, cfg), monitorSpot(obj, spec), obj.id, cfg, floor.design), obj });
