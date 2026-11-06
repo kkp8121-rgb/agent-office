@@ -238,7 +238,7 @@ test('server: SSE broadcasts state only on change, new log entries, and pings', 
   const cfg = loadConfig({ server: { ssePingMs: 40 } });
   const c = await start(t, { cfg });
   const got = sse(c, (t) => t.includes(': ping') && t.includes('새 작업'));
-  await new Promise((r) => setTimeout(r, 20));
+  for (let i = 0; i < 400 && c.server.sseClients < 1; i++) await new Promise((r) => setTimeout(r, 5));
   c.server.broadcast(); // nothing changed since connect: no state event
   c.office.applySessionEvents('s1', [{ kind: 'tool', ts: 5000, toolUseId: 't9', name: 'Bash', text: '새 작업' }], 5000);
   c.server.broadcast();
