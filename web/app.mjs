@@ -243,6 +243,12 @@ function setupScenes() {
   if (ui.lobby) createLobby();
   createCeo();
   if (bv) applyView(); // the lobby and the CEO room are made hidden: show them in the building
+  if (DEBUG === 'building' || DEBUG_AMBIENT) { // ?debug=building (or ambient): the effects context and what the building view keeps alive, for checking it from outside
+    window.__building = {
+      ctx: () => fxCtx,
+      state: () => ({ active: bv?.active() ?? false, zoom: bv?.zoom() ?? null, scrolls: bv?.scrolls() ?? false, stills: [...floorRecs.values(), ...(lobby ? [lobby] : []), ...(ceo ? [ceo] : [])].filter((f) => f.still).map((f) => f.sid) }),
+    };
+  }
   if (DEBUG === 'follow') { // ?debug=follow: what the follow mode sees, for checking it from outside
     window.__follow = { state: () => ({ on: following, rotating, shown: shownId, timer: followTimer !== 0, timers: liveTimers.size, scores: [...followScores(Date.now())] }) };
   }

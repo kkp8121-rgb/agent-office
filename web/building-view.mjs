@@ -9,17 +9,6 @@ import { planCar } from './commute.mjs';
 import { CEO_ID, LOBBY_ID } from './view.mjs';
 
 const ASSET = '/assets/building/';
-const CAR_H = 96; // elev-car.png / elev-shaft-door.png height
-const CAR_W = 64;
-const RACK_W = 56;
-const RACK_H = 96;
-const RACK_FLOOR_Y = 152; // the basement's floor line, inside the alcoves (assets/building/README.md)
-const ALCOVE_FIRST = 21;
-const ALCOVE_LAST = 1014;
-const ALCOVE_W = 107;
-const TOWER_X = 973; // the crane tower in roof.png
-const ARM_W = 224;
-const HOOK_W = 14;
 const LIVE_DEBOUNCE_MS = 60;
 
 /** @typedef {{id: string, slot: HTMLElement, w: number, h: number, floorNo?: number, status?: string, design: string}} Room */
@@ -60,6 +49,7 @@ export function createBuildingView(deps) {
   // ---- the fixed pieces: roof, crane, shaft, car, basement ----
   const roof = mk('b-roof');
   roof.append(pic('b-roof-img', 'roof'));
+  for (const side of ['b-lamp-l', 'b-lamp-r']) roof.append(mk(`b-roof-lamp ${side}`)); // two warm lights on the roof terrace, drawn at night only (static)
   const arm = pic('b-crane-arm', 'crane-arm');
   const cable = mk('b-cable');
   cable.append(pic('b-hook', 'crane-hook'));
@@ -74,11 +64,10 @@ export function createBuildingView(deps) {
   sysBar.append(mk('b-sys-fill'));
   sys.append(sysText, sysBar);
   const racks = [];
-  const step = (ALCOVE_LAST - ALCOVE_FIRST - ALCOVE_W) / (cfg.basement.racks - 1);
+  base.style.setProperty('--b-racks', String(cfg.basement.racks)); // building.css puts rack i into alcove i of basement.png
   for (let i = 0; i < cfg.basement.racks; i++) {
     const r = mk('b-rack');
-    r.style.left = `${ALCOVE_FIRST + step * i + (ALCOVE_W - RACK_W) / 2 + cfg.facadePx}px`;
-    r.style.top = `${RACK_FLOOR_Y - RACK_H}px`;
+    r.style.setProperty('--b-i', String(i));
     r.append(pic('b-rack-off', 'rack-off'), pic('b-rack-on', 'rack-on'));
     racks.push(r);
   }
@@ -114,9 +103,10 @@ export function createBuildingView(deps) {
     return order.filter((id) => byId.has(id)).map((id) => byId.get(id));
   };
 
+  /** Where the car stands at floor `id`: the bottom of the floor (the car and the shaft doors hang up from there, see building.css). */
   const doorY = (id) => {
     const row = layout?.rows.find((r) => r.id === id);
-    return row ? row.top + row.h - CAR_H : 0;
+    return row ? row.top + row.h : 0;
   };
 
   function partsOf(id) {
@@ -150,7 +140,7 @@ export function createBuildingView(deps) {
       p.slab.style.top = `${row.top + row.h}px`;
       p.win.style.top = `${row.top}px`;
       p.win.style.height = `${row.h}px`;
-      p.door.style.top = `${row.top + row.h - CAR_H}px`;
+      p.door.style.top = `${row.top + row.h}px`;
     }
     for (const [id, p] of [...parts]) {
       if (ghosts.has(id) || layout.rows.some((r) => r.id === id)) continue;
@@ -167,6 +157,7 @@ export function createBuildingView(deps) {
   function paint() {
     const rooms = ordered();
     const night = deps.isNight();
+    host.classList.toggle('b-night', night);
     for (const room of rooms) {
       const p = partsOf(room.id);
       const w = windowPic({ id: room.id, status: room.status }, night);
@@ -316,7 +307,7 @@ export function createBuildingView(deps) {
   }
 
   function crane(dropped) {
-    cable.style.setProperty('--b-drop', `${cfg.roofPx + 160}px`);
+    cable.style.setProperty('--b-drop', `${layout.rows.find((x) => x.id === dropped[0].id)?.top ?? cfg.roofPx}px`); // the cable reaches the top of the new floor's place
     cable.style.setProperty('--b-crane-ms', `${cfg.craneMs}ms`);
     cable.classList.remove('run');
     void cable.offsetWidth;
@@ -355,8 +346,9 @@ export function createBuildingView(deps) {
     const ctx = deps.ctx();
     const frec = deps.roomRec(id);
     const lead = frec?.agents?.get('lead');
-    if (!ctx || !lead) return;
+    if (!lead) return;
     for (const n of [lead.el, lead.tagRoot]) n.classList.remove('b-wait');
+    if (!ctx) return;
     const target = lead.target;
     if (!ride || !target || frec.off || frec.still || !ctx.fx.fxOn()) return;
     const token = ctx.gesture.acquire(lead, 'life');

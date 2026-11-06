@@ -20,6 +20,10 @@
 
 #floors.b-on > .b-roof { display: block; position: absolute; left: 0; top: 0; width: var(--b-w); z-index: 5; pointer-events: none; }
 .b-roof-img { position: absolute; left: var(--b-facade); top: 0; image-rendering: pixelated; }
+.b-lamp-l { left: calc(var(--b-facade) + 150px); }
+.b-lamp-r { left: calc(var(--b-facade) + 640px); }
+.b-roof-lamp { display: none; position: absolute; top: 20px; width: 110px; height: 110px; margin-left: -55px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 214, 120, .6) 0, rgba(255, 190, 90, .28) 38%, rgba(255, 190, 90, 0) 70%); }
+#floors.b-night .b-roof-lamp { display: block; }
 .b-crane-arm, .b-cable { display: none; }
 .fx-on .b-crane-arm { display: block; position: absolute; left: calc(var(--b-facade) + 783px); top: 3px; image-rendering: pixelated; }
 .fx-on .b-cable { display: block; position: absolute; left: calc(var(--b-facade) + 797px); top: 52px; width: 2px; height: 0; background: #2b2b2b; }
@@ -45,18 +49,19 @@
   background: repeating-linear-gradient(to bottom, #2c3340 0 14px, #262c37 14px 16px); box-shadow: inset 2px 0 0 #1b1f27;
 }
 #floors.b-on > .b-sdoor {
-  display: block; position: absolute; left: calc(var(--b-facade) + var(--b-inner) + (var(--b-shaftw) - 64px) / 2); z-index: 3; image-rendering: pixelated;
+  display: block; position: absolute; left: calc(var(--b-facade) + var(--b-inner) + (var(--b-shaftw) - 64px) / 2); z-index: 3; image-rendering: pixelated; transform: translateY(-100%);
   transition: top var(--b-move) ease-in-out, opacity .3s;
 }
 #floors.b-on > .b-sdoor.open { opacity: .15; }
 #floors.b-on > .b-car {
-  display: block; position: absolute; left: calc(var(--b-facade) + var(--b-inner) + (var(--b-shaftw) - 64px) / 2); z-index: 4; image-rendering: pixelated;
+  display: block; position: absolute; left: calc(var(--b-facade) + var(--b-inner) + (var(--b-shaftw) - 64px) / 2); z-index: 4; image-rendering: pixelated; transform: translateY(-100%);
   transition: top var(--b-move) ease-in-out;
 }
 
 #floors.b-on > .b-base { display: block; position: absolute; left: 0; width: var(--b-w); z-index: 2; background: #365172; overflow: hidden; --b-blink: 1600ms; }
 .b-base-img { position: absolute; left: var(--b-facade); top: 0; image-rendering: pixelated; }
-.b-rack { position: absolute; width: 56px; height: 96px; image-rendering: pixelated; }
+/* rack i stands in alcove i of basement.png (alcoves 107 px wide from x 21 to x 1014, floor line at y 152) */
+.b-rack { position: absolute; width: 56px; height: 96px; top: 56px; image-rendering: pixelated; left: calc(var(--b-facade) + 21px + (107px - 56px) / 2 + var(--b-i, 0) * ((1014px - 21px - 107px) / (var(--b-racks, 8) - 1))); }
 .b-rack img { position: absolute; left: 0; top: 0; image-rendering: pixelated; }
 .b-rack .b-rack-on { display: none; }
 .b-rack.on .b-rack-on { display: block; }
