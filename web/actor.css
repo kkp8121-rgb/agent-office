@@ -17,6 +17,7 @@
   position: absolute; translate: -50% -100%; image-rendering: pixelated; pointer-events: none; user-select: none;
 }
 html.fx-on .ac-pile.ac-wobble { animation: ac-wobble var(--ac-wobble) ease-in-out infinite; }
+body.paused .ac-pile.ac-wobble, body.paused .ac-glass.ac-spin .ac-glass-img { animation-play-state: paused; }
 @keyframes ac-wobble {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-2px); }

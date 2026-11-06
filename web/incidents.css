@@ -108,6 +108,7 @@ html.fx-on .ic-veil { transition: opacity .6s linear; }
 #alert-denied { color: var(--err); font-size: 11px; }
 
 body.paused .body.ic-wave, body.paused .body.ic-faint, body.paused .ic-paper { animation-play-state: paused; }
+body.paused .ic-bell::after, body.paused #floors.ic-has-call::after, body.paused #topbar .tab.ic-tab-call { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
   .body.ic-wave, .body.ic-faint, .ic-paper, .ic-bell::after, #floors.ic-has-call::after, #topbar .tab.ic-tab-call { animation: none !important; }
   .ic-veil { transition: none !important; }

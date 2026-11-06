@@ -42,6 +42,17 @@ test('every band colour keeps ui.badge.minLumaGap from the tag paper in both the
   assert.equal(Math.round(lumaGap('#000000', '#ffffff')), 255);
 });
 
+test('the five band colours differ pairwise by ui.badge.minLumaGap in relative luminance, light and dark separately', () => {
+  for (const theme of ['light', 'dark']) {
+    for (let i = 0; i < MODELS.length; i++) {
+      for (let j = i + 1; j < MODELS.length; j++) {
+        const gap = lumaGap(badge.colors[MODELS[i]][theme], badge.colors[MODELS[j]][theme]);
+        assert.ok(gap >= badge.minLumaGap, `${MODELS[i]} vs ${MODELS[j]} ${theme}: ${gap.toFixed(1)}`);
+      }
+    }
+  }
+});
+
 // ---------- paper pile (3) ----------
 
 test('the pile offset is chosen by room design, null draws nothing, a flipped desk mirrors dx', () => {

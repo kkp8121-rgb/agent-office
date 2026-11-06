@@ -58,6 +58,7 @@ html.fx-on .cf-prop.cf-tugging { animation: cf-pull var(--cf-tug-ms, 1400ms) eas
 .cf-lamp[data-on="1"] .cf-lamp-on { opacity: 1; }
 @keyframes cf-blink { from { opacity: 1; } to { opacity: 0; } }
 html.fx-on .cf-lamp[data-on="1"][data-blink="1"] .cf-lamp-on { animation: cf-blink var(--cf-blink-ms, 800ms) steps(1) infinite alternate; }
+body.paused .cf-lamp[data-on="1"][data-blink="1"] .cf-lamp-on { animation-play-state: paused; }
 
 @media (prefers-reduced-motion: reduce) {
   html.fx-on .fx-move.cf-tugging, html.fx-on .cf-prop.cf-tugging, html.fx-on .cf-lamp[data-on="1"][data-blink="1"] .cf-lamp-on { animation: none; }
